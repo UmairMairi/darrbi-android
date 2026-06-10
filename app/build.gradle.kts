@@ -119,9 +119,13 @@ dependencies {
     implementation(libs.androidx.material.icons.core)
     implementation(libs.androidx.material.icons.extended)
 
-    // Maps
+    // Maps + location + places
     implementation(libs.maps.compose)
     implementation(libs.play.services.maps)
+    implementation(libs.play.services.location)
+    implementation(libs.places)
+    // Places SDK uses View-based Material Components styles (cornerFamily/cornerSize attrs).
+    implementation(libs.google.material)
 
     // Image loading
     implementation(libs.coil.compose)

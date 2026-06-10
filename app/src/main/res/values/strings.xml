@@ -230,6 +230,32 @@
     <!-- Invite friends -->
     <string name="invite_share_message">Join me on Darrbi — the easy way to get around. Download the app now!</string>
 
+    <!-- Rider ride booking -->
+    <string name="rider_where_to">Where to?</string>
+    <string name="rider_pickup_location">Pickup Location</string>
+    <string name="rider_enter_here">Enter here</string>
+    <string name="rider_use_current_location">Use Current Location</string>
+    <string name="rider_confirm_pickup">Confirm Pickup</string>
+    <string name="rider_edit">Edit</string>
+    <string name="rider_set_location_from_map">Set Location From Map</string>
+    <string name="rider_confirm_location">Confirm Location</string>
+    <string name="cd_recenter">My location</string>
+    <!-- Rider ride selection -->
+    <string name="rider_current_location">Current Location</string>
+    <string name="rider_recommended">Recommended for you</string>
+    <string name="rider_more_available_rides">More available rides</string>
+    <string name="rider_min_away">min away</string>
+    <string name="rider_no_captain">No Captain Available.</string>
+    <string name="rider_balance">Balance</string>
+    <string name="rider_promo">+PROMO</string>
+    <string name="rider_confirm_ride">Confirm Ride</string>
+    <string name="rider_add_balance">Add Balance</string>
+    <string name="rider_promo_title">Add Promo Code</string>
+    <string name="rider_promo_hint">Enter promo code</string>
+    <string name="rider_promo_apply">Apply</string>
+    <string name="rider_searching_title">We are waiting for the confirmation from your captain</string>
+    <string name="rider_searching_cancel">Cancel</string>
+
     <!-- Application status detail -->
     <string name="status_detail_title">Your Application Is Under Review</string>
     <string name="status_detail_subtitle">If you have received an SMS from AMN portal, please follow the instructions to complete your request for registration</string>

@@ -20,6 +20,7 @@ import com.mytm.darrbi.presentation.notifications.NotificationsScreen
 import com.mytm.darrbi.presentation.onboarding.OnboardingScreen
 import com.mytm.darrbi.presentation.profile.ProfileScreen
 import com.mytm.darrbi.presentation.reports.MyReportsScreen
+import com.mytm.darrbi.presentation.rider.RiderFlowScreen
 import com.mytm.darrbi.presentation.rides.MyRidesScreen
 import com.mytm.darrbi.presentation.rides.ReportProblemScreen
 import com.mytm.darrbi.presentation.rides.RideDetailsScreen
@@ -36,7 +37,7 @@ private const val CUSTOMER_CARE_NUMBER = "+966500000000"
 
 /** Top-level destinations after the splash. */
 private enum class Route {
-    Onboarding, Dashboard, StatusDetail, Profile, TopupDetails,
+    Onboarding, Dashboard, RiderHome, StatusDetail, Profile, TopupDetails,
     MyRides, RideDetails, ReportProblem, MyReports, Terms, Privacy,
     AppSettings, CustomerCare, Notifications,
 }
@@ -55,6 +56,8 @@ fun DarrbiRoot() {
     var selectedRideGiven by remember { mutableStateOf(false) }
     // Where "Report a Problem" should return to (it's reachable from Ride Details and Customer Care).
     var reportReturn by remember { mutableStateOf(Route.RideDetails) }
+    // Where Profile should return to (captain dashboard vs rider home).
+    var profileReturn by remember { mutableStateOf(Route.Dashboard) }
 
     LaunchedEffect(Unit) {
         delay(SPLASH_DURATION_MS)
@@ -66,19 +69,25 @@ fun DarrbiRoot() {
             SplashScreen()
         } else {
             when (route) {
-                Route.Onboarding -> OnboardingScreen(onNavigateToDashboard = { route = Route.Dashboard })
+                Route.Onboarding -> OnboardingScreen(
+                    onNavigateToDashboard = { route = Route.Dashboard },
+                    onNavigateToRiderHome = { route = Route.RiderHome },
+                )
                 Route.Dashboard -> CaptainDashboardScreen(
                     onSeeDetails = { route = Route.StatusDetail },
-                    onProfile = { route = Route.Profile },
+                    onProfile = { profileReturn = Route.Dashboard; route = Route.Profile },
+                )
+                Route.RiderHome -> RiderFlowScreen(
+                    onProfile = { profileReturn = Route.RiderHome; route = Route.Profile },
                 )
                 Route.StatusDetail -> {
                     BackHandler { route = Route.Dashboard }
                     CaptainStatusDetailScreen(onDone = { route = Route.Dashboard })
                 }
                 Route.Profile -> {
-                    BackHandler { route = Route.Dashboard }
+                    BackHandler { route = profileReturn }
                     ProfileScreen(
-                        onBack = { route = Route.Dashboard },
+                        onBack = { route = profileReturn },
                         onLogout = { route = Route.Onboarding },
                         onViewBalanceDetails = { route = Route.TopupDetails },
                         onMyRides = { route = Route.MyRides },

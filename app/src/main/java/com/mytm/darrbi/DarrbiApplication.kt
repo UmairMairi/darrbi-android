@@ -1,6 +1,7 @@
 package com.mytm.darrbi
 
 import android.app.Application
+import com.google.android.libraries.places.api.Places
 import com.mytm.darrbi.core.common.ApplicationScope
 import com.mytm.darrbi.domain.repository.SessionRepository
 import dagger.hilt.android.HiltAndroidApp
@@ -23,5 +24,10 @@ class DarrbiApplication : Application() {
         // Start every launch with a clean slate: no stale session/userId in preferences. The session is
         // (re)populated only when a token is received from verify-OTP, and that token is used for all APIs.
         applicationScope.launch { sessionRepository.clear() }
+
+        // Google Places SDK for location autocomplete (uses the same Maps key).
+        if (!Places.isInitialized()) {
+            Places.initialize(this, BuildConfig.MAPS_API_KEY)
+        }
     }
 }

@@ -56,6 +56,8 @@ data class OnboardingUiState(
     val applicationState: ApplicationState = ApplicationState.UnderReview,
     /** Set when the host should leave onboarding for the dashboard (returning user login, or app approved). */
     val navigateToDashboard: Boolean = false,
+    /** Set when the host should leave onboarding for the rider home/booking flow (rider login or signup). */
+    val navigateToRiderHome: Boolean = false,
     val isLoading: Boolean = false,
     val errorMessage: String? = null,
     val completed: Boolean = false,

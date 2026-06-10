@@ -143,7 +143,8 @@ class OnboardingViewModel @Inject constructor(
     /**
      * Post-OTP routing (matches ride-android):
      * - name not set yet → continue onboarding at the user-type step.
-     * - returning user → dashboard; for a captain, fetch + cache `GET /captains` first.
+     * - returning rider (userType 1) → rider home.
+     * - returning captain (userType 2) → fetch + cache `GET /captains`, then the captain dashboard.
      */
     private suspend fun routeAfterOtp(session: AuthSession) {
         if (!session.isNameUpdated) {
@@ -152,8 +153,10 @@ class OnboardingViewModel @Inject constructor(
         }
         if (session.userType == USER_TYPE_CAPTAIN) {
             getCaptainDetails()
+            _state.update { it.copy(isLoading = false, navigateToDashboard = true) }
+        } else {
+            _state.update { it.copy(isLoading = false, navigateToRiderHome = true) }
         }
-        _state.update { it.copy(isLoading = false, navigateToDashboard = true) }
     }
 
     private fun resend() {
@@ -203,7 +206,8 @@ class OnboardingViewModel @Inject constructor(
         _state.update { it.copy(isLoading = true, errorMessage = null) }
         viewModelScope.launch {
             when (val result = setRiderName(current.fullMobile(), current.name, current.referralCode)) {
-                is ApiResult.Success -> _state.update { it.copy(isLoading = false, completed = true) }
+                // New rider finished onboarding → go straight to the rider home (booking) flow.
+                is ApiResult.Success -> _state.update { it.copy(isLoading = false, navigateToRiderHome = true) }
                 is ApiResult.Error -> _state.update { it.copy(isLoading = false, errorMessage = result.message) }
                 is ApiResult.Failure -> _state.update { it.copy(isLoading = false, errorMessage = result.error.message) }
             }

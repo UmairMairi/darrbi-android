@@ -69,6 +69,7 @@ import com.mytm.darrbi.core.designsystem.components.LicensePlate
 @Composable
 fun OnboardingScreen(
     onNavigateToDashboard: () -> Unit = {},
+    onNavigateToRiderHome: () -> Unit = {},
     viewModel: OnboardingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -76,6 +77,9 @@ fun OnboardingScreen(
     // language here persists it, which re-localizes the whole tree.
     LaunchedEffect(state.navigateToDashboard) {
         if (state.navigateToDashboard) onNavigateToDashboard()
+    }
+    LaunchedEffect(state.navigateToRiderHome) {
+        if (state.navigateToRiderHome) onNavigateToRiderHome()
     }
     OnboardingContent(state = state, onEvent = viewModel::onEvent)
 }

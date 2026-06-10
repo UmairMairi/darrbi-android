@@ -97,6 +97,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideRideApi(@MainApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.RideApi =
+        retrofit.create(com.mytm.darrbi.data.remote.service.RideApi::class.java)
+
+    @Provides
+    @Singleton
     fun provideCmsApi(@CmsApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.CmsApi =
         retrofit.create(com.mytm.darrbi.data.remote.service.CmsApi::class.java)
 

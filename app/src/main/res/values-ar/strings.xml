@@ -230,6 +230,32 @@
     <!-- Invite friends -->
     <string name="invite_share_message">انضم إليّ على دربي — الطريقة الأسهل للتنقّل. حمّل التطبيق الآن!</string>
 
+    <!-- Rider ride booking -->
+    <string name="rider_where_to">إلى أين؟</string>
+    <string name="rider_pickup_location">موقع الانطلاق</string>
+    <string name="rider_enter_here">اكتب هنا</string>
+    <string name="rider_use_current_location">استخدام الموقع الحالي</string>
+    <string name="rider_confirm_pickup">تأكيد موقع الانطلاق</string>
+    <string name="rider_edit">تعديل</string>
+    <string name="rider_set_location_from_map">تحديد الموقع من الخريطة</string>
+    <string name="rider_confirm_location">تأكيد الموقع</string>
+    <string name="cd_recenter">موقعي</string>
+    <!-- Rider ride selection -->
+    <string name="rider_current_location">الموقع الحالي</string>
+    <string name="rider_recommended">موصى به لك</string>
+    <string name="rider_more_available_rides">المزيد من الرحلات المتوفّرة</string>
+    <string name="rider_min_away">دقيقة</string>
+    <string name="rider_no_captain">لا يوجد كابتن متاح.</string>
+    <string name="rider_balance">الرصيد</string>
+    <string name="rider_promo">+ رمز ترويجي</string>
+    <string name="rider_confirm_ride">تأكيد الرحلة</string>
+    <string name="rider_add_balance">إضافة رصيد</string>
+    <string name="rider_promo_title">إضافة رمز ترويجي</string>
+    <string name="rider_promo_hint">أدخل الرمز الترويجي</string>
+    <string name="rider_promo_apply">تطبيق</string>
+    <string name="rider_searching_title">في انتظار تأكيد الكابتن</string>
+    <string name="rider_searching_cancel">إلغاء</string>
+
     <!-- Application status detail -->
     <string name="status_detail_title">طلبك قيد المراجعة</string>
     <string name="status_detail_subtitle">إذا استلمت رسالة نصية من بوابة أمن، فيرجى اتباع التعليمات لإكمال طلب التسجيل</string>
