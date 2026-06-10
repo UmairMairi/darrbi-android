@@ -1,0 +1,271 @@
+<resources>
+    <string name="app_name">دربي</string>
+
+    <!-- Common -->
+    <string name="common_next">التالي</string>
+    <string name="common_verify">تحقق</string>
+    <string name="cd_back">رجوع</string>
+    <string name="cd_close">إغلاق</string>
+    <string name="country_picker_title">اختر الدولة</string>
+    <string name="search_hint">بحث</string>
+
+    <!-- Onboarding: language -->
+    <string name="onboarding_select_language">اختر لغتك</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">عربى</string>
+
+    <!-- Onboarding: mobile -->
+    <string name="onboarding_enter_mobile_title">أدخل رقم جوالك</string>
+    <string name="onboarding_mobile_label">رقم الجوال</string>
+    <string name="onboarding_whatsapp_optin">استلام رمز التحقق عبر واتساب</string>
+
+    <!-- Onboarding: OTP -->
+    <string name="onboarding_enter_otp_title">أدخل رمز التحقق</string>
+    <string name="onboarding_otp_subtitle">تم إرسال الرمز إلى %1$s</string>
+    <string name="onboarding_didnt_receive_otp">لم تستلم الرمز؟</string>
+    <string name="onboarding_resend_otp">إعادة إرسال الرمز</string>
+
+    <!-- Onboarding: user type -->
+    <string name="onboarding_continue_as">المتابعة كـ</string>
+    <string name="onboarding_rider">راكب</string>
+    <string name="onboarding_captain">كابتن</string>
+
+    <!-- Onboarding: name -->
+    <string name="onboarding_enter_name_title">أدخل اسمك</string>
+    <string name="onboarding_name_label">الاسم</string>
+    <string name="onboarding_referral_label">رمز الإحالة (اختياري)</string>
+
+    <!-- Onboarding: captain -->
+    <string name="onboarding_captain_ride_type_title">اختر نوع الرحلة</string>
+    <string name="ride_type_passenger">رحلة ركاب</string>
+    <string name="ride_type_pickup">توصيل</string>
+    <string name="onboarding_select_option_title">اختر خيارك</string>
+    <string name="car_option_own">أملك سيارة</string>
+    <string name="car_option_service">استخدم خدمة Drive-A-Derrbi</string>
+    <string name="onboarding_captain_details_title">الرجاء إدخال بياناتك</string>
+    <string name="captain_nid_label">رقم الهوية / الإقامة</string>
+    <string name="captain_license_expiry_label">تاريخ انتهاء الرخصة</string>
+
+    <!-- Onboarding: captain - I own a car -->
+    <string name="onboarding_add_car_sequence_title">أضف الرقم التسلسلي للسيارة</string>
+    <string name="car_sequence_label">الرقم التسلسلي</string>
+    <string name="car_not_owner_toggle">أنا مفوّض، ولست مالك السيارة</string>
+    <string name="car_owner_id_label">هوية مالك السيارة</string>
+    <string name="car_sequence_help_title">كيفية العثور على الرقم التسلسلي لسيارتك</string>
+    <string name="common_learn_more">اعرف المزيد</string>
+    <string name="common_done">تم</string>
+    <string name="common_confirm">تأكيد</string>
+    <string name="common_see_details">عرض التفاصيل</string>
+    <string name="car_seats_format">%1$d مقاعد</string>
+    <string name="car_no_cars_title">لا توجد سيارات مسجّلة على هويتك / إقامتك</string>
+    <string name="car_use_drive_a_derrbi">استخدم Drive a Derrbi</string>
+    <string name="app_status_under_review_title">طلبك قيد المعالجة</string>
+    <string name="app_status_under_review_subtitle">سجّل الدخول وفوّض عبر بوابة أبشر</string>
+    <string name="app_status_rejected_title">تم رفض الطلب</string>
+    <string name="app_status_rejected_subtitle">تعذّر الموافقة على طلبك</string>
+
+    <!-- Onboarding: done -->
+    <string name="onboarding_complete_title">تم بنجاح</string>
+
+    <!-- Captain dashboard (application under review) -->
+    <string name="dashboard_app_under_process">طلبك قيد المعالجة</string>
+    <string name="dashboard_absher_subtitle">سجّل الدخول وفوّض عبر بوابة أبشر،</string>
+    <string name="cd_profile">الملف الشخصي</string>
+
+    <!-- Profile -->
+    <string name="cd_notifications">الإشعارات</string>
+    <string name="cd_edit_profile">تعديل الملف الشخصي</string>
+    <string name="cd_copy">نسخ</string>
+    <string name="profile_status_good">🙂 جيد</string>
+    <string name="profile_referral_code">رمز الإحالة</string>
+    <string name="profile_balance">الرصيد</string>
+    <string name="profile_view_details">عرض التفاصيل</string>
+    <string name="profile_topup">شحن الرصيد</string>
+    <string name="profile_currency_sar">ر.س</string>
+    <string name="profile_iban">رقم الآيبان</string>
+    <string name="profile_bank">البنك</string>
+    <string name="profile_update_iban">تحديث الآيبان</string>
+    <string name="profile_version">الإصدار 1.1</string>
+    <string name="menu_subscription">الاشتراك</string>
+    <string name="menu_car_deal_details">تفاصيل السيارة</string>
+    <string name="menu_saved_cards">البطاقات المحفوظة</string>
+    <string name="menu_my_rides">رحلاتي</string>
+    <string name="menu_app_settings">إعدادات التطبيق</string>
+    <string name="menu_customer_care">خدمة العملاء</string>
+    <string name="menu_terms_conditions">الشروط والأحكام</string>
+    <string name="menu_privacy_policy">سياسة الخصوصية</string>
+    <string name="menu_invite_friends">دعوة الأصدقاء</string>
+    <string name="menu_log_out">تسجيل الخروج</string>
+
+    <!-- Captain dashboard: approved / IBAN / no riders -->
+    <string name="dashboard_approved_title">تمت الموافقة على طلبك</string>
+    <string name="common_start_now">ابدأ الآن</string>
+    <string name="iban_enter_title">أدخل رقم الآيبان</string>
+    <string name="iban_enter_subtitle">لبدء رحلتك الأولى، يرجى إدخال رقم الآيبان الخاص بك</string>
+    <string name="iban_label">رقم الآيبان</string>
+    <string name="iban_incorrect">رقم الآيبان غير صحيح، يرجى إدخال رقم آيبان صحيح</string>
+    <string name="iban_bank_format">البنك : %1$s</string>
+    <string name="no_riders_title">لا يوجد ركاب بالقرب منك</string>
+    <string name="no_riders_subtitle">توجّه إلى المناطق عالية الطلب للعثور على المزيد من الركاب</string>
+    <string name="no_riders_navigate">التوجه إلى منطقة عالية الطلب</string>
+
+    <!-- Topup details + refund -->
+    <string name="topup_details_title">تفاصيل الشحن</string>
+    <string name="topup_amount">مبلغ الشحن</string>
+    <string name="topup_time">الوقت</string>
+    <string name="topup_date">التاريخ</string>
+    <string name="topup_status">الحالة</string>
+    <string name="topup_status_successful">ناجحة</string>
+    <string name="topup_status_failed">فشلت</string>
+    <string name="topup_status_refunded">مُسترَدّة</string>
+    <string name="topup_refund">استرداد</string>
+    <string name="topup_ending_format">تنتهي بـ %1$s</string>
+    <string name="payment_wallet">المحفظة</string>
+    <string name="payment_promotion">عرض ترويجي</string>
+    <string name="payment_card">بطاقة</string>
+    <string name="payment_tabby">Tabby</string>
+    <string name="payment_tamara">Tamara</string>
+    <string name="refund_title">استرداد مبلغ الشحن</string>
+    <string name="refund_min">الحد الأدنى</string>
+    <string name="refund_max">الحد الأقصى</string>
+    <string name="refund_amount_label">أدخل مبلغ الاسترداد</string>
+    <string name="refund_confirm_title">هل أنت متأكد من الاسترداد؟</string>
+    <string name="refund_confirm_info">سيتم استرداد مبلغ %1$s وتحويله إلى طريقة الدفع الأصلية</string>
+
+    <!-- My Rides -->
+    <string name="my_rides_title">رحلاتي</string>
+    <string name="rides_taken">رحلات ركبتها</string>
+    <string name="rides_given">رحلات قدّمتها</string>
+    <string name="ride_rating_good">🙂 جيد</string>
+    <string name="chart_24h">24 س</string>
+    <string name="chart_1w">أسبوع</string>
+    <string name="chart_1m">شهر</string>
+    <string name="chart_3m">3 أشهر</string>
+    <string name="chart_1y">سنة</string>
+    <string name="chart_all">كل الوقت</string>
+
+    <!-- Ride details -->
+    <string name="ride_details_title">تفاصيل الرحلة</string>
+    <string name="ride_your_driver">سائقك</string>
+    <string name="ride_your_rider">الراكب</string>
+    <string name="ride_car_type">نوع السيارة</string>
+    <string name="ride_car_plate">رقم لوحة السيارة</string>
+    <string name="ride_total_payment">إجمالي المبلغ</string>
+    <string name="ride_loyalty_points">إجمالي نقاط الولاء المكتسبة</string>
+    <string name="ride_points_format">%1$d نقطة</string>
+    <string name="ride_report_problem">الإبلاغ عن مشكلة</string>
+    <string name="ride_download_invoice">تنزيل فاتورة ضريبة القيمة المضافة</string>
+
+    <!-- Report a problem -->
+    <string name="report_title">مشاكل الركاب</string>
+    <string name="report_subtitle">سنساعدك فور وصف المشكلة في الفقرة أدناه</string>
+    <string name="report_your_problem">مشكلتك</string>
+    <string name="report_describe_hint">اكتب هنا</string>
+    <string name="report_photo_info">صورة واحدة بحجم إجمالي حتى 300 كيلوبايت</string>
+    <string name="report_add_photo">إضافة صورة</string>
+    <string name="report_photo_sheet_title">صورة شحنتك</string>
+    <string name="report_take_picture">التقاط صورة</string>
+    <string name="report_choose_gallery">الاختيار من المعرض</string>
+    <string name="report_submit">إبلاغ</string>
+    <string name="complaint_registration">التسجيل</string>
+    <string name="complaint_trip">الرحلة</string>
+    <string name="complaint_topup">الشحن</string>
+    <string name="complaint_balance">الرصيد</string>
+    <string name="complaint_refund">الاسترداد</string>
+    <string name="complaint_different_car">سيارة مختلفة</string>
+    <string name="complaint_other">أخرى</string>
+
+    <!-- Legal (terms / privacy) -->
+    <string name="legal_body">لوريم إيبسوم هو نص شكلي يستخدم في صناعة الطباعة والتنضيد. كان لوريم إيبسوم النص الشكلي المعياري للصناعة منذ القرن الخامس عشر، عندما أخذت مطبعة مجهولة لوحًا من الحروف وخلطته لعمل كتاب عينة للحروف.\n\nلقد صمد هذا النص ليس فقط لخمسة قرون، بل أيضًا للقفزة إلى التنضيد الإلكتروني دون أن يتغير في جوهره. اشتهر في الستينيات بإصدار أوراق تحتوي على مقاطع من لوريم إيبسوم، ومؤخرًا مع برامج النشر المكتبي.</string>
+
+    <!-- Logout confirmation -->
+    <string name="logout_confirm_title">هل تريد تسجيل الخروج من دربي؟</string>
+    <string name="logout_confirm_subtitle">يمكنك تسجيل الدخول مرة أخرى في أي وقت برقم جوالك</string>
+    <string name="logout_dismiss">تجاهل</string>
+    <string name="logout_confirm">نعم، سجّل الخروج</string>
+
+    <!-- My Reports -->
+    <string name="menu_my_reports">تقاريري</string>
+    <string name="my_reports_title">تقاريري</string>
+    <string name="report_issue_type">نوع المشكلة</string>
+    <string name="report_status_label">الحالة</string>
+    <string name="report_date_time">التاريخ والوقت</string>
+    <string name="report_description">الوصف</string>
+    <string name="report_rating">التقييم</string>
+    <string name="report_status_pending">قيد الانتظار</string>
+    <string name="report_status_solved">تم الحل</string>
+    <string name="report_rate_us">قيّمنا</string>
+    <string name="rate_us_title">قيّمنا</string>
+    <string name="rate_us_subtitle">قيّم خدمتنا المتعلقة بمشكلتك</string>
+    <string name="rate_excellent">ممتاز</string>
+    <string name="rate_best">الأفضل</string>
+    <string name="rate_good">جيد</string>
+    <string name="rate_average">متوسط</string>
+    <string name="rate_poor">ضعيف</string>
+    <string name="common_submit">إرسال</string>
+
+    <!-- Add balance / topup -->
+    <string name="addbalance_title">إضافة رصيد</string>
+    <string name="addbalance_enter_amount">أدخل المبلغ</string>
+    <string name="addbalance_saved_cards">البطاقات المحفوظة</string>
+    <string name="addbalance_add_new">إضافة جديدة</string>
+    <string name="addbalance_no_cards">لا توجد بطاقات محفوظة</string>
+    <string name="addbalance_add_balance">إضافة رصيد</string>
+    <string name="addbalance_quick">%1$d ر.س</string>
+    <string name="topup_success_title">تم الشحن بنجاح</string>
+    <string name="topup_success_subtitle">سيتم إضافة %1$s ر.س إلى محفظتك قريبًا.</string>
+    <string name="topup_failed_title">فشل الشحن!</string>
+    <string name="topup_failed_subtitle">يرجى المحاولة لاحقًا، نواجه بعض مشكلات الخادم.</string>
+    <string name="common_try_again">حاول مرة أخرى</string>
+
+    <!-- App settings -->
+    <string name="app_settings_title">إعدادات التطبيق</string>
+    <string name="settings_change_language">تغيير اللغة</string>
+    <string name="settings_notification">الإشعارات</string>
+    <string name="settings_face_id">المعرّف بالوجه</string>
+
+    <!-- Notifications -->
+    <string name="notifications_title">الإشعارات</string>
+
+    <!-- Invite friends -->
+    <string name="invite_share_message">انضم إليّ على دربي — الطريقة الأسهل للتنقّل. حمّل التطبيق الآن!</string>
+
+    <!-- Application status detail -->
+    <string name="status_detail_title">طلبك قيد المراجعة</string>
+    <string name="status_detail_subtitle">إذا استلمت رسالة نصية من بوابة أمن، فيرجى اتباع التعليمات لإكمال طلب التسجيل</string>
+    <string name="support_call_customer_care">اتصل بخدمة العملاء</string>
+    <string name="support_whatsapp_care">واتساب خدمة العملاء</string>
+    <string name="support_report_problem">الإبلاغ عن مشكلة</string>
+
+    <!-- Errors -->
+    <string name="error_generic">حدث خطأ ما</string>
+    <string name="error_invalid_mobile">أدخل رقم جوال صحيح</string>
+    <string name="error_invalid_otp">أدخل رمز التحقق</string>
+    <string name="error_invalid_nid">أدخل رقم هوية / إقامة صحيح</string>
+
+    <!-- Hijri date picker -->
+    <string name="date_picker_title">اختر تاريخ الانتهاء</string>
+    <string-array name="hijri_months">
+        <item>محرم</item>
+        <item>صفر</item>
+        <item>ربيع الأول</item>
+        <item>ربيع الآخر</item>
+        <item>جمادى الأولى</item>
+        <item>جمادى الآخرة</item>
+        <item>رجب</item>
+        <item>شعبان</item>
+        <item>رمضان</item>
+        <item>شوال</item>
+        <item>ذو القعدة</item>
+        <item>ذو الحجة</item>
+    </string-array>
+    <string-array name="weekday_initials">
+        <item>ح</item>
+        <item>ن</item>
+        <item>ث</item>
+        <item>ر</item>
+        <item>خ</item>
+        <item>ج</item>
+        <item>س</item>
+    </string-array>
+</resources>

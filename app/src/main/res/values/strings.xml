@@ -1,0 +1,271 @@
+<resources>
+    <string name="app_name">Darrbi</string>
+
+    <!-- Common -->
+    <string name="common_next">Next</string>
+    <string name="common_verify">Verify</string>
+    <string name="cd_back">Back</string>
+    <string name="cd_close">Close</string>
+    <string name="country_picker_title">Select Country</string>
+    <string name="search_hint">Search</string>
+
+    <!-- Onboarding: language -->
+    <string name="onboarding_select_language">Select Your Language</string>
+    <string name="language_english">English</string>
+    <string name="language_arabic">عربى</string>
+
+    <!-- Onboarding: mobile -->
+    <string name="onboarding_enter_mobile_title">Enter Your Mobile No.</string>
+    <string name="onboarding_mobile_label">Mobile Number</string>
+    <string name="onboarding_whatsapp_optin">Get OTP on WhatsApp</string>
+
+    <!-- Onboarding: OTP -->
+    <string name="onboarding_enter_otp_title">Enter OTP</string>
+    <string name="onboarding_otp_subtitle">OTP sent to %1$s</string>
+    <string name="onboarding_didnt_receive_otp">Didn\'t receive the OTP?</string>
+    <string name="onboarding_resend_otp">Resend OTP</string>
+
+    <!-- Onboarding: user type -->
+    <string name="onboarding_continue_as">Continue As</string>
+    <string name="onboarding_rider">Rider</string>
+    <string name="onboarding_captain">Captain</string>
+
+    <!-- Onboarding: name -->
+    <string name="onboarding_enter_name_title">Enter Your Name</string>
+    <string name="onboarding_name_label">Your Name</string>
+    <string name="onboarding_referral_label">Referral Code (Optional)</string>
+
+    <!-- Onboarding: captain -->
+    <string name="onboarding_captain_ride_type_title">Select your ride type</string>
+    <string name="ride_type_passenger">Passenger Ride</string>
+    <string name="ride_type_pickup">Pickup</string>
+    <string name="onboarding_select_option_title">Select Your Option</string>
+    <string name="car_option_own">I Own A Car</string>
+    <string name="car_option_service">Use Our Service Drive-A-Derrbi</string>
+    <string name="onboarding_captain_details_title">Please Enter Your Details</string>
+    <string name="captain_nid_label">NID/Iqama Number</string>
+    <string name="captain_license_expiry_label">License Expiry Date</string>
+
+    <!-- Onboarding: captain - I own a car -->
+    <string name="onboarding_add_car_sequence_title">Add Car Sequence No.</string>
+    <string name="car_sequence_label">Sequence No.</string>
+    <string name="car_not_owner_toggle">I\'m Authorized, I\'m Not The Owner Of The Car</string>
+    <string name="car_owner_id_label">Car Owner ID</string>
+    <string name="car_sequence_help_title">How To Find Car Sequence Number For Your Car</string>
+    <string name="common_learn_more">Learn More</string>
+    <string name="common_done">Done</string>
+    <string name="common_confirm">Confirm</string>
+    <string name="common_see_details">See Details</string>
+    <string name="car_seats_format">%1$d seats</string>
+    <string name="car_no_cars_title">You Don\'t Have Any Cars Registered To Your NID/Iqama</string>
+    <string name="car_use_drive_a_derrbi">Use Drive a Derrbi</string>
+    <string name="app_status_under_review_title">Your Application Under Process</string>
+    <string name="app_status_under_review_subtitle">Login and authorize on Absher portal</string>
+    <string name="app_status_rejected_title">Application Rejected</string>
+    <string name="app_status_rejected_subtitle">Your application could not be approved</string>
+
+    <!-- Onboarding: done -->
+    <string name="onboarding_complete_title">You\'re all set</string>
+
+    <!-- Captain dashboard (application under review) -->
+    <string name="dashboard_app_under_process">Your Application Under Process</string>
+    <string name="dashboard_absher_subtitle">Login and authorize on Absher portal,</string>
+    <string name="cd_profile">Profile</string>
+
+    <!-- Profile -->
+    <string name="cd_notifications">Notifications</string>
+    <string name="cd_edit_profile">Edit profile</string>
+    <string name="cd_copy">Copy</string>
+    <string name="profile_status_good">🙂 Good</string>
+    <string name="profile_referral_code">Referral Code</string>
+    <string name="profile_balance">Balance</string>
+    <string name="profile_view_details">View Details</string>
+    <string name="profile_topup">Topup</string>
+    <string name="profile_currency_sar">SAR</string>
+    <string name="profile_iban">IBAN</string>
+    <string name="profile_bank">Bank</string>
+    <string name="profile_update_iban">Update IBAN</string>
+    <string name="profile_version">version 1.1</string>
+    <string name="menu_subscription">Subscription</string>
+    <string name="menu_car_deal_details">Car Deal Details</string>
+    <string name="menu_saved_cards">Saved Cards</string>
+    <string name="menu_my_rides">My Rides</string>
+    <string name="menu_app_settings">App Settings</string>
+    <string name="menu_customer_care">Customer Care</string>
+    <string name="menu_terms_conditions">Terms &amp; Conditions</string>
+    <string name="menu_privacy_policy">Privacy Policy</string>
+    <string name="menu_invite_friends">Invite Friends</string>
+    <string name="menu_log_out">Log Out</string>
+
+    <!-- Captain dashboard: approved / IBAN / no riders -->
+    <string name="dashboard_approved_title">Your Application Is Approved</string>
+    <string name="common_start_now">Start Now</string>
+    <string name="iban_enter_title">Enter IBAN</string>
+    <string name="iban_enter_subtitle">In order to take your first ride please enter your IBAN</string>
+    <string name="iban_label">IBAN</string>
+    <string name="iban_incorrect">IBAN is incorrect, please enter the correct IBAN</string>
+    <string name="iban_bank_format">Bank : %1$s</string>
+    <string name="no_riders_title">There are no riders around</string>
+    <string name="no_riders_subtitle">Drive to high-demand zones to find more riders</string>
+    <string name="no_riders_navigate">Navigate to high demand zone</string>
+
+    <!-- Topup details + refund -->
+    <string name="topup_details_title">Topup Details</string>
+    <string name="topup_amount">Topup Amount</string>
+    <string name="topup_time">Time</string>
+    <string name="topup_date">Date</string>
+    <string name="topup_status">Status</string>
+    <string name="topup_status_successful">Successful</string>
+    <string name="topup_status_failed">Failed</string>
+    <string name="topup_status_refunded">Refunded</string>
+    <string name="topup_refund">Refund</string>
+    <string name="topup_ending_format">Ending %1$s</string>
+    <string name="payment_wallet">Wallet</string>
+    <string name="payment_promotion">Promotion</string>
+    <string name="payment_card">Card</string>
+    <string name="payment_tabby">Tabby</string>
+    <string name="payment_tamara">Tamara</string>
+    <string name="refund_title">Refund Topup Amount</string>
+    <string name="refund_min">Minimum Amount</string>
+    <string name="refund_max">Maximum Amount</string>
+    <string name="refund_amount_label">Enter Refund Amount</string>
+    <string name="refund_confirm_title">Sure You Want To Refund?</string>
+    <string name="refund_confirm_info">Your refund amount is %1$s and will be transferred to original payment method</string>
+
+    <!-- My Rides -->
+    <string name="my_rides_title">My Rides</string>
+    <string name="rides_taken">Rides Taken</string>
+    <string name="rides_given">Rides Given</string>
+    <string name="ride_rating_good">🙂 Good</string>
+    <string name="chart_24h">24 h</string>
+    <string name="chart_1w">1 w</string>
+    <string name="chart_1m">1 m</string>
+    <string name="chart_3m">3 m</string>
+    <string name="chart_1y">1 y</string>
+    <string name="chart_all">All time</string>
+
+    <!-- Ride details -->
+    <string name="ride_details_title">Ride Details</string>
+    <string name="ride_your_driver">Your Driver</string>
+    <string name="ride_your_rider">Your Rider</string>
+    <string name="ride_car_type">Car Type</string>
+    <string name="ride_car_plate">Car Number Plate</string>
+    <string name="ride_total_payment">Total Payment</string>
+    <string name="ride_loyalty_points">Total Loyalty Points Earned</string>
+    <string name="ride_points_format">%1$d pts</string>
+    <string name="ride_report_problem">Report A Problem</string>
+    <string name="ride_download_invoice">Download VAT Invoice</string>
+
+    <!-- Report a problem -->
+    <string name="report_title">Riders Problems</string>
+    <string name="report_subtitle">We will help you as soon as you describe the problem in the paragraph below</string>
+    <string name="report_your_problem">Your Problem</string>
+    <string name="report_describe_hint">Describe here</string>
+    <string name="report_photo_info">1 photo with a total size upto 300kb</string>
+    <string name="report_add_photo">Add Photo</string>
+    <string name="report_photo_sheet_title">Picture of Your Cargo</string>
+    <string name="report_take_picture">Take a Picture</string>
+    <string name="report_choose_gallery">Choose from Gallery</string>
+    <string name="report_submit">Report</string>
+    <string name="complaint_registration">Registration</string>
+    <string name="complaint_trip">Trip</string>
+    <string name="complaint_topup">Topup</string>
+    <string name="complaint_balance">Balance</string>
+    <string name="complaint_refund">Refund</string>
+    <string name="complaint_different_car">Different Car</string>
+    <string name="complaint_other">Other</string>
+
+    <!-- Legal (terms / privacy) -->
+    <string name="legal_body">Lorem ipsum dolor sit amet, consectetur adipiscing elit. Volutpat lacus enim, purus massa porttitor. Luctus non tempus sit imperdiet volutpat gravida. A commodo eget lorem venenatis nunc ut tincidunt. Magnis eget amet iaculis amet neque. Faucibus sapien nullam posuere at turpis faucibus sed. Imperdiet sagittis ut habitasse malesuada consequat mi ut sem. Etiam quis libero diam fusce aliquam convallis ac risus mattis. Ac mauris dolor neque etiam quisque dui.\n\nFermentum aliquet amet mauris feugiat ipsum. Nam cursus arcu ut lacinia ut sed consequat arcu. Lorem in risus id in aenean non morbi pharetra eleifend. Condimentum ipsum tincidunt mattis ultricies faucibus euismod. Ut ultrices quis commodo aenean gravida consectetur cum. Rhoncus aliquam non gravida volutpat diam ipsum. Lacus nibh rhoncus habitasse diam tristique.</string>
+
+    <!-- Logout confirmation -->
+    <string name="logout_confirm_title">Want to log out from Derrbi?</string>
+    <string name="logout_confirm_subtitle">You can log back in anytime with your mobile number</string>
+    <string name="logout_dismiss">Dismiss</string>
+    <string name="logout_confirm">Yes, Log Out</string>
+
+    <!-- My Reports -->
+    <string name="menu_my_reports">My Reports</string>
+    <string name="my_reports_title">My Reports</string>
+    <string name="report_issue_type">Issue Type</string>
+    <string name="report_status_label">Status</string>
+    <string name="report_date_time">Date &amp; Time</string>
+    <string name="report_description">Description</string>
+    <string name="report_rating">Rating</string>
+    <string name="report_status_pending">Pending</string>
+    <string name="report_status_solved">Solved</string>
+    <string name="report_rate_us">Rate Us</string>
+    <string name="rate_us_title">Rate Us</string>
+    <string name="rate_us_subtitle">Rate our service related to your issue</string>
+    <string name="rate_excellent">Excellent</string>
+    <string name="rate_best">Best</string>
+    <string name="rate_good">Good</string>
+    <string name="rate_average">Average</string>
+    <string name="rate_poor">Poor</string>
+    <string name="common_submit">Submit</string>
+
+    <!-- Add balance / topup -->
+    <string name="addbalance_title">Add Balance</string>
+    <string name="addbalance_enter_amount">Enter Amount</string>
+    <string name="addbalance_saved_cards">Saved Cards</string>
+    <string name="addbalance_add_new">Add new</string>
+    <string name="addbalance_no_cards">No saved cards available</string>
+    <string name="addbalance_add_balance">Add Balance</string>
+    <string name="addbalance_quick">%1$d SAR</string>
+    <string name="topup_success_title">Topup Successful</string>
+    <string name="topup_success_subtitle">SAR %1$s will be credited to your wallet shortly.</string>
+    <string name="topup_failed_title">Topup Failed!</string>
+    <string name="topup_failed_subtitle">Please try again after some time we are facing some server issues.</string>
+    <string name="common_try_again">Try Again</string>
+
+    <!-- App settings -->
+    <string name="app_settings_title">App Settings</string>
+    <string name="settings_change_language">Change Language</string>
+    <string name="settings_notification">Notification</string>
+    <string name="settings_face_id">Face ID</string>
+
+    <!-- Notifications -->
+    <string name="notifications_title">Notification</string>
+
+    <!-- Invite friends -->
+    <string name="invite_share_message">Join me on Darrbi — the easy way to get around. Download the app now!</string>
+
+    <!-- Application status detail -->
+    <string name="status_detail_title">Your Application Is Under Review</string>
+    <string name="status_detail_subtitle">If you have received an SMS from AMN portal, please follow the instructions to complete your request for registration</string>
+    <string name="support_call_customer_care">Call Customer Care</string>
+    <string name="support_whatsapp_care">Whatsapp Care</string>
+    <string name="support_report_problem">Report a Problem</string>
+
+    <!-- Errors -->
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_invalid_mobile">Enter a valid mobile number</string>
+    <string name="error_invalid_otp">Enter the OTP</string>
+    <string name="error_invalid_nid">Enter a valid NID / Iqama number</string>
+
+    <!-- Hijri date picker -->
+    <string name="date_picker_title">Select Expiry Date</string>
+    <string-array name="hijri_months">
+        <item>Muharram</item>
+        <item>Safar</item>
+        <item>Rabi I</item>
+        <item>Rabi II</item>
+        <item>Jumada I</item>
+        <item>Jumada II</item>
+        <item>Rajab</item>
+        <item>Shaban</item>
+        <item>Ramadan</item>
+        <item>Shawwal</item>
+        <item>Dhul-Qadah</item>
+        <item>Dhul-Hijjah</item>
+    </string-array>
+    <string-array name="weekday_initials">
+        <item>S</item>
+        <item>M</item>
+        <item>T</item>
+        <item>W</item>
+        <item>T</item>
+        <item>F</item>
+        <item>S</item>
+    </string-array>
+</resources>
