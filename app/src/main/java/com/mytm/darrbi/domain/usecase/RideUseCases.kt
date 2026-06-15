@@ -26,3 +26,7 @@ class CreateTripUseCase @Inject constructor(private val repository: RideReposito
         promoCode: String?,
     ): ApiResult<BookedTrip> = repository.createTrip(pickup, destination, cabId, promoCode)
 }
+
+class CancelTripUseCase @Inject constructor(private val repository: RideRepository) {
+    suspend operator fun invoke(tripId: String): ApiResult<Unit> = repository.cancelTripRequest(tripId)
+}

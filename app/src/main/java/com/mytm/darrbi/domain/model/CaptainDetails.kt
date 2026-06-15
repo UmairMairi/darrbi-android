@@ -13,6 +13,8 @@ data class CaptainDetails(
     val approved: Boolean?,
     val isWaslApproved: Int?,
     val driverSubStatus: Int?,
+    /** Active-mode flag from `GET /captains`: true = captain mode active, false = rider mode active. */
+    val driverModeSwitch: Boolean?,
     /** Saved IBAN; null until the captain adds one. */
     val iban: String?,
     val mobileNo: String?,

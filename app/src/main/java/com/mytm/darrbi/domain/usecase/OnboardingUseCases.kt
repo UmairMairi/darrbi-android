@@ -1,6 +1,7 @@
 package com.mytm.darrbi.domain.usecase
 
 import com.mytm.darrbi.core.common.ApiResult
+import com.mytm.darrbi.core.common.DeviceInfoProvider
 import com.mytm.darrbi.domain.model.CaptainDetails
 import com.mytm.darrbi.domain.model.CarInfo
 import com.mytm.darrbi.domain.model.IbanInfo
@@ -126,4 +127,26 @@ class GetCaptainDetailsUseCase @Inject constructor(
         if (result is ApiResult.Success) sessionRepository.saveCaptain(result.data)
         return result
     }
+}
+
+/** Flips the active mode (rider ⇄ captain): `POST /captains/change-driver-mode`. */
+class ChangeDriverModeUseCase @Inject constructor(
+    private val repository: OnboardingRepository,
+) {
+    suspend operator fun invoke(): ApiResult<Unit> = repository.changeDriverMode()
+}
+
+/** Requests the ClickPay hosted-page URL to top up the wallet by [amount] (opened in a WebView). */
+class GetHostedTopUpUrlUseCase @Inject constructor(
+    private val repository: OnboardingRepository,
+) {
+    suspend operator fun invoke(amount: Int): ApiResult<String> = repository.hostedTopUpUrl(amount)
+}
+
+/** Reads the device's FCM token and registers it with the server (best-effort, post-login). */
+class UpdateDeviceTokenUseCase @Inject constructor(
+    private val repository: OnboardingRepository,
+    private val deviceInfo: DeviceInfoProvider,
+) {
+    suspend operator fun invoke(): ApiResult<Unit> = repository.updateDeviceToken(deviceInfo.fcmToken())
 }

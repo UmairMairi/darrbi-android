@@ -37,6 +37,7 @@ fun CaptainDetailsData.toDomain(): CaptainDetails = CaptainDetails(
     approved = approved,
     isWaslApproved = isWASLApproved,
     driverSubStatus = driverSubStatus,
+    driverModeSwitch = driverModeSwitch,
     iban = iban,
     mobileNo = mobileNo,
     dateOfBirth = dateOfBirth,

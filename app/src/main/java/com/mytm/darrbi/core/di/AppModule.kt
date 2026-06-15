@@ -33,6 +33,7 @@ object AppModule {
         mainUrl = BuildConfig.MAIN_URL,
         cmsUrl = BuildConfig.CMS_URL,
         dashboardUrl = BuildConfig.DASHBOARD_URL,
+        socketUrl = BuildConfig.SOCKET_URL,
         rentalUrl = BuildConfig.RENTAL_URL,
         rentalToken = BuildConfig.RENTAL_TOKEN,
         secretKey = BuildConfig.SECRET_KEY,
@@ -60,5 +61,9 @@ object AppModule {
             @SuppressLint("HardwareIds")
             override val deviceId: String =
                 Settings.Secure.getString(context.contentResolver, Settings.Secure.ANDROID_ID).orEmpty()
+
+            // Returns the FCM token once Firebase Messaging is configured (needs google-services.json for
+            // com.mytm.darrbi). Until then it's empty and the server simply stores no push token.
+            override suspend fun fcmToken(): String = ""
         }
 }

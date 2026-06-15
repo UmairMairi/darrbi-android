@@ -3,13 +3,25 @@ package com.mytm.darrbi.presentation
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import com.mytm.darrbi.core.designsystem.DarrbiTheme
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.mytm.darrbi.R
 import com.mytm.darrbi.domain.model.Ride
 import com.mytm.darrbi.presentation.dashboard.CaptainDashboardScreen
@@ -49,8 +61,34 @@ private enum class Route {
 @Composable
 fun DarrbiRoot() {
     val context = LocalContext.current
+    val sessionViewModel: SessionViewModel = hiltViewModel()
+    val modeSwitchViewModel: ModeSwitchViewModel = hiltViewModel()
+    val modeSwitching by modeSwitchViewModel.switching.collectAsStateWithLifecycle()
+    val modeSwitchError by modeSwitchViewModel.error.collectAsStateWithLifecycle()
+    // Surface a failed RIDER/CAPTAIN switch (it was silent before — looked like the toggle did nothing).
+    LaunchedEffect(modeSwitchError) {
+        modeSwitchError?.let {
+            android.widget.Toast.makeText(context, it, android.widget.Toast.LENGTH_SHORT).show()
+            modeSwitchViewModel.consumeError()
+        }
+    }
+    // No NavHost here, so every screen's hiltViewModel() is scoped to this Activity's store; clearing it
+    // on logout drops all feature ViewModels (and their StateFlows) so the next session starts clean.
+    val viewModelStoreOwner = LocalViewModelStoreOwner.current
     var showSplash by remember { mutableStateOf(true) }
     var route by remember { mutableStateOf(Route.Onboarding) }
+
+    // Switches the active RIDER/CAPTAIN mode (GET /captains + conditional change-driver-mode) then routes.
+    fun switchMode(toCaptain: Boolean) {
+        modeSwitchViewModel.switchMode(toCaptain) { target ->
+            route = when (target) {
+                ModeTarget.Captain -> Route.Dashboard
+                ModeTarget.Rider -> Route.RiderHome
+                // Not a registered driver yet → into the become-a-captain onboarding.
+                ModeTarget.RegisterCaptain -> Route.Onboarding
+            }
+        }
+    }
     // Ride selected from the My Rides list, passed to the details screen.
     var selectedRide by remember { mutableStateOf<Ride?>(null) }
     var selectedRideGiven by remember { mutableStateOf(false) }
@@ -60,10 +98,17 @@ fun DarrbiRoot() {
     var profileReturn by remember { mutableStateOf(Route.Dashboard) }
 
     LaunchedEffect(Unit) {
+        // Auto-login: route from the persisted session (saved token → straight to the dashboard).
+        route = when (sessionViewModel.resolveStartDestination()) {
+            StartDestination.CaptainDashboard -> Route.Dashboard
+            StartDestination.RiderHome -> Route.RiderHome
+            StartDestination.Onboarding -> Route.Onboarding
+        }
         delay(SPLASH_DURATION_MS)
         showSplash = false
     }
 
+    Box(modifier = Modifier.fillMaxSize()) {
     Crossfade(targetState = showSplash, animationSpec = tween(durationMillis = 400), label = "root") { splash ->
         if (splash) {
             SplashScreen()
@@ -76,9 +121,13 @@ fun DarrbiRoot() {
                 Route.Dashboard -> CaptainDashboardScreen(
                     onSeeDetails = { route = Route.StatusDetail },
                     onProfile = { profileReturn = Route.Dashboard; route = Route.Profile },
+                    onSwitchToRider = { switchMode(toCaptain = false) },
+                    modeSwitching = modeSwitching,
                 )
                 Route.RiderHome -> RiderFlowScreen(
                     onProfile = { profileReturn = Route.RiderHome; route = Route.Profile },
+                    onSwitchToCaptain = { switchMode(toCaptain = true) },
+                    modeSwitching = modeSwitching,
                 )
                 Route.StatusDetail -> {
                     BackHandler { route = Route.Dashboard }
@@ -88,7 +137,13 @@ fun DarrbiRoot() {
                     BackHandler { route = profileReturn }
                     ProfileScreen(
                         onBack = { route = profileReturn },
-                        onLogout = { route = Route.Onboarding },
+                        onLogout = {
+                            // Clear prefs, then navigate home and reset every ViewModel/StateFlow.
+                            sessionViewModel.logout {
+                                route = Route.Onboarding
+                                viewModelStoreOwner?.viewModelStore?.clear()
+                            }
+                        },
                         onViewBalanceDetails = { route = Route.TopupDetails },
                         onMyRides = { route = Route.MyRides },
                         onMyReports = { route = Route.MyReports },
@@ -168,6 +223,24 @@ fun DarrbiRoot() {
                     BackHandler { route = Route.Profile }
                     LegalScreen(titleRes = R.string.menu_privacy_policy, page = LegalPage.Privacy, onBack = { route = Route.Profile })
                 }
+            }
+        }
+    }
+        // Mode switch is in flight (GET /captains + change-driver-mode) → block input and show a spinner so
+        // the RIDER/CAPTAIN toggle gives feedback instead of appearing to do nothing.
+        if (modeSwitching) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(DarrbiTheme.colors.splashBackground.copy(alpha = 0.32f))
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        onClick = {},
+                    ),
+                contentAlignment = Alignment.Center,
+            ) {
+                CircularProgressIndicator(color = DarrbiTheme.colors.primary)
             }
         }
     }

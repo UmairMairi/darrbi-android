@@ -55,6 +55,9 @@ class ProfileViewModel @Inject constructor(
     /** Re-fetch the IBAN (e.g. after the user updates it). */
     fun refreshIban() = loadIban()
 
+    /** Re-fetch the wallet balance (e.g. after a successful top-up). */
+    fun refreshBalance() = loadBalance()
+
     private fun loadIban() {
         _state.update { it.copy(isLoadingIban = true) }
         viewModelScope.launch {

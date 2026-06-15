@@ -24,4 +24,7 @@ interface RideRepository {
         cabId: String,
         promoCode: String?,
     ): ApiResult<BookedTrip>
+
+    /** Cancels a pending trip request (`PUT trips/cancel-trip-request/{tripId}`). */
+    suspend fun cancelTripRequest(tripId: String): ApiResult<Unit>
 }

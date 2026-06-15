@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "44634991756",
+    "project_id": "darbi-b2b75",
+    "storage_bucket": "darbi-b2b75.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:44634991756:android:81806d4c11e495707c9fa9",
+        "android_client_info": {
+          "package_name": "com.mytm.darrbi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXM8wXDd_WyRiczv4CZRtvm5VExOMsR3I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:44634991756:android:91038b219d4de93f7c9fa9",
+        "android_client_info": {
+          "package_name": "com.rider.ride"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDXM8wXDd_WyRiczv4CZRtvm5VExOMsR3I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

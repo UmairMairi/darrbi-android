@@ -26,8 +26,10 @@ class VerifyOtpUseCase @Inject constructor(
     ): ApiResult<AuthSession> {
         val result = authRepository.verifyOtp(mobileNo, transactionId, otp, language)
         if (result is ApiResult.Success) {
+            // Persist the full session so the splash can auto-login on the next app launch.
             sessionRepository.saveSession(result.data.token, result.data.userId)
             sessionRepository.saveUser(result.data.profile)
+            sessionRepository.saveLoginState(result.data.userType, result.data.isNameUpdated)
         }
         return result
     }

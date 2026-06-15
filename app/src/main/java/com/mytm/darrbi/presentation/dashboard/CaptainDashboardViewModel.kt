@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.CaptainDetails
+import com.mytm.darrbi.domain.model.PlaceLocation
+import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
+import com.mytm.darrbi.domain.repository.SocketService
 import com.mytm.darrbi.domain.usecase.GetCaptainDetailsUseCase
 import com.mytm.darrbi.domain.usecase.ValidateIbanUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -26,6 +29,8 @@ data class CaptainDashboardUiState(
     val ibanVerifying: Boolean = false,
     val ibanError: Boolean = false,
     val bankName: String? = null,
+    /** Device location, once the captain is set up and grants permission, used to centre the map. */
+    val myLocation: PlaceLocation? = null,
     val errorMessage: String? = null,
 ) {
     val canSubmitIban: Boolean
@@ -47,6 +52,8 @@ sealed interface CaptainDashboardEvent {
 class CaptainDashboardViewModel @Inject constructor(
     private val getCaptainDetails: GetCaptainDetailsUseCase,
     private val validateIban: ValidateIbanUseCase,
+    private val currentLocation: CurrentLocationUseCase,
+    private val socketService: SocketService,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CaptainDashboardUiState())
@@ -56,10 +63,23 @@ class CaptainDashboardViewModel @Inject constructor(
         refresh()
     }
 
+    /** Centre the map on the device location (called once permission is granted on the ready dashboard). */
+    fun locateMe() {
+        viewModelScope.launch {
+            when (val result = currentLocation()) {
+                is ApiResult.Success -> _state.update { it.copy(myLocation = result.data) }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
     fun onEvent(event: CaptainDashboardEvent) {
         when (event) {
-            CaptainDashboardEvent.StartNow ->
-                _state.update { it.copy(started = true, stage = stageFor(it.captain, started = true)) }
+            CaptainDashboardEvent.StartNow -> {
+                val stage = stageFor(_state.value.captain, started = true)
+                _state.update { it.copy(started = true, stage = stage) }
+                connectSocketIfReady(stage)
+            }
             is CaptainDashboardEvent.IbanChanged -> _state.update {
                 // Keep the raw IBAN (uppercased, no spaces); the field formats it for display.
                 it.copy(
@@ -79,8 +99,12 @@ class CaptainDashboardViewModel @Inject constructor(
         _state.update { it.copy(stage = CaptainStage.Loading) }
         viewModelScope.launch {
             when (val result = getCaptainDetails()) {
-                is ApiResult.Success ->
-                    _state.update { it.copy(captain = result.data, stage = stageFor(result.data, it.started)) }
+                is ApiResult.Success -> {
+                    val stage = stageFor(result.data, _state.value.started)
+                    _state.update { it.copy(captain = result.data, stage = stage) }
+                    // All checks passed (WASL approved + IBAN set → NoRiders) → open the socket.
+                    connectSocketIfReady(stage)
+                }
                 // No captain yet / fetch failed → treat as still under review.
                 is ApiResult.Error ->
                     _state.update { it.copy(captain = null, stage = stageFor(null, it.started)) }
@@ -118,5 +142,10 @@ class CaptainDashboardViewModel @Inject constructor(
         !captain.iban.isNullOrBlank() -> CaptainStage.NoRiders
         !started -> CaptainStage.Approved
         else -> CaptainStage.EnterIban
+    }
+
+    /** Connect the real-time socket only when the captain is fully verified (WASL approved + IBAN set). */
+    private fun connectSocketIfReady(stage: CaptainStage) {
+        if (stage == CaptainStage.NoRiders) socketService.connect()
     }
 }

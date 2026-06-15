@@ -55,6 +55,7 @@
     <string name="common_learn_more">اعرف المزيد</string>
     <string name="common_done">تم</string>
     <string name="common_confirm">تأكيد</string>
+    <string name="common_cancel">إلغاء</string>
     <string name="common_see_details">عرض التفاصيل</string>
     <string name="car_seats_format">%1$d مقاعد</string>
     <string name="car_no_cars_title">لا توجد سيارات مسجّلة على هويتك / إقامتك</string>
@@ -254,7 +255,16 @@
     <string name="rider_promo_hint">أدخل الرمز الترويجي</string>
     <string name="rider_promo_apply">تطبيق</string>
     <string name="rider_searching_title">في انتظار تأكيد الكابتن</string>
-    <string name="rider_searching_cancel">إلغاء</string>
+    <string name="rider_searching_cancel">إلغاء الرحلة</string>
+    <string name="rider_no_captain_title">عذراً! حاول مرة أخرى، لم يتم العثور على كابتن</string>
+    <string name="rider_try_again">حاول مرة أخرى</string>
+    <!-- Location permission -->
+    <string name="location_denied_title">إذن الموقع مطلوب</string>
+    <string name="location_denied_message">يحتاج دربي إلى موقعك لعرض مكانك على الخريطة والعثور على الرحلات القريبة منك. لقد رفضت الإذن، يُرجى تفعيل الموقع من الإعدادات.</string>
+    <string name="location_open_settings">فتح الإعدادات</string>
+    <!-- Rider/Captain mode toggle -->
+    <string name="mode_rider">راكب</string>
+    <string name="mode_captain">كابتن</string>
 
     <!-- Application status detail -->
     <string name="status_detail_title">طلبك قيد المراجعة</string>

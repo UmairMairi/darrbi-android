@@ -1,6 +1,7 @@
 package com.mytm.darrbi.domain.usecase
 
 import com.mytm.darrbi.core.common.ApiResult
+import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.PlaceSuggestion
 import com.mytm.darrbi.domain.repository.PlacesRepository
@@ -29,4 +30,11 @@ class ReverseGeocodeUseCase @Inject constructor(
 ) {
     suspend operator fun invoke(latitude: Double, longitude: Double): ApiResult<PlaceLocation> =
         repository.reverseGeocode(latitude, longitude)
+}
+
+class GetRouteUseCase @Inject constructor(
+    private val repository: PlacesRepository,
+) {
+    suspend operator fun invoke(origin: PlaceLocation, destination: PlaceLocation): ApiResult<List<LatLngPoint>> =
+        repository.getRoute(origin, destination)
 }

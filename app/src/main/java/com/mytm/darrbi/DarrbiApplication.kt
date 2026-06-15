@@ -2,32 +2,20 @@ package com.mytm.darrbi
 
 import android.app.Application
 import com.google.android.libraries.places.api.Places
-import com.mytm.darrbi.core.common.ApplicationScope
-import com.mytm.darrbi.domain.repository.SessionRepository
 import dagger.hilt.android.HiltAndroidApp
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.launch
-import javax.inject.Inject
 
 @HiltAndroidApp
 class DarrbiApplication : Application() {
 
-    @Inject
-    lateinit var sessionRepository: SessionRepository
-
-    @Inject
-    @ApplicationScope
-    lateinit var applicationScope: CoroutineScope
-
     override fun onCreate() {
         super.onCreate()
-        // Start every launch with a clean slate: no stale session/userId in preferences. The session is
-        // (re)populated only when a token is received from verify-OTP, and that token is used for all APIs.
-        applicationScope.launch { sessionRepository.clear() }
+        // The persisted session is kept across launches (auto-login); it's cleared only on logout.
 
-        // Google Places SDK for location autocomplete (uses the same Maps key).
+        // Google Places SDK for location autocomplete via the NEW Places API (the legacy one is sunset).
+        // REQUIRES "Places API (New)" enabled on the key's Cloud project (963092244705); otherwise
+        // findAutocompletePredictions fails with 9011 (API not enabled).
         if (!Places.isInitialized()) {
-            Places.initialize(this, BuildConfig.MAPS_API_KEY)
+            Places.initializeWithNewPlacesApiEnabled(this, BuildConfig.MAPS_API_KEY)
         }
     }
 }

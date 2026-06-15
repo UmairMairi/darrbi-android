@@ -1,46 +1,38 @@
 package com.mytm.darrbi.data.location
 
-import android.Manifest
 import android.content.Context
-import android.content.pm.PackageManager
-import android.location.Geocoder
-import androidx.core.content.ContextCompat
-import com.google.android.gms.location.LocationServices
-import com.google.android.gms.location.Priority
-import com.google.android.gms.tasks.CancellationTokenSource
-import com.google.android.gms.tasks.Task
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.AutocompleteSessionToken
 import com.google.android.libraries.places.api.model.Place
 import com.google.android.libraries.places.api.net.FetchPlaceRequest
 import com.google.android.libraries.places.api.net.FindAutocompletePredictionsRequest
 import com.mytm.darrbi.core.common.ApiResult
-import com.mytm.darrbi.core.common.AppError
+import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.PlaceSuggestion
+import com.mytm.darrbi.domain.repository.MapService
 import com.mytm.darrbi.domain.repository.PlacesRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
-import kotlinx.coroutines.suspendCancellableCoroutine
-import java.util.Locale
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlin.coroutines.resume
-import kotlin.coroutines.resumeWithException
 
+/** Place search/resolution via the Google Places SDK; device location is delegated to [MapService]. */
 @Singleton
 class PlacesRepositoryImpl @Inject constructor(
     @ApplicationContext private val context: Context,
+    private val mapService: MapService,
 ) : PlacesRepository {
 
     private val placesClient by lazy { Places.createClient(context) }
-    private val fusedClient by lazy { LocationServices.getFusedLocationProviderClient(context) }
     // A session token keeps autocomplete + details billed as one session.
     private var sessionToken = AutocompleteSessionToken.newInstance()
 
     override suspend fun autocomplete(query: String): ApiResult<List<PlaceSuggestion>> {
         if (query.isBlank()) return ApiResult.Success(emptyList())
         return runCatching {
+            // Mirror ride-android's WhereToGo/Pickup autocomplete: restrict predictions to one country.
             val request = FindAutocompletePredictionsRequest.builder()
+                .setCountries(AUTOCOMPLETE_COUNTRY)
                 .setSessionToken(sessionToken)
                 .setQuery(query)
                 .build()
@@ -52,7 +44,7 @@ class PlacesRepositoryImpl @Inject constructor(
                     secondaryText = it.getSecondaryText(null).toString(),
                 )
             }
-        }.toResult()
+        }.toApiResult()
     }
 
     override suspend fun placeDetails(placeId: String): ApiResult<PlaceLocation> = runCatching {
@@ -67,58 +59,20 @@ class PlacesRepositoryImpl @Inject constructor(
             latitude = place.latLng?.latitude ?: 0.0,
             longitude = place.latLng?.longitude ?: 0.0,
         )
-    }.toResult()
+    }.toApiResult()
 
-    override suspend fun currentLocation(): ApiResult<PlaceLocation> {
-        if (!hasLocationPermission()) {
-            return ApiResult.Failure(AppError.Unknown("Location permission not granted"))
-        }
-        return runCatching {
-            val location = fusedClient.getCurrentLocation(
-                Priority.PRIORITY_BALANCED_POWER_ACCURACY,
-                CancellationTokenSource().token,
-            ).await() ?: error("Current location unavailable")
-            PlaceLocation(
-                name = "",
-                address = geocodeAddress(location.latitude, location.longitude),
-                latitude = location.latitude,
-                longitude = location.longitude,
-            )
-        }.toResult()
+    // Device location + geocoding + routing live in the map service (the single owner of map/location ops).
+    override suspend fun currentLocation(): ApiResult<PlaceLocation> = mapService.currentLocation()
+
+    override suspend fun reverseGeocode(latitude: Double, longitude: Double): ApiResult<PlaceLocation> =
+        mapService.reverseGeocode(latitude, longitude)
+
+    override suspend fun getRoute(origin: PlaceLocation, destination: PlaceLocation): ApiResult<List<LatLngPoint>> =
+        mapService.routeBetween(origin, destination)
+
+    private companion object {
+        // Country to bias autocomplete to (matches ride-android's WhereToGo/Pickup test region).
+        // Switch to "SA" for the Saudi production market.
+        const val AUTOCOMPLETE_COUNTRY = "PK"
     }
-
-    override suspend fun reverseGeocode(latitude: Double, longitude: Double): ApiResult<PlaceLocation> = runCatching {
-        PlaceLocation(
-            name = "",
-            address = geocodeAddress(latitude, longitude),
-            latitude = latitude,
-            longitude = longitude,
-        )
-    }.toResult()
-
-    private fun hasLocationPermission(): Boolean =
-        ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(context, Manifest.permission.ACCESS_COARSE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED
-
-    @Suppress("DEPRECATION")
-    private fun geocodeAddress(lat: Double, lng: Double): String = runCatching {
-        Geocoder(context, Locale.getDefault()).getFromLocation(lat, lng, 1)
-            ?.firstOrNull()
-            ?.getAddressLine(0)
-            .orEmpty()
-    }.getOrDefault("")
 }
-
-/** Suspend bridge for Play-services [Task] without the coroutines-play-services artifact. */
-private suspend fun <T> Task<T>.await(): T = suspendCancellableCoroutine { cont ->
-    addOnSuccessListener { cont.resume(it) }
-    addOnFailureListener { cont.resumeWithException(it) }
-    addOnCanceledListener { cont.cancel() }
-}
-
-private fun <T> Result<T>.toResult(): ApiResult<T> = fold(
-    onSuccess = { ApiResult.Success(it) },
-    onFailure = { ApiResult.Failure(AppError.Unknown(it.message)) },
-)

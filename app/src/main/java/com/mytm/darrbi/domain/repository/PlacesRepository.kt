@@ -1,6 +1,7 @@
 package com.mytm.darrbi.domain.repository
 
 import com.mytm.darrbi.core.common.ApiResult
+import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.PlaceSuggestion
 
@@ -17,4 +18,7 @@ interface PlacesRepository {
 
     /** Reverse-geocode an arbitrary point (e.g. a pin dropped on the map) to an address. */
     suspend fun reverseGeocode(latitude: Double, longitude: Double): ApiResult<PlaceLocation>
+
+    /** Driving route polyline from [origin] to [destination] (Google Routes API). */
+    suspend fun getRoute(origin: PlaceLocation, destination: PlaceLocation): ApiResult<List<LatLngPoint>>
 }

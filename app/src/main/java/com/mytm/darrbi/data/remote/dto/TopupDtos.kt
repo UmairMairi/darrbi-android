@@ -1,6 +1,39 @@
 package com.mytm.darrbi.data.remote.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
+
+/**
+ * `POST user/clickpay-hosted-method-top-up` request. Body: `{method, amount, name, email, city, country}`
+ * — `method = 4` selects the ClickPay hosted payment page; name/email/city/country are billing details
+ * ClickPay prefills (the customer can still edit them on the hosted page).
+ */
+@Serializable
+data class HostedTopUpRequest(
+    val method: Int,
+    val amount: Int,
+    val name: String,
+    val email: String,
+    val city: String,
+    val country: String,
+) {
+    companion object {
+        const val HOSTED_METHOD_CLICKPAY = 1
+    }
+}
+
+/**
+ * `POST user/clickpay-hosted-method-top-up` `data` payload: `{checkout_url, txnId, order_id}` (wrapped in
+ * the standard MainEnvelope). The hosted page (`checkout_url`) is opened in a WebView; success/failure is
+ * read from the final page. `redirect_url` is kept as a fallback for other gateway configs.
+ */
+@Serializable
+data class HostedTopUpData(
+    @SerialName("checkout_url") val checkoutUrl: String? = null,
+    @SerialName("redirect_url") val redirectUrl: String? = null,
+    val txnId: String? = null,
+    @SerialName("order_id") val orderId: String? = null,
+)
 
 /** `POST /user/top-up-history` request — entityType "3" filters to top-up transactions (ride-android). */
 @Serializable

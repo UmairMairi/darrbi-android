@@ -9,6 +9,7 @@ data class EnvConfig(
     val mainUrl: String,
     val cmsUrl: String,
     val dashboardUrl: String,
+    val socketUrl: String,
     val rentalUrl: String,
     val rentalToken: String,
     val secretKey: String,

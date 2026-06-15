@@ -14,3 +14,9 @@ data class PlaceLocation(
     val latitude: Double,
     val longitude: Double,
 )
+
+/** A single coordinate on a route polyline (pickup → destination). */
+data class LatLngPoint(
+    val latitude: Double,
+    val longitude: Double,
+)

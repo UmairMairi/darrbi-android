@@ -19,4 +19,7 @@ interface LanguageProvider {
 /** Stable device identifier used by auth endpoints (e.g. the verify-otp `deviceId` header). */
 interface DeviceInfoProvider {
     val deviceId: String
+
+    /** FCM push token to register with the server; empty when push isn't configured yet. */
+    suspend fun fcmToken(): String
 }

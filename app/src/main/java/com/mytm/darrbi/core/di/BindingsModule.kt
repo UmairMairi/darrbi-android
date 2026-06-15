@@ -5,15 +5,19 @@ import com.mytm.darrbi.core.common.SessionProvider
 import com.mytm.darrbi.core.common.UserIdProvider
 import com.mytm.darrbi.core.datastore.LanguageStore
 import com.mytm.darrbi.core.datastore.SessionStore
+import com.mytm.darrbi.data.location.MapServiceImpl
 import com.mytm.darrbi.data.location.PlacesRepositoryImpl
+import com.mytm.darrbi.data.socket.SocketServiceImpl
 import com.mytm.darrbi.data.repository.AuthRepositoryImpl
 import com.mytm.darrbi.data.repository.OnboardingRepositoryImpl
 import com.mytm.darrbi.data.repository.RideRepositoryImpl
 import com.mytm.darrbi.domain.repository.AuthRepository
+import com.mytm.darrbi.domain.repository.MapService
 import com.mytm.darrbi.domain.repository.OnboardingRepository
 import com.mytm.darrbi.domain.repository.PlacesRepository
 import com.mytm.darrbi.domain.repository.RideRepository
 import com.mytm.darrbi.domain.repository.SessionRepository
+import com.mytm.darrbi.domain.repository.SocketService
 import dagger.Binds
 import dagger.Module
 import dagger.hilt.InstallIn
@@ -57,4 +61,12 @@ abstract class BindingsModule {
     @Binds
     @Singleton
     abstract fun bindRideRepository(impl: RideRepositoryImpl): RideRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindMapService(impl: MapServiceImpl): MapService
+
+    @Binds
+    @Singleton
+    abstract fun bindSocketService(impl: SocketServiceImpl): SocketService
 }

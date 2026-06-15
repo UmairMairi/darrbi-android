@@ -42,6 +42,7 @@ android {
             buildConfigField("String", "MAIN_URL", "\"https://api-darbi.xintdev.com\"")
             buildConfigField("String", "CMS_URL", "\"https://cms-darbi.xintdev.com\"")
             buildConfigField("String", "DASHBOARD_URL", "\"https://admin-darbi.xintdev.com\"")
+            buildConfigField("String", "SOCKET_URL", "\"https://socket-darbi.xintdev.com\"")
 //            buildConfigField("String", "MAIN_URL", "\"http://150.230.54.239:3000\"")
 //            buildConfigField("String", "CMS_URL", "\"https://cmsride.xintdev.com\"")
 //            buildConfigField("String", "DASHBOARD_URL", "\"http://dev-dashboard.ride.sa\"")
@@ -51,18 +52,21 @@ android {
             buildConfigField("String", "MAIN_URL", "\"https://api-darbi.xintdev.com\"")
             buildConfigField("String", "CMS_URL", "\"https://cms-darbi.xintdev.com\"")
             buildConfigField("String", "DASHBOARD_URL", "\"https://admin-darbi.xintdev.com\"")
+            buildConfigField("String", "SOCKET_URL", "\"https://socket-darbi.xintdev.com\"")
         }
         create("preprod") {
             dimension = "env"
             buildConfigField("String", "MAIN_URL", "\"https://pre-prod-apis.ride.sa\"")
             buildConfigField("String", "CMS_URL", "\"https://prod-cms.ride.sa\"")
             buildConfigField("String", "DASHBOARD_URL", "\"https://pre-prod-dashboard.ride.sa\"")
+            buildConfigField("String", "SOCKET_URL", "\"https://pre-prod-socket.ride.sa\"")
         }
         create("production") {
             dimension = "env"
             buildConfigField("String", "MAIN_URL", "\"https://prodapi.ride.sa\"")
             buildConfigField("String", "CMS_URL", "\"https://cmsride.xintdev.com\"")
             buildConfigField("String", "DASHBOARD_URL", "\"https://proddashboard.ride.sa\"")
+            buildConfigField("String", "SOCKET_URL", "\"https://prodsocket.ride.sa\"")
         }
     }
 
@@ -144,6 +148,12 @@ dependencies {
     implementation(libs.okhttp.logging.interceptor)
     implementation(libs.retrofit.kotlinx.serialization.converter)
     implementation(libs.kotlinx.serialization.json)
+
+    // Socket.IO (real-time). 2.1.x speaks Engine.IO v4 (EIO=4), which the darbi socket server requires
+    // (ride-android's 2.0.1 is EIO=3 and is rejected by this backend). Exclude the bundled org.json.
+    implementation("io.socket:socket.io-client:2.1.0") {
+        exclude(group = "org.json", module = "json")
+    }
 
     // DataStore
     implementation(libs.androidx.datastore.preferences)

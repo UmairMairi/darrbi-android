@@ -33,6 +33,8 @@ data class DarrbiColors(
     val inputBorder: Color,
     /** Brand splash background — intentionally black in both light and dark (the logo is light-on-dark). */
     val splashBackground: Color,
+    /** Bright accent green for the RIDER/CAPTAIN mode toggle's active segment (per the design). */
+    val modeAccent: Color,
 )
 
 private val BrandGreen = Color(0xFF13B542)
@@ -40,6 +42,7 @@ private val BrandBlue = Color(0xFF3399FF)
 private val Black = Color(0xFF000000)
 private val NearBlack = Color(0xFF0A0A0A)
 private val White = Color(0xFFFFFFFF)
+private val ModeGreen = Color(0xFF34D94F)
 
 val LightDarrbiColors = DarrbiColors(
     primary = BrandGreen,
@@ -62,6 +65,7 @@ val LightDarrbiColors = DarrbiColors(
     onButtonDisabled = White,
     inputBorder = Color(0xFFE2E2E2),
     splashBackground = Black,
+    modeAccent = ModeGreen,
 )
 
 val DarkDarrbiColors = DarrbiColors(
@@ -85,4 +89,5 @@ val DarkDarrbiColors = DarrbiColors(
     onButtonDisabled = Color(0xFF8A8A8A),
     inputBorder = Color(0xFF545454),
     splashBackground = Black,
+    modeAccent = ModeGreen,
 )

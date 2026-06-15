@@ -103,7 +103,10 @@ fun ProfileScreen(
         )
     }
     if (showAddBalance) {
-        com.mytm.darrbi.presentation.topup.AddBalanceSheet(onDismiss = { showAddBalance = false })
+        com.mytm.darrbi.presentation.topup.AddBalanceSheet(
+            onDismiss = { showAddBalance = false },
+            onTopUpSuccess = { viewModel.refreshBalance() },
+        )
     }
     if (showUpdateIban) {
         UpdateIbanSheet(

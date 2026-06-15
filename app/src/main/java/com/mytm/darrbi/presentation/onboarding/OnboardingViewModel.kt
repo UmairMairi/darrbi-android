@@ -12,6 +12,7 @@ import com.mytm.darrbi.domain.usecase.GuestToDriverUseCase
 import com.mytm.darrbi.domain.usecase.RequestOtpUseCase
 import com.mytm.darrbi.domain.usecase.SetRiderNameUseCase
 import com.mytm.darrbi.domain.usecase.SubmitCaptainApplicationUseCase
+import com.mytm.darrbi.domain.usecase.UpdateDeviceTokenUseCase
 import com.mytm.darrbi.domain.usecase.VerifyOtpUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
@@ -27,6 +28,7 @@ import javax.inject.Inject
 class OnboardingViewModel @Inject constructor(
     private val requestOtp: RequestOtpUseCase,
     private val verifyOtp: VerifyOtpUseCase,
+    private val updateDeviceToken: UpdateDeviceTokenUseCase,
     private val setRiderName: SetRiderNameUseCase,
     private val guestToDriver: GuestToDriverUseCase,
     private val getCaptainDetails: GetCaptainDetailsUseCase,
@@ -132,6 +134,8 @@ class OnboardingViewModel @Inject constructor(
             when (result) {
                 is ApiResult.Success -> {
                     resendJob?.cancel()
+                    // Token is now saved → register the FCM/device token with the server (best-effort).
+                    updateDeviceToken()
                     routeAfterOtp(result.data)
                 }
                 is ApiResult.Error -> _state.update { it.copy(isLoading = false, errorMessage = result.message) }
@@ -143,8 +147,9 @@ class OnboardingViewModel @Inject constructor(
     /**
      * Post-OTP routing (matches ride-android):
      * - name not set yet → continue onboarding at the user-type step.
-     * - returning rider (userType 1) → rider home.
-     * - returning captain (userType 2) → fetch + cache `GET /captains`, then the captain dashboard.
+     * - userType 1 → rider home.
+     * - userType 2 (has a driver profile) → the *current* status comes from `GET /captains`:
+     *   `driverModeSwitch` true → captain dashboard (driver), false → rider home.
      */
     private suspend fun routeAfterOtp(session: AuthSession) {
         if (!session.isNameUpdated) {
@@ -152,8 +157,8 @@ class OnboardingViewModel @Inject constructor(
             return
         }
         if (session.userType == USER_TYPE_CAPTAIN) {
-            getCaptainDetails()
-            _state.update { it.copy(isLoading = false, navigateToDashboard = true) }
+            val inDriverMode = (getCaptainDetails() as? ApiResult.Success)?.data?.driverModeSwitch == true
+            _state.update { it.copy(isLoading = false, navigateToDashboard = inDriverMode, navigateToRiderHome = !inDriverMode) }
         } else {
             _state.update { it.copy(isLoading = false, navigateToRiderHome = true) }
         }

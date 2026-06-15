@@ -41,23 +41,32 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.hilt.navigation.compose.hiltViewModel
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mytm.darrbi.R
 import com.mytm.darrbi.core.designsystem.DarrbiTheme
 import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiTextField
 
-private enum class AddBalanceStage { Input, Success, Failed }
+private enum class AddBalanceStage { Input, Paying, Success, Failed }
 
 /**
  * "Add Balance" (topup) — a bottom sheet stacked over the profile screen (opened from the Balance card's
- * Topup button). No Apple Pay button (Android). On success/failure it swaps to a result state in the sheet.
+ * Topup button). "Add Balance" calls `clickpay-hosted-method-top-up` (method 1) for a hosted-page URL,
+ * opens it in an in-app WebView, and reads the result to swap to the Success/Failed state.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun AddBalanceSheet(onDismiss: () -> Unit) {
+fun AddBalanceSheet(
+    onDismiss: () -> Unit,
+    onTopUpSuccess: () -> Unit = {},
+    viewModel: AddBalanceViewModel = hiltViewModel(),
+) {
     var stage by remember { mutableStateOf(AddBalanceStage.Input) }
     var amount by remember { mutableStateOf("") }
+    var hostedUrl by remember { mutableStateOf<String?>(null) }
+    val loading by viewModel.loading.collectAsStateWithLifecycle()
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
 
     ModalBottomSheet(
@@ -66,10 +75,22 @@ fun AddBalanceSheet(onDismiss: () -> Unit) {
         containerColor = DarrbiTheme.colors.surface,
     ) {
         when (stage) {
-            AddBalanceStage.Input -> InputContent(
+            AddBalanceStage.Input, AddBalanceStage.Paying -> InputContent(
                 amount = amount,
+                loading = loading,
                 onAmountChange = { new -> amount = new.filter { it.isDigit() } },
-                onAddBalance = { stage = AddBalanceStage.Success },
+                onAddBalance = {
+                    amount.toIntOrNull()?.let { amt ->
+                        viewModel.requestHostedUrl(amt) { url ->
+                            if (url != null) {
+                                hostedUrl = url
+                                stage = AddBalanceStage.Paying
+                            } else {
+                                stage = AddBalanceStage.Failed
+                            }
+                        }
+                    }
+                },
             )
             AddBalanceStage.Success -> ResultContent(
                 ringColor = DarrbiTheme.colors.primary,
@@ -91,10 +112,29 @@ fun AddBalanceSheet(onDismiss: () -> Unit) {
             )
         }
     }
+
+    // Open the hosted page full-screen; the WebView result decides Success vs Failed.
+    if (stage == AddBalanceStage.Paying) {
+        hostedUrl?.let { url ->
+            PaymentWebViewDialog(
+                url = url,
+                onResult = { success ->
+                    if (success) {
+                        stage = AddBalanceStage.Success
+                        // Payment done → refresh the wallet balance via get-balance.
+                        onTopUpSuccess()
+                    } else {
+                        stage = AddBalanceStage.Failed
+                    }
+                },
+                onCancel = { stage = AddBalanceStage.Input },
+            )
+        }
+    }
 }
 
 @Composable
-private fun InputContent(amount: String, onAmountChange: (String) -> Unit, onAddBalance: () -> Unit) {
+private fun InputContent(amount: String, loading: Boolean, onAmountChange: (String) -> Unit, onAddBalance: () -> Unit) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -152,7 +192,7 @@ private fun InputContent(amount: String, onAmountChange: (String) -> Unit, onAdd
         )
         DarrbiPrimaryButton(
             text = stringResource(R.string.addbalance_add_balance),
-            enabled = amount.isNotBlank(),
+            enabled = amount.isNotBlank() && !loading,
             onClick = onAddBalance,
         )
     }

@@ -15,7 +15,7 @@ fun VerifyOtpData.toDomain(): AuthSession = AuthSession(
     token = token.orEmpty(),
     userId = userId ?: details?.id,
     isNameUpdated = details?.isNameUpdated ?: false,
-    userType = 1 ?: details?.userType,
+    userType = details?.userType,
     profile = details.toUserProfile(),
 )
 

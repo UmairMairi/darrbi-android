@@ -1,9 +1,6 @@
 package com.mytm.darrbi.presentation.rider
 
-import android.Manifest
 import androidx.activity.compose.BackHandler
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -17,8 +14,11 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
@@ -39,6 +40,7 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
@@ -53,14 +55,18 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.CabOption
@@ -69,43 +75,133 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import android.graphics.Bitmap
+import android.graphics.drawable.BitmapDrawable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.ui.platform.LocalDensity
+import androidx.core.content.ContextCompat
+import com.google.android.gms.maps.CameraUpdateFactory
+import com.google.android.gms.maps.model.BitmapDescriptor
+import com.google.android.gms.maps.model.BitmapDescriptorFactory
 import com.google.android.gms.maps.model.CameraPosition
 import com.google.android.gms.maps.model.LatLng
+import com.google.android.gms.maps.model.LatLngBounds
 import com.google.maps.android.compose.CameraPositionState
 import com.google.maps.android.compose.GoogleMap
 import com.google.maps.android.compose.MapProperties
 import com.google.maps.android.compose.MapType
 import com.google.maps.android.compose.MapUiSettings
+import com.google.maps.android.compose.Marker
+import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
+import com.google.maps.android.compose.rememberMarkerState
 import com.mytm.darrbi.R
+import com.mytm.darrbi.domain.model.LatLngPoint
+import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.core.designsystem.DarrbiTheme
 import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
+import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.domain.model.PlaceSuggestion
+import com.mytm.darrbi.presentation.common.LocationPermissionDeniedDialog
+import com.mytm.darrbi.presentation.common.ModeToggle
+import com.mytm.darrbi.presentation.common.RideMode
+import com.mytm.darrbi.presentation.common.openAppSettings
+import com.mytm.darrbi.presentation.common.rememberLocationPermissionState
 
 /**
  * Rider ride-booking flow (location selection): home map → destination search → pickup search →
- * confirm pickup. Search is powered by the Google Places SDK; "Use Current Location" by device GPS.
- * [onPickupConfirmed] hands off to ride selection (next increment).
+ * confirm pickup → ride selection. Search is powered by the Google Places SDK; location by [MapService].
+ * On entry the screen asks for location permission and, once granted, centres the map on the device.
  */
 @Composable
 fun RiderFlowScreen(
     onProfile: () -> Unit = {},
+    onSwitchToCaptain: () -> Unit = {},
+    modeSwitching: Boolean = false,
     viewModel: RiderBookingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
-    val locationPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    LaunchedEffect(Unit) { locationPermission.launch(Manifest.permission.ACCESS_FINE_LOCATION) }
+
+    // Surface transient errors (e.g. a failed cancel) and consume them so they show once.
+    val errorContext = LocalContext.current
+    LaunchedEffect(state.errorMessage) {
+        state.errorMessage?.let {
+            android.widget.Toast.makeText(errorContext, it, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.onEvent(RiderBookingEvent.ConsumeError)
+        }
+    }
+
+    // Ask for location permission on arrival; once granted, centre the map on the current location.
+    val locationPermission = rememberLocationPermissionState()
+    LaunchedEffect(Unit) { locationPermission.requestIfNeeded() }
+    LaunchedEffect(locationPermission.isGranted) {
+        if (locationPermission.isGranted) viewModel.onEvent(RiderBookingEvent.LocateMe)
+    }
 
     BackHandler(enabled = state.step != RiderStep.Home) { viewModel.onEvent(RiderBookingEvent.Back) }
 
     // One shared camera for every map-backed step, so the recenter button can move it.
     val defaultLocation = LatLng(24.7136, 46.6753)
     val cameraPositionState = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(defaultLocation, 14f) }
-    val recenter = { cameraPositionState.position = CameraPosition.fromLatLngZoom(defaultLocation, 15f) }
+    // Follow the device location to the map as soon as it resolves (smooth pan, instant-move fallback).
+    LaunchedEffect(state.myLocation) {
+        state.myLocation?.let {
+            val target = LatLng(it.latitude, it.longitude)
+            runCatching { cameraPositionState.animate(CameraUpdateFactory.newLatLngZoom(target, 16f), 800) }
+                .onFailure { cameraPositionState.position = CameraPosition.fromLatLngZoom(target, 16f) }
+        }
+    }
+    val recenter = {
+        val target = state.myLocation?.let { LatLng(it.latitude, it.longitude) } ?: defaultLocation
+        cameraPositionState.position = CameraPosition.fromLatLngZoom(target, 16f)
+    }
+
+    // On confirm-pickup / select-ride, frame the pickup + destination + route on the map.
+    val density = LocalDensity.current
+    val showRoute = state.step == RiderStep.ConfirmPickup ||
+        state.step == RiderStep.SelectRide ||
+        state.step == RiderStep.Searching
+    // Measured bottom-sheet height → reserve that area (plus the status bar) so the route frames ABOVE it.
+    var routeSheetHeightPx by remember { mutableStateOf(0) }
+    val statusTopDp = with(density) { WindowInsets.statusBars.getTop(this).toDp() }
+    val mapContentPadding = if (showRoute) {
+        PaddingValues(
+            start = 24.dp,
+            end = 24.dp,
+            top = statusTopDp + 16.dp,
+            bottom = with(density) { routeSheetHeightPx.toDp() } + 16.dp,
+        )
+    } else {
+        PaddingValues(0.dp)
+    }
+    LaunchedEffect(showRoute, state.pickup, state.destination, state.routePoints, routeSheetHeightPx) {
+        val pickup = state.pickup
+        val destination = state.destination
+        if (showRoute && pickup != null && destination != null) {
+            val pts = buildList {
+                add(LatLng(pickup.latitude, pickup.longitude))
+                add(LatLng(destination.latitude, destination.longitude))
+                addAll(state.routePoints.map { LatLng(it.latitude, it.longitude) })
+            }
+            val bounds = LatLngBounds.builder().apply { pts.forEach { include(it) } }.build()
+            runCatching { cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, ROUTE_BOUNDS_PADDING_PX), 700) }
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize().background(DarrbiTheme.colors.surfaceVariant)) {
         // The map picker draws its own interactive map; every other step uses the static background map.
-        if (state.step != RiderStep.MapPicker) RiderMap(cameraPositionState)
+        if (state.step != RiderStep.MapPicker) {
+            RiderMap(
+                cameraPositionState = cameraPositionState,
+                showMyLocation = locationPermission.isGranted,
+                pickup = if (showRoute) state.pickup else null,
+                destination = if (showRoute) state.destination else null,
+                routePoints = if (showRoute) state.routePoints else emptyList(),
+                contentPadding = mapContentPadding,
+            )
+        }
         when (state.step) {
             RiderStep.Home -> HomeOverlay(onProfile = onProfile, onSearch = { viewModel.onEvent(RiderBookingEvent.OpenDestinationSearch) })
             RiderStep.DestinationSearch -> SearchOverlay(
@@ -125,30 +221,146 @@ fun RiderFlowScreen(
                 onRecenter = recenter,
             )
             RiderStep.MapPicker -> MapPickerOverlay(
+                // Open centred on the current location; fall back to the shared camera's last position.
+                start = state.myLocation?.let { LatLng(it.latitude, it.longitude) } ?: cameraPositionState.position.target,
+                showMyLocation = locationPermission.isGranted,
                 onConfirm = { lat, lng -> viewModel.onEvent(RiderBookingEvent.ConfirmMapLocation(lat, lng)) },
             )
             RiderStep.ConfirmPickup -> ConfirmPickupOverlay(
                 address = state.pickup?.address.orEmpty(),
                 onEdit = { viewModel.onEvent(RiderBookingEvent.EditPickup) },
                 onConfirm = { viewModel.onEvent(RiderBookingEvent.ProceedToRideSelection) },
+                onHeight = { routeSheetHeightPx = it },
             )
-            RiderStep.SelectRide -> SelectRideOverlay(state = state, onEvent = viewModel::onEvent)
-            RiderStep.Searching -> SearchingOverlay(onCancel = { viewModel.onEvent(RiderBookingEvent.Back) })
+            RiderStep.SelectRide -> SelectRideOverlay(
+                state = state,
+                onEvent = viewModel::onEvent,
+                onHeight = { routeSheetHeightPx = it },
+            )
+            RiderStep.Searching -> SearchingOverlay(
+                noCaptainFound = state.noCaptainFound,
+                onTryAgain = { viewModel.onEvent(RiderBookingEvent.TryAgainSearch) },
+                onCancel = { viewModel.onEvent(RiderBookingEvent.CancelRide) },
+                onHeight = { routeSheetHeightPx = it },
+            )
         }
-        if (state.isResolving) {
+        // RIDER/CAPTAIN mode toggle, top-start over the map (location-selection steps only).
+        if (state.step == RiderStep.Home || state.step == RiderStep.DestinationSearch || state.step == RiderStep.PickupSearch) {
+            ModeToggle(
+                selected = RideMode.Rider,
+                onSelect = { if (it == RideMode.Captain) onSwitchToCaptain() },
+                enabled = !modeSwitching,
+                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(16.dp),
+            )
+        }
+        if (state.isResolving || state.isCancelling) {
             CircularProgressIndicator(color = DarrbiTheme.colors.primary, modifier = Modifier.align(Alignment.Center))
+        }
+    }
+
+    // Location denied with "don't ask again" → instructions + a button into system Settings.
+    if (locationPermission.isPermanentlyDenied) {
+        val context = LocalContext.current
+        LocationPermissionDeniedDialog(onOpenSettings = { context.openAppSettings() })
+    }
+}
+
+/** Extra breathing room (px) around the route bounds; the map's contentPadding does the main framing. */
+private const val ROUTE_BOUNDS_PADDING_PX = 48
+
+@Composable
+private fun RiderMap(
+    cameraPositionState: CameraPositionState,
+    showMyLocation: Boolean,
+    pickup: PlaceLocation? = null,
+    destination: PlaceLocation? = null,
+    routePoints: List<LatLngPoint> = emptyList(),
+    contentPadding: PaddingValues = PaddingValues(0.dp),
+) {
+    val routeColor = DarrbiTheme.colors.primary
+    val pickupLatLng = pickup?.let { LatLng(it.latitude, it.longitude) }
+    val destLatLng = destination?.let { LatLng(it.latitude, it.longitude) }
+    // Full route (real road route when available; otherwise a straight pickup→destination line).
+    val fullRoute = remember(pickupLatLng, destLatLng, routePoints) {
+        if (pickupLatLng != null && destLatLng != null) {
+            if (routePoints.size >= 2) routePoints.map { LatLng(it.latitude, it.longitude) }
+            else listOf(pickupLatLng, destLatLng)
+        } else {
+            emptyList()
+        }
+    }
+    // Animate the polyline drawing from start → end whenever the route changes.
+    val progress = remember { Animatable(0f) }
+    LaunchedEffect(fullRoute) {
+        if (fullRoute.size >= 2) {
+            progress.snapTo(0f)
+            progress.animateTo(1f, animationSpec = tween(durationMillis = 1400, easing = FastOutSlowInEasing))
+        }
+    }
+    val drawnRoute = remember(fullRoute, progress.value) { partialPath(fullRoute, progress.value) }
+
+    GoogleMap(
+        modifier = Modifier.fillMaxSize(),
+        cameraPositionState = cameraPositionState,
+        contentPadding = contentPadding,
+        properties = MapProperties(mapType = MapType.NORMAL, isMyLocationEnabled = showMyLocation),
+        uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false, mapToolbarEnabled = false, compassEnabled = false),
+    ) {
+        if (pickupLatLng != null && destLatLng != null && drawnRoute.size >= 2) {
+            Polyline(points = drawnRoute, color = routeColor, width = 6f)
+            // Same marker_1 pin for both the route start (pickup) and end (destination).
+            // Anchor at the icon centre (default is bottom-centre) so its centre sits on the location.
+            val markerIcon = rememberMarkerIcon()
+            val markerAnchor = Offset(0.5f, 0.5f)
+            Marker(
+                state = rememberMarkerState(key = "pickup_${pickupLatLng.latitude},${pickupLatLng.longitude}", position = pickupLatLng),
+                icon = markerIcon,
+                anchor = markerAnchor,
+            )
+            Marker(
+                state = rememberMarkerState(key = "dest_${destLatLng.latitude},${destLatLng.longitude}", position = destLatLng),
+                icon = markerIcon,
+                anchor = markerAnchor,
+            )
         }
     }
 }
 
+/** The leading [fraction] (0..1) of [points], interpolating the head point for a smooth draw-on. */
+private fun partialPath(points: List<LatLng>, fraction: Float): List<LatLng> {
+    if (points.size < 2) return points
+    if (fraction >= 1f) return points
+    if (fraction <= 0f) return listOf(points.first())
+    val position = (points.size - 1) * fraction
+    val index = position.toInt()
+    val segmentFraction = position - index
+    val head = points.subList(0, index + 1).toMutableList()
+    if (index < points.size - 1) {
+        val a = points[index]
+        val b = points[index + 1]
+        head.add(
+            LatLng(
+                a.latitude + (b.latitude - a.latitude) * segmentFraction,
+                a.longitude + (b.longitude - a.longitude) * segmentFraction,
+            ),
+        )
+    }
+    return head
+}
+
+/** Scaled `marker_1` pin used for the route endpoints (aspect ratio 156×184 preserved). */
 @Composable
-private fun RiderMap(cameraPositionState: CameraPositionState) {
-    GoogleMap(
-        modifier = Modifier.fillMaxSize(),
-        cameraPositionState = cameraPositionState,
-        properties = MapProperties(mapType = MapType.NORMAL),
-        uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false, mapToolbarEnabled = false, compassEnabled = false),
-    )
+private fun rememberMarkerIcon(): BitmapDescriptor? {
+    val context = LocalContext.current
+    val density = LocalDensity.current
+    return remember {
+        runCatching {
+            val heightPx = with(density) { 46.dp.roundToPx() }
+            val widthPx = (heightPx * 156f / 184f).toInt()
+            val source = (ContextCompat.getDrawable(context, R.drawable.marker_1) as BitmapDrawable).bitmap
+            BitmapDescriptorFactory.fromBitmap(Bitmap.createScaledBitmap(source, widthPx, heightPx, true))
+        }.getOrNull()
+    }
 }
 
 @Composable
@@ -209,11 +421,13 @@ private fun androidx.compose.foundation.layout.BoxScope.SearchOverlay(
     }
 
     // Bottom sheet: search field → set-from-map → live results. Wraps its content; the map shows above.
+    // imePadding on the card (not its content) lifts the whole card above the keyboard with no inner gap.
     Surface(
         modifier = Modifier
             .align(Alignment.BottomCenter)
             .fillMaxWidth()
-            .wrapContentHeight(),
+            .wrapContentHeight()
+            .imePadding(),
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         color = DarrbiTheme.colors.surface,
         shadowElevation = 8.dp,
@@ -221,8 +435,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SearchOverlay(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 20.dp)
-                .imePadding(),
+                .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
             if (title != null) {
@@ -268,18 +481,21 @@ private fun SetLocationFromMapButton(onClick: () -> Unit) {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.MapPickerOverlay(onConfirm: (Double, Double) -> Unit) {
-    val riyadh = LatLng(24.7136, 46.6753)
-    val cameraPositionState = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(riyadh, 16f) }
+private fun androidx.compose.foundation.layout.BoxScope.MapPickerOverlay(
+    start: LatLng,
+    showMyLocation: Boolean,
+    onConfirm: (Double, Double) -> Unit,
+) {
+    val cameraPositionState = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(start, 16f) }
     GoogleMap(
         modifier = Modifier.fillMaxSize(),
         cameraPositionState = cameraPositionState,
-        properties = MapProperties(mapType = MapType.NORMAL),
+        properties = MapProperties(mapType = MapType.NORMAL, isMyLocationEnabled = showMyLocation),
         uiSettings = MapUiSettings(zoomControlsEnabled = false, myLocationButtonEnabled = false, mapToolbarEnabled = false, compassEnabled = false),
     )
     // Fixed centre marker — the map moves under it; its tip marks the chosen location.
     androidx.compose.foundation.Image(
-        painter = androidx.compose.ui.res.painterResource(R.drawable.marker_1),
+        painter = painterResource(R.drawable.marker_1),
         contentDescription = null,
         modifier = Modifier
             .align(Alignment.Center)
@@ -350,7 +566,7 @@ private fun SuggestionRow(suggestion: PlaceSuggestion, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically,
     ) {
         androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(R.drawable.icon_marker_history),
+            painter = painterResource(R.drawable.icon_marker_history),
             contentDescription = null,
             modifier = Modifier.size(28.dp),
         )
@@ -365,33 +581,32 @@ private fun SuggestionRow(suggestion: PlaceSuggestion, onClick: () -> Unit) {
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.ConfirmPickupOverlay(address: String, onEdit: () -> Unit, onConfirm: () -> Unit) {
-    // Centre pickup pin over the map.
-    Icon(
-        imageVector = Icons.Filled.Place,
-        contentDescription = null,
-        tint = DarrbiTheme.colors.onSurface,
-        modifier = Modifier.align(Alignment.Center).size(40.dp),
-    )
+private fun androidx.compose.foundation.layout.BoxScope.ConfirmPickupOverlay(
+    address: String,
+    onEdit: () -> Unit,
+    onConfirm: () -> Unit,
+    onHeight: (Int) -> Unit,
+) {
+    // The pickup + destination markers and route are drawn on the map itself (see RiderMap).
     Surface(
-        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { onHeight(it.height) },
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         color = DarrbiTheme.colors.surface,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.rider_pickup_location), style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface, modifier = Modifier.weight(1f))
-                Text(stringResource(R.string.rider_edit), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.primary, modifier = Modifier.clickable(onClick = onEdit))
+                Text(stringResource(R.string.rider_pickup_location), style = DarrbiTheme.typography.title.copy(fontSize = 16.sp), color = DarrbiTheme.colors.onSurface, modifier = Modifier.weight(1f))
+                Text(stringResource(R.string.rider_edit), style = DarrbiTheme.typography.button.copy(fontSize = 14.sp), color = DarrbiTheme.colors.primary, modifier = Modifier.clickable(onClick = onEdit))
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             HorizontalDivider(color = DarrbiTheme.colors.outline)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.Place, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(24.dp))
-                Spacer(Modifier.width(12.dp))
-                Text(address, style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface, maxLines = 2)
+                Icon(Icons.Filled.Place, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(20.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(address, style = DarrbiTheme.typography.bodyMedium.copy(fontSize = 13.sp), color = DarrbiTheme.colors.onSurface, maxLines = 2)
             }
-            Spacer(Modifier.height(20.dp))
+            Spacer(Modifier.height(14.dp))
             DarrbiPrimaryButton(text = stringResource(R.string.rider_confirm_pickup), onClick = onConfirm)
         }
     }
@@ -405,27 +620,28 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPickupOverlay(add
 private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
     state: RiderBookingUiState,
     onEvent: (RiderBookingEvent) -> Unit,
+    onHeight: (Int) -> Unit,
 ) {
     var showPromo by remember { mutableStateOf(false) }
     var showAddBalance by remember { mutableStateOf(false) }
     val insufficient = state.isBalanceInsufficient
 
     Surface(
-        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().wrapContentHeight(),
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().wrapContentHeight().onSizeChanged { onHeight(it.height) },
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         color = DarrbiTheme.colors.surface,
         shadowElevation = 8.dp,
     ) {
-        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp)) {
             RouteHeader(
                 pickup = state.pickup?.address?.takeIf { it.isNotBlank() } ?: stringResource(R.string.rider_current_location),
                 destination = state.destination?.address.orEmpty(),
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = DarrbiTheme.colors.outline)
-            Spacer(Modifier.height(16.dp))
-            Text(stringResource(R.string.rider_recommended), style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface)
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(10.dp))
+            Text(stringResource(R.string.rider_recommended), style = DarrbiTheme.typography.title.copy(fontSize = 15.sp), color = DarrbiTheme.colors.onSurface)
+            Spacer(Modifier.height(6.dp))
             // Cab list — caps its height and scrolls only when the cabs overflow, so the sheet wraps tightly.
             Column(modifier = Modifier.fillMaxWidth().heightIn(max = 320.dp).verticalScroll(rememberScrollState())) {
                 when {
@@ -443,29 +659,29 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.rider_more_available_rides), style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.rider_more_available_rides), style = DarrbiTheme.typography.title.copy(fontSize = 15.sp), color = DarrbiTheme.colors.onSurface)
+            Spacer(Modifier.height(8.dp))
             HorizontalDivider(color = DarrbiTheme.colors.outline)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(8.dp))
             // Balance + promo row.
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Column(modifier = Modifier.weight(1f)) {
-                    Text(stringResource(R.string.rider_balance), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                    Text(stringResource(R.string.rider_balance), style = DarrbiTheme.typography.label.copy(fontSize = 12.sp), color = DarrbiTheme.colors.onSurfaceVariant)
                     Text(
                         text = "${stringResource(R.string.profile_currency_sar)} ${formatFare(state.balance ?: 0.0)}",
-                        style = DarrbiTheme.typography.title,
+                        style = DarrbiTheme.typography.title.copy(fontSize = 16.sp),
                         color = if (insufficient) DarrbiTheme.colors.error else DarrbiTheme.colors.onSurface,
                     )
                 }
                 Text(
                     text = stringResource(R.string.rider_promo),
-                    style = DarrbiTheme.typography.button,
+                    style = DarrbiTheme.typography.button.copy(fontSize = 14.sp),
                     color = DarrbiTheme.colors.primary,
                     modifier = Modifier.clickable { showPromo = true }.padding(8.dp),
                 )
             }
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(12.dp))
             DarrbiPrimaryButton(
                 text = stringResource(if (insufficient) R.string.rider_add_balance else R.string.rider_confirm_ride),
                 onClick = { if (insufficient) showAddBalance = true else onEvent(RiderBookingEvent.ConfirmRide) },
@@ -485,7 +701,10 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
         )
     }
     if (showAddBalance) {
-        com.mytm.darrbi.presentation.topup.AddBalanceSheet(onDismiss = { showAddBalance = false })
+        com.mytm.darrbi.presentation.topup.AddBalanceSheet(
+            onDismiss = { showAddBalance = false },
+            onTopUpSuccess = { onEvent(RiderBookingEvent.RefreshBalance) },
+        )
     }
 }
 
@@ -499,11 +718,11 @@ private fun RouteHeader(pickup: String, destination: String) {
         }
         Spacer(Modifier.width(14.dp))
         Column(modifier = Modifier.weight(1f)) {
-            Text(pickup, style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface, maxLines = 1)
-            Spacer(Modifier.height(10.dp))
+            Text(pickup, style = DarrbiTheme.typography.title.copy(fontSize = 14.sp), color = DarrbiTheme.colors.onSurface, maxLines = 1)
+            Spacer(Modifier.height(8.dp))
             HorizontalDivider(color = DarrbiTheme.colors.outline)
-            Spacer(Modifier.height(10.dp))
-            Text(destination, style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface, maxLines = 1)
+            Spacer(Modifier.height(8.dp))
+            Text(destination, style = DarrbiTheme.typography.title.copy(fontSize = 14.sp), color = DarrbiTheme.colors.onSurface, maxLines = 1)
         }
     }
 }
@@ -516,13 +735,13 @@ private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onCl
             .clip(RoundedCornerShape(16.dp))
             .background(if (selected) DarrbiTheme.colors.surfaceVariant else Color.Transparent)
             .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 12.dp),
+            .padding(horizontal = 12.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
             model = cab.imageUrl,
             contentDescription = null,
-            modifier = Modifier.width(68.dp).height(46.dp),
+            modifier = Modifier.width(60.dp).height(40.dp),
             contentScale = ContentScale.Fit,
             placeholder = painterResource(R.drawable.placeholder_select_car),
             error = painterResource(R.drawable.placeholder_select_car),
@@ -531,7 +750,7 @@ private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onCl
         Spacer(Modifier.width(12.dp))
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(cab.name, style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface, maxLines = 1)
+                Text(cab.name, style = DarrbiTheme.typography.title.copy(fontSize = 15.sp), color = DarrbiTheme.colors.onSurface, maxLines = 1)
                 if (cab.seats > 0) {
                     Spacer(Modifier.width(10.dp))
                     Icon(Icons.Filled.Person, null, tint = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.size(16.dp))
@@ -555,11 +774,11 @@ private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onCl
                 )
                 Text(
                     "$currency ${formatFare((cab.fare - discount).coerceAtLeast(0.0))}",
-                    style = DarrbiTheme.typography.title,
+                    style = DarrbiTheme.typography.title.copy(fontSize = 15.sp),
                     color = DarrbiTheme.colors.onSurface,
                 )
             } else {
-                Text("$currency ${formatFare(cab.fare)}", style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface)
+                Text("$currency ${formatFare(cab.fare)}", style = DarrbiTheme.typography.title.copy(fontSize = 15.sp), color = DarrbiTheme.colors.onSurface)
             }
         }
     }
@@ -615,31 +834,68 @@ private fun PromoSheet(applied: AppliedPromo?, loading: Boolean, onApply: (Strin
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.SearchingOverlay(onCancel: () -> Unit) {
+private fun androidx.compose.foundation.layout.BoxScope.SearchingOverlay(
+    noCaptainFound: Boolean,
+    onTryAgain: () -> Unit,
+    onCancel: () -> Unit,
+    onHeight: (Int) -> Unit,
+) {
+    // The pickup + destination markers and route are drawn on the map (same as confirm-pickup / select-ride).
     Surface(
-        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { onHeight(it.height) },
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
         color = DarrbiTheme.colors.surface,
     ) {
         Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(28.dp),
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 20.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            CircularProgressIndicator(color = DarrbiTheme.colors.primary)
-            Spacer(Modifier.height(20.dp))
+            // Car illustration with a badge: a clock while waiting, an info "i" once no captain was found.
+            Box(contentAlignment = Alignment.Center) {
+                androidx.compose.foundation.Image(
+                    painter = painterResource(R.drawable.image_car),
+                    contentDescription = null,
+                    modifier = Modifier.fillMaxWidth(0.55f),
+                    contentScale = ContentScale.Fit,
+                )
+                if (noCaptainFound) {
+                    // Icons.Filled.Info is a solid disc with a cut-out "i"; tinted green it reads as a
+                    // green circle with a white "i" over the white card.
+                    Icon(
+                        imageVector = Icons.Filled.Info,
+                        contentDescription = null,
+                        tint = DarrbiTheme.colors.primary,
+                        modifier = Modifier.align(Alignment.BottomEnd).size(34.dp),
+                    )
+                } else {
+                    androidx.compose.foundation.Image(
+                        painter = painterResource(R.drawable.icon_rider_wait),
+                        contentDescription = null,
+                        modifier = Modifier.align(Alignment.BottomEnd).size(34.dp),
+                    )
+                }
+            }
+            Spacer(Modifier.height(14.dp))
             Text(
-                stringResource(R.string.rider_searching_title),
-                style = DarrbiTheme.typography.title,
+                stringResource(if (noCaptainFound) R.string.rider_no_captain_title else R.string.rider_searching_title),
+                style = DarrbiTheme.typography.titleLarge.copy(fontSize = 19.sp),
                 color = DarrbiTheme.colors.onSurface,
-                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            Spacer(Modifier.height(20.dp))
-            Text(
-                stringResource(R.string.rider_searching_cancel),
-                style = DarrbiTheme.typography.button,
-                color = DarrbiTheme.colors.error,
-                modifier = Modifier.clickable(onClick = onCancel).padding(8.dp),
-            )
+            Spacer(Modifier.height(14.dp))
+            if (noCaptainFound) {
+                DarrbiPrimaryButton(text = stringResource(R.string.rider_try_again), onClick = onTryAgain)
+                Spacer(Modifier.height(12.dp))
+                DarrbiSecondaryButton(text = stringResource(R.string.rider_searching_cancel), onClick = onCancel)
+            } else {
+                LinearProgressIndicator(
+                    modifier = Modifier.width(120.dp).clip(CircleShape),
+                    color = DarrbiTheme.colors.onSurface,
+                    trackColor = DarrbiTheme.colors.outline,
+                )
+                Spacer(Modifier.height(20.dp))
+                DarrbiSecondaryButton(text = stringResource(R.string.rider_searching_cancel), onClick = onCancel)
+            }
         }
     }
 }

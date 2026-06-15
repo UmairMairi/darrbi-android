@@ -1,13 +1,34 @@
 package com.mytm.darrbi.data.remote.dto
 
+import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 
-/** `POST /user/set-rider-name` (note: backend spells the field `referalCode`). */
+/**
+ * `POST /user/update-customer` — the live endpoint that registers/updates the signed-in user and submits
+ * the rider's name (ride-android's actual flow; `set-rider-name` is dead there). The whole entered name is
+ * sent as [firstName] with [lastName] = " ". No `mobileNo` is sent — the `sessionId` header identifies the
+ * user. Backend keys: `referredById` (referral) and capital-A `AppVersion`.
+ */
 @Serializable
-data class SetRiderNameRequest(
-    val mobileNo: String,
-    val name: String,
-    val referalCode: String? = null,
+data class UpdateCustomerRequest(
+    val firstName: String? = null,
+    val lastName: String? = null,
+    /** FCM/push device token (ride-android's `deviceToken`); omitted when blank. */
+    val deviceToken: String? = null,
+    val deviceName: String = "Android",
+    val deviceOS: String = "Android",
+    @SerialName("AppVersion") val appVersion: String,
+    val referredById: String? = null,
+)
+
+/** `POST /user/update-customer` response — carries the userId assigned on first registration. */
+@Serializable
+data class UpdateCustomerData(
+    val userId: String? = null,
+    val isNameUpdated: Boolean? = null,
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val referralCode: String? = null,
 )
 
 /**
@@ -86,6 +107,8 @@ data class CaptainDetailsData(
     val approved: Boolean? = null,
     val isWASLApproved: Int? = null,
     val driverSubStatus: Int? = null,
+    /** Active-mode flag: true = captain/driver mode active, false = rider mode active. */
+    val driverModeSwitch: Boolean? = null,
     val iban: String? = null,
     val mobileNo: String? = null,
     val dateOfBirth: String? = null,

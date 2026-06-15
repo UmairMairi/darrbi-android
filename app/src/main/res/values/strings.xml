@@ -55,6 +55,7 @@
     <string name="common_learn_more">Learn More</string>
     <string name="common_done">Done</string>
     <string name="common_confirm">Confirm</string>
+    <string name="common_cancel">Cancel</string>
     <string name="common_see_details">See Details</string>
     <string name="car_seats_format">%1$d seats</string>
     <string name="car_no_cars_title">You Don\'t Have Any Cars Registered To Your NID/Iqama</string>
@@ -254,7 +255,16 @@
     <string name="rider_promo_hint">Enter promo code</string>
     <string name="rider_promo_apply">Apply</string>
     <string name="rider_searching_title">We are waiting for the confirmation from your captain</string>
-    <string name="rider_searching_cancel">Cancel</string>
+    <string name="rider_searching_cancel">Cancel Ride</string>
+    <string name="rider_no_captain_title">Oops! Please try again no captain found</string>
+    <string name="rider_try_again">Try Again</string>
+    <!-- Location permission -->
+    <string name="location_denied_title">Location Access Needed</string>
+    <string name="location_denied_message">Darbi needs your location to show your position on the map and find rides near you. You\'ve denied it, so please enable Location in Settings.</string>
+    <string name="location_open_settings">Open Settings</string>
+    <!-- Rider/Captain mode toggle -->
+    <string name="mode_rider">RIDER</string>
+    <string name="mode_captain">CAPTAIN</string>
 
     <!-- Application status detail -->
     <string name="status_detail_title">Your Application Is Under Review</string>

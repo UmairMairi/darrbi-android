@@ -39,6 +39,12 @@ interface OnboardingRepository {
     /** Captain account: `GET /captains` — fetched after login for a returning captain. */
     suspend fun getCaptainDetails(): ApiResult<CaptainDetails>
 
+    /** Flips the active mode (rider ⇄ captain) server-side via `POST /captains/change-driver-mode`. */
+    suspend fun changeDriverMode(): ApiResult<Unit>
+
+    /** Registers the device's FCM/push token with the server via `POST /user/update-customer`. */
+    suspend fun updateDeviceToken(fcmToken: String): ApiResult<Unit>
+
     /** Validate an IBAN and resolve its bank: `GET /user/validate-iban/{iban}`. */
     suspend fun validateIban(iban: String): ApiResult<IbanInfo>
 
@@ -59,6 +65,9 @@ interface OnboardingRepository {
 
     /** Refund part/all of a top-up: `POST /user/top-up/refund`. */
     suspend fun refundTopup(transactionId: String, amount: Double): ApiResult<Unit>
+
+    /** Requests the ClickPay hosted-page URL for a top-up of [amount] (`method = 1`). */
+    suspend fun hostedTopUpUrl(amount: Int): ApiResult<String>
 
     /** Rides the user took as a passenger: `GET /trips/rider`. */
     suspend fun getRidesTaken(): ApiResult<List<Ride>>

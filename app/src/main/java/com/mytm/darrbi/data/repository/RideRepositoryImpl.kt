@@ -5,6 +5,7 @@ import com.mytm.darrbi.core.common.UserIdProvider
 import com.mytm.darrbi.core.common.map
 import com.mytm.darrbi.core.network.safeApiCall
 import com.mytm.darrbi.core.network.unwrapMain
+import com.mytm.darrbi.core.network.unwrapMainUnit
 import com.mytm.darrbi.data.mapper.toDomain
 import com.mytm.darrbi.data.remote.dto.CreateTripRequest
 import com.mytm.darrbi.data.remote.dto.PromoValidateRequest
@@ -83,6 +84,9 @@ class RideRepositoryImpl @Inject constructor(
                 ),
             )
         }.unwrapMain().map { BookedTrip(tripId = it.id.orEmpty(), requestTimeLimit = it.tripRequestTimeLimit) }
+
+    override suspend fun cancelTripRequest(tripId: String): ApiResult<Unit> =
+        safeApiCall { api.cancelTripRequest(tripId) }.unwrapMainUnit()
 
     private companion object {
         const val ADDRESS_PICKUP = 1

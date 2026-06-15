@@ -11,21 +11,25 @@ import com.mytm.darrbi.data.remote.dto.IbanValidationData
 import com.mytm.darrbi.data.remote.dto.LegalData
 import com.mytm.darrbi.data.remote.dto.NotificationDto
 import com.mytm.darrbi.data.remote.dto.RefundRequest
-import com.mytm.darrbi.data.remote.dto.SetRiderNameRequest
+import com.mytm.darrbi.data.remote.dto.HostedTopUpData
+import com.mytm.darrbi.data.remote.dto.HostedTopUpRequest
 import com.mytm.darrbi.data.remote.dto.TopupHistoryData
 import com.mytm.darrbi.data.remote.dto.TopupHistoryRequest
 import com.mytm.darrbi.data.remote.dto.TripHistoryData
+import com.mytm.darrbi.data.remote.dto.UpdateCustomerData
+import com.mytm.darrbi.data.remote.dto.UpdateCustomerRequest
 import kotlinx.serialization.json.JsonElement
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Header
 import retrofit2.http.POST
 import retrofit2.http.Path
 import retrofit2.http.Query
 
 /** Post-OTP onboarding endpoints on the Main API (same as ride-android). */
 interface OnboardingApi {
-    @POST("user/set-rider-name")
-    suspend fun setRiderName(@Body body: SetRiderNameRequest): MainEnvelope<JsonElement>
+    @POST("user/update-customer")
+    suspend fun updateCustomer(@Body body: UpdateCustomerRequest): MainEnvelope<UpdateCustomerData>
 
     @POST("captains/guest-to-driver")
     suspend fun guestToDriver(@Body body: GuestToDriverRequest): MainEnvelope<JsonElement>
@@ -38,6 +42,10 @@ interface OnboardingApi {
 
     @GET("captains")
     suspend fun getCaptainDetails(): MainEnvelope<CaptainDetailsData>
+
+    /** Server-side toggle of the active mode (rider ⇄ captain); no body, body ignored. */
+    @POST("captains/change-driver-mode")
+    suspend fun changeDriverMode(): MainEnvelope<JsonElement>
 
     @GET("user/validate-iban/{iban}")
     suspend fun validateIban(@Path("iban") iban: String): MainEnvelope<IbanValidationData>
@@ -56,6 +64,12 @@ interface OnboardingApi {
 
     @POST("user/top-up-history")
     suspend fun getTopupHistory(@Body body: TopupHistoryRequest): MainEnvelope<TopupHistoryData>
+
+    @POST("user/clickpay-hosted-method-top-up")
+    suspend fun clickpayHostedTopUp(
+        @Header("Authorization") authorization: String,
+        @Body body: HostedTopUpRequest,
+    ): MainEnvelope<HostedTopUpData>
 
     @POST("user/top-up/refund")
     suspend fun refundTopup(@Body body: RefundRequest): MainEnvelope<JsonElement>
