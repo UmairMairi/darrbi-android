@@ -53,6 +53,8 @@ data class Bid(
     val driverName: String?,
     val driverRating: Double?,
     val driverImageUrl: String?,
+    /** Driver's vehicle, e.g. "Toyota - Corolla" (when the backend provides it). */
+    val driverCar: String? = null,
 )
 
 /** Result of creating a BID trip: the open trip id, status, and the authoritative fare range. */

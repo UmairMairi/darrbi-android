@@ -36,6 +36,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Call
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MyLocation
 import androidx.compose.material.icons.filled.Person
@@ -325,14 +326,24 @@ fun RiderFlowScreen(
                 onSubmit = { fare -> viewModel.onEvent(RiderBookingEvent.SubmitOffer(fare)) },
                 onHeight = { routeSheetHeightPx = it },
             )
-            RiderStep.Bidding -> BiddingOverlay(
-                state = state,
-                onSelect = { bidId -> viewModel.onEvent(RiderBookingEvent.SelectBid(bidId)) },
-                onReject = { bidId -> viewModel.onEvent(RiderBookingEvent.RejectBid(bidId)) },
-                onRaise = { fare -> viewModel.onEvent(RiderBookingEvent.RaiseOffer(fare)) },
-                onCancel = { viewModel.onEvent(RiderBookingEvent.CancelBidding) },
-                onHeight = { routeSheetHeightPx = it },
-            )
+            RiderStep.Bidding -> if (state.bids.isEmpty()) {
+                BiddingOverlay(
+                    state = state,
+                    onRaise = { fare -> viewModel.onEvent(RiderBookingEvent.RaiseOffer(fare)) },
+                    onCancel = { viewModel.onEvent(RiderBookingEvent.CancelBidding) },
+                    onHeight = { routeSheetHeightPx = it },
+                )
+            } else {
+                // Offers arriving → full-screen "Select Offers" list (Accept/Decline per driver).
+                SelectOffersList(
+                    bids = state.bids,
+                    inFlight = state.isBidActionInFlight,
+                    onAccept = { bidId -> viewModel.onEvent(RiderBookingEvent.SelectBid(bidId)) },
+                    onDecline = { bidId -> viewModel.onEvent(RiderBookingEvent.RejectBid(bidId)) },
+                    onCancel = { viewModel.onEvent(RiderBookingEvent.CancelBidding) },
+                    modifier = Modifier.fillMaxSize(),
+                )
+            }
             RiderStep.Searching -> SearchingOverlay(
                 noCaptainFound = state.noCaptainFound,
                 onTryAgain = { viewModel.onEvent(RiderBookingEvent.TryAgainSearch) },
@@ -1733,8 +1744,6 @@ private fun StepperButton(symbol: String, enabled: Boolean, onClick: () -> Unit)
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.BiddingOverlay(
     state: RiderBookingUiState,
-    onSelect: (String) -> Unit,
-    onReject: (String) -> Unit,
     onRaise: (Double) -> Unit,
     onCancel: () -> Unit,
     onHeight: (Int) -> Unit,
@@ -1778,15 +1787,6 @@ private fun androidx.compose.foundation.layout.BoxScope.BiddingOverlay(
                 enabled = !inFlight && target.toDouble() > offered,
                 onClick = { onRaise(target.toDouble()) },
             )
-            if (state.bids.isNotEmpty()) {
-                Spacer(Modifier.height(14.dp))
-                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
-                    state.bids.forEachIndexed { index, bid ->
-                        BidRow(bid = bid, enabled = !inFlight, onSelect = { onSelect(bid.bidId) }, onReject = { onReject(bid.bidId) })
-                        if (index < state.bids.lastIndex) HorizontalDivider(color = DarrbiTheme.colors.outline)
-                    }
-                }
-            }
             Spacer(Modifier.height(16.dp))
             // Payment row.
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1857,55 +1857,150 @@ private fun CashGlyph() {
     }
 }
 
+/**
+ * Full-screen "Select Offers" list (per the reference): a back + Cancel Request top bar over the dimmed
+ * route map, then a scroll of driver offer cards with a live TTL bar and Decline / Accept.
+ */
 @Composable
-private fun BidRow(bid: com.mytm.darrbi.domain.model.Bid, enabled: Boolean, onSelect: () -> Unit, onReject: () -> Unit) {
-    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-        AsyncImage(
-            model = bid.driverImageUrl,
-            contentDescription = null,
-            modifier = Modifier.size(44.dp).clip(CircleShape),
-            contentScale = ContentScale.Crop,
-            placeholder = painterResource(R.drawable.user_placeholder),
-            error = painterResource(R.drawable.user_placeholder),
-            fallback = painterResource(R.drawable.user_placeholder),
-        )
-        Spacer(Modifier.width(12.dp))
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = bid.driverName ?: stringResource(R.string.rider_captain_fallback),
-                style = DarrbiTheme.typography.bodyMedium,
-                color = DarrbiTheme.colors.onSurface,
-                maxLines = 1,
-                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-            )
-            val eta = bid.etaToPickupSec?.let { stringResource(R.string.rider_eta_min, (it / 60).coerceAtLeast(1)) }
-            val dist = bid.pickupDistanceKm?.let { "${formatFare(it)} km" }
-            val sub = listOfNotNull(eta, dist).joinToString(" • ")
-            if (sub.isNotBlank()) {
-                Text(sub, style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
+private fun SelectOffersList(
+    bids: List<com.mytm.darrbi.domain.model.Bid>,
+    inFlight: Boolean,
+    onAccept: (String) -> Unit,
+    onDecline: (String) -> Unit,
+    onCancel: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.background(Color.Black.copy(alpha = 0.18f)).statusBarsPadding()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+            Box(
+                modifier = Modifier.size(44.dp).clip(CircleShape).background(DarrbiTheme.colors.surface).clickable(onClick = onCancel),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.cd_back), tint = DarrbiTheme.colors.onSurface)
             }
+            Spacer(Modifier.weight(1f))
+            Surface(
+                shape = RoundedCornerShape(50),
+                color = DarrbiTheme.colors.surface,
+                shadowElevation = 3.dp,
+                onClick = onCancel,
+            ) {
+                Row(modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Close, null, tint = DarrbiTheme.colors.onSurface, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                    Text(stringResource(R.string.rider_cancel_request), style = DarrbiTheme.typography.button.copy(fontSize = 15.sp), color = DarrbiTheme.colors.onSurface)
+                }
+            }
+            Spacer(Modifier.weight(1f))
+            Spacer(Modifier.width(44.dp)) // balances the profile avatar drawn at the top-end
         }
-        Spacer(Modifier.width(8.dp))
-        Text(
-            text = stringResource(R.string.rider_fare_sar, formatFare(bid.fare)),
-            style = DarrbiTheme.typography.title.copy(fontSize = 16.sp),
-            color = DarrbiTheme.colors.onSurface,
-        )
-        Spacer(Modifier.width(10.dp))
-        Surface(
-            modifier = Modifier.clip(RoundedCornerShape(10.dp)).clickable(enabled = enabled, onClick = onSelect),
-            shape = RoundedCornerShape(10.dp),
-            color = DarrbiTheme.colors.primary,
+        Column(
+            modifier = Modifier.fillMaxWidth().weight(1f).verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).navigationBarsPadding(),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Text(
-                stringResource(R.string.rider_select),
-                style = DarrbiTheme.typography.button.copy(fontSize = 14.sp),
-                color = DarrbiTheme.colors.onPrimary,
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
-            )
+            Spacer(Modifier.height(2.dp))
+            bids.forEach { bid ->
+                OfferCard(bid = bid, enabled = !inFlight, onAccept = { onAccept(bid.bidId) }, onDecline = { onDecline(bid.bidId) })
+            }
+            Spacer(Modifier.height(8.dp))
         }
     }
 }
+
+@Composable
+private fun OfferCard(
+    bid: com.mytm.darrbi.domain.model.Bid,
+    enabled: Boolean,
+    onAccept: () -> Unit,
+    onDecline: () -> Unit,
+) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(16.dp),
+        color = DarrbiTheme.colors.surface,
+        shadowElevation = 2.dp,
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = bid.driverImageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.size(48.dp).clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(R.drawable.user_placeholder),
+                    error = painterResource(R.drawable.user_placeholder),
+                    fallback = painterResource(R.drawable.user_placeholder),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = bid.driverName ?: stringResource(R.string.rider_captain_fallback),
+                        style = DarrbiTheme.typography.title.copy(fontSize = 17.sp),
+                        color = DarrbiTheme.colors.onSurface,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    bid.driverCar?.let {
+                        Text(it, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant, maxLines = 1, overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis)
+                    }
+                }
+                bid.driverRating?.let { rating ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(String.format(Locale.US, "%.1f/5", rating), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            TtlBar(bidId = bid.bidId)
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.rider_sar_amount, formatFare(bid.fare)),
+                    style = DarrbiTheme.typography.titleLarge.copy(fontSize = 24.sp),
+                    color = DarrbiTheme.colors.onSurface,
+                )
+                Spacer(Modifier.weight(1f))
+                val eta = bid.etaToPickupSec?.let { stringResource(R.string.rider_eta_min, (it / 60).coerceAtLeast(1)) }
+                val dist = bid.pickupDistanceKm?.let { "${formatFare(it)} km" }
+                val sub = listOfNotNull(dist, eta).joinToString(" • ")
+                if (sub.isNotBlank()) Text(sub, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+            }
+            Spacer(Modifier.height(14.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                Surface(
+                    modifier = Modifier.weight(1f).height(54.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = enabled, onClick = onDecline),
+                    shape = RoundedCornerShape(14.dp),
+                    color = DarrbiTheme.colors.surfaceVariant,
+                ) {
+                    Box(contentAlignment = Alignment.Center) {
+                        Text(stringResource(R.string.rider_decline), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onSurface)
+                    }
+                }
+                DarrbiPrimaryButton(
+                    text = stringResource(R.string.rider_accept),
+                    onClick = onAccept,
+                    enabled = enabled,
+                    modifier = Modifier.weight(1f),
+                )
+            }
+        }
+    }
+}
+
+/** A green bar that depletes over the bid TTL (client-side, from when the offer first appears). */
+@Composable
+private fun TtlBar(bidId: String) {
+    val progress = remember(bidId) { Animatable(1f) }
+    LaunchedEffect(bidId) { progress.animateTo(0f, tween(durationMillis = BID_TTL_MS, easing = LinearEasing)) }
+    Box(modifier = Modifier.fillMaxWidth().height(4.dp).clip(RoundedCornerShape(50)).background(DarrbiTheme.colors.outline.copy(alpha = 0.4f))) {
+        Box(modifier = Modifier.fillMaxWidth(progress.value.coerceIn(0f, 1f)).height(4.dp).clip(RoundedCornerShape(50)).background(DarrbiTheme.colors.primary))
+    }
+}
+
+/** Bid TTL (mirror of the server `SETTING_BID_TTL_SECONDS` default) for the countdown bar. */
+private const val BID_TTL_MS = 45_000
 
 /** V2 fare-range factors (mirror the server `SETTING_BID_*` defaults) for the client-side hint. */
 private const val V2_MIN_FACTOR = 0.80

@@ -67,6 +67,7 @@ fun BidDto.toDomain(): Bid? {
         driverName = driverName?.takeIf { it.isNotBlank() },
         driverRating = driverRating,
         driverImageUrl = driverImage?.takeIf { it.isNotBlank() },
+        driverCar = listOfNotNull(driverCar, carName, vehicle).firstOrNull { it.isNotBlank() },
     )
 }
 

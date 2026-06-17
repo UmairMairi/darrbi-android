@@ -367,6 +367,8 @@
     <string name="rider_change_price">تغيير السعر</string>
     <string name="rider_pays_for_ride">الراكب يدفع للرحلة</string>
     <string name="rider_cancel_request">إلغاء الطلب</string>
+    <string name="rider_decline">رفض</string>
+    <string name="rider_accept">قبول</string>
     <string name="rider_select">اختيار</string>
     <string name="rider_captain_fallback">الكابتن</string>
     <string name="rider_eta_min">%1$d دقيقة</string>

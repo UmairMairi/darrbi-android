@@ -70,6 +70,9 @@ data class BidDto(
     val driverName: String? = null,
     val driverRating: Double? = null,
     val driverImage: String? = null,
+    val driverCar: String? = null,
+    val carName: String? = null,
+    val vehicle: String? = null,
 )
 
 /** `GET v2/trips/:id/bids` → `data:{ tripId, tripStatus, riderOfferedFare, currency, bids }`. */
