@@ -1,9 +1,11 @@
 package com.mytm.darrbi.domain.repository
 
 import com.mytm.darrbi.domain.model.AcceptedTrip
+import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.ChatMessage
 import com.mytm.darrbi.domain.model.ChatMessageStatus
 import com.mytm.darrbi.domain.model.LatLngPoint
+import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.RideRequest
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -67,6 +69,39 @@ sealed interface ChatSocketEvent {
 }
 
 /**
+ * V2 broadcast-dispatch + bidding events pushed by the server (all wrapped in the `{v,event,emittedAt,data}`
+ * envelope). The open-trips list is exposed as state; bid outcomes/updates flow through [SocketService.v2Events].
+ */
+sealed interface V2SocketEvent {
+    /** RIDER: the live competing-bids list for a trip changed (cheapest-first; full replacement). */
+    data class BidsUpdate(val tripId: String, val bids: List<Bid>, val riderOfferedFare: Double, val currency: String) : V2SocketEvent
+
+    /** RIDER: the match was committed (`v2/bid-accepted` / `driver-selected`). */
+    data class BidAccepted(val tripId: String, val bidId: String, val driverId: String, val agreedFare: Double, val currency: String) : V2SocketEvent
+
+    /** DRIVER: you won the trip (`v2/bid-won`) → switch to the assigned/navigate flow. */
+    data class BidWon(val tripId: String, val bidId: String, val agreedFare: Double) : V2SocketEvent
+
+    /** DRIVER: you lost (`v2/bid-lost`) — `reason` = ANOTHER_DRIVER_SELECTED | LOST_DRIVER_RACE | DRIVER_INELIGIBLE. */
+    data class BidLost(val tripId: String, val bidId: String, val reason: String?) : V2SocketEvent
+
+    /** DRIVER: the rider dismissed your bid (`v2/bid-rejected`). */
+    data class BidRejected(val tripId: String, val bidId: String) : V2SocketEvent
+
+    /** DRIVER: your 45s bid TTL elapsed (`v2/bid-expired`) — you may re-bid. */
+    data class BidExpired(val tripId: String, val bidId: String) : V2SocketEvent
+
+    /** DRIVER: the trip ended before a match (`v2/trip-closed`) — RIDER_CANCELLED | EXPIRED | NO_DRIVER. */
+    data class TripClosed(val tripId: String, val reason: String?) : V2SocketEvent
+
+    /** RIDER: no bids yet (`v2/no-bids`) — nudge to raise the offer. */
+    data class NoBids(val tripId: String) : V2SocketEvent
+
+    /** RIDER: the bidding window elapsed with no selection (`v2/bidding-timeout`). */
+    data class BiddingTimeout(val tripId: String) : V2SocketEvent
+}
+
+/**
  * Real-time Socket.IO connection (mirrors ride-android's `SocketTask`): an unauthenticated connection to
  * the socket host that registers the session by emitting `subscribe-user` once connected. A single
  * app-scoped service so both rider and captain dashboards share one connection.
@@ -85,6 +120,12 @@ interface SocketService {
 
     /** In-trip chat events (received messages, ack/delivered/read status, typing) on the shared socket. */
     val chatEvents: SharedFlow<ChatSocketEvent>
+
+    /** DRIVER (V2): the live broadcast set of open (awaiting-bids) trips, from list/new/update events. */
+    val openTrips: StateFlow<List<OpenTrip>>
+
+    /** V2 bidding events (live bids, bid outcomes) for both rider and driver. */
+    val v2Events: SharedFlow<V2SocketEvent>
 
     /** Opens the connection (idempotent) and, on connect, registers the user via `subscribe-user`. */
     fun connect()

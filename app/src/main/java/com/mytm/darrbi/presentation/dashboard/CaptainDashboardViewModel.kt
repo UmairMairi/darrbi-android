@@ -3,20 +3,25 @@ package com.mytm.darrbi.presentation.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mytm.darrbi.core.common.ApiResult
+import com.mytm.darrbi.domain.model.BidType
 import com.mytm.darrbi.domain.model.CaptainDetails
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OngoingTrip
+import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.RideRequest
 import com.mytm.darrbi.domain.model.TripStage
 import com.mytm.darrbi.domain.repository.SocketService
 import com.mytm.darrbi.domain.repository.TripSocketEvent
+import com.mytm.darrbi.domain.repository.V2SocketEvent
 import com.mytm.darrbi.domain.usecase.AcceptTripUseCase
 import com.mytm.darrbi.domain.usecase.CancelTripByDriverUseCase
 import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
 import com.mytm.darrbi.domain.usecase.GetCaptainDetailsUseCase
 import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
+import com.mytm.darrbi.domain.usecase.GetOpenTripsUseCase
 import com.mytm.darrbi.domain.usecase.GetRouteUseCase
+import com.mytm.darrbi.domain.usecase.PlaceBidUseCase
 import com.mytm.darrbi.domain.usecase.ReachedPickupUseCase
 import com.mytm.darrbi.domain.usecase.RejectTripUseCase
 import com.mytm.darrbi.domain.usecase.StreamLocationUpdatesUseCase
@@ -64,6 +69,19 @@ data class CaptainDashboardUiState(
     val navigateStarted: Boolean = false,
     /** Whether the 3-dot menu (with Cancel Ride) is open. */
     val showMenu: Boolean = false,
+    // --- V2 broadcast dispatch + bidding ---
+    /** Online (accepting/showing broadcast trips) vs offline (banner). Verified → online by default. */
+    val isOnline: Boolean = true,
+    /** Live broadcast list of open (awaiting-bids) trips, from the socket. */
+    val openTrips: List<OpenTrip> = emptyList(),
+    /** The open trip whose bid sheet is showing; null when closed. */
+    val biddingTrip: OpenTrip? = null,
+    /** A bid POST is in flight. */
+    val isPlacingBid: Boolean = false,
+    /** V2 bid error code to surface in the sheet (e.g. BID_BELOW_FLOOR, DRIVER_INELIGIBLE). */
+    val bidErrorCode: String? = null,
+    /** One-shot: you lost / the trip closed → reason code shown once. */
+    val bidLostReason: String? = null,
     val errorMessage: String? = null,
 ) {
     val canSubmitIban: Boolean
@@ -92,6 +110,18 @@ sealed interface CaptainDashboardEvent {
     data object CancelTrip : CaptainDashboardEvent
     data object ConsumeError : CaptainDashboardEvent
     data object ConsumeAccepted : CaptainDashboardEvent
+    // --- V2 ---
+    /** Toggle online/offline. */
+    data class SetOnline(val online: Boolean) : CaptainDashboardEvent
+    /** Open the bid sheet for an open trip. */
+    data class OpenBidSheet(val tripId: String) : CaptainDashboardEvent
+    data object DismissBidSheet : CaptainDashboardEvent
+    /** Bid by accepting the rider's offered fare as-is. */
+    data class AcceptFare(val tripId: String) : CaptainDashboardEvent
+    /** Bid with a counter price (must be within the trip's fare range). */
+    data class CounterBid(val tripId: String, val fare: Double) : CaptainDashboardEvent
+    data object ConsumeBidError : CaptainDashboardEvent
+    data object ConsumeBidLost : CaptainDashboardEvent
 }
 
 @HiltViewModel
@@ -106,6 +136,8 @@ class CaptainDashboardViewModel @Inject constructor(
     private val reachedPickup: ReachedPickupUseCase,
     private val cancelTripByDriver: CancelTripByDriverUseCase,
     private val getOngoingTrip: GetOngoingTripUseCase,
+    private val getOpenTrips: GetOpenTripsUseCase,
+    private val placeBid: PlaceBidUseCase,
     private val socketService: SocketService,
 ) : ViewModel() {
 
@@ -120,10 +152,34 @@ class CaptainDashboardViewModel @Inject constructor(
 
     init {
         refresh()
-        // Listen for incoming ride requests on the shared socket (captain side).
+        // Listen for incoming ride requests on the shared socket (captain side; V1 fallback).
         viewModelScope.launch {
             socketService.tripEvents.collect { event ->
                 if (event is TripSocketEvent.TripRequest) onTripRequest(event.request)
+            }
+        }
+        // V2: mirror the broadcast open-trips list into state (shown when online).
+        viewModelScope.launch {
+            socketService.openTrips.collect { trips ->
+                _state.update { st ->
+                    val sorted = trips.sortedByDescending { it.createdAtMillis ?: 0L }
+                    st.copy(
+                        openTrips = sorted,
+                        // Keep the open bid sheet's trip in sync (or close it if the trip vanished).
+                        biddingTrip = st.biddingTrip?.let { open -> sorted.firstOrNull { it.tripId == open.tripId } },
+                    )
+                }
+            }
+        }
+        // V2: bid outcomes — won → assigned/navigate; lost/closed → drop + notify.
+        viewModelScope.launch {
+            socketService.v2Events.collect { event ->
+                when (event) {
+                    is V2SocketEvent.BidWon -> onBidWon()
+                    is V2SocketEvent.BidLost -> _state.update { it.copy(bidLostReason = event.reason ?: REASON_LOST) }
+                    is V2SocketEvent.TripClosed -> _state.update { it.copy(bidLostReason = event.reason ?: REASON_CLOSED) }
+                    else -> Unit // rider-facing events
+                }
             }
         }
     }
@@ -147,7 +203,12 @@ class CaptainDashboardViewModel @Inject constructor(
     fun locateMe() {
         viewModelScope.launch {
             when (val result = currentLocation()) {
-                is ApiResult.Success -> _state.update { it.copy(myLocation = result.data) }
+                is ApiResult.Success -> {
+                    val hadLocation = _state.value.myLocation != null
+                    _state.update { it.copy(myLocation = result.data) }
+                    // First fix while online → pull the open-trips snapshot now that we have coords.
+                    if (!hadLocation && _state.value.isOnline && _state.value.stage == CaptainStage.NoRiders) fetchOpenTrips()
+                }
                 is ApiResult.Error, is ApiResult.Failure -> Unit
             }
         }
@@ -178,6 +239,70 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.CancelTrip -> cancelTrip()
             CaptainDashboardEvent.ConsumeError -> _state.update { it.copy(errorMessage = null) }
             CaptainDashboardEvent.ConsumeAccepted -> _state.update { it.copy(tripAccepted = false) }
+            is CaptainDashboardEvent.SetOnline -> setOnline(event.online)
+            is CaptainDashboardEvent.OpenBidSheet ->
+                _state.update { st -> st.copy(biddingTrip = st.openTrips.firstOrNull { it.tripId == event.tripId }, bidErrorCode = null) }
+            CaptainDashboardEvent.DismissBidSheet -> _state.update { it.copy(biddingTrip = null, bidErrorCode = null) }
+            is CaptainDashboardEvent.AcceptFare -> submitBid(event.tripId, BidType.AcceptFare, null)
+            is CaptainDashboardEvent.CounterBid -> submitBid(event.tripId, BidType.Counter, event.fare)
+            CaptainDashboardEvent.ConsumeBidError -> _state.update { it.copy(bidErrorCode = null) }
+            CaptainDashboardEvent.ConsumeBidLost -> _state.update { it.copy(bidLostReason = null) }
+        }
+    }
+
+    /** Online ⇄ offline. Going online (re)pulls the open-trips snapshot; the socket keeps it live. */
+    private fun setOnline(online: Boolean) {
+        _state.update { it.copy(isOnline = online) }
+        if (online) {
+            socketService.connect()
+            fetchOpenTrips()
+        }
+    }
+
+    /** Initial open-trips pull (the socket's `open-trips-list` keeps it fresh afterwards). */
+    private fun fetchOpenTrips() {
+        val cabId = _state.value.captain?.cabId ?: return
+        val loc = _state.value.myLocation ?: return
+        viewModelScope.launch {
+            when (val result = getOpenTrips(cabId, loc.latitude, loc.longitude)) {
+                is ApiResult.Success -> _state.update {
+                    // Merge: keep any socket-delivered trips, prefer the fresh snapshot.
+                    val merged = (result.data + it.openTrips).distinctBy { t -> t.tripId }
+                        .sortedByDescending { t -> t.createdAtMillis ?: 0L }
+                    it.copy(openTrips = merged)
+                }
+                is ApiResult.Error, is ApiResult.Failure -> Unit // socket list still applies
+            }
+        }
+    }
+
+    /** Place a bid (ACCEPT the fare or COUNTER). Surfaces the V2 error code on failure. */
+    private fun submitBid(tripId: String, bidType: BidType, fare: Double?) {
+        if (_state.value.isPlacingBid) return
+        _state.update { it.copy(isPlacingBid = true, bidErrorCode = null) }
+        viewModelScope.launch {
+            val result = placeBid(
+                tripId = tripId,
+                bidType = bidType,
+                bidFare = fare,
+                cabId = _state.value.captain?.cabId,
+            )
+            when (result) {
+                is ApiResult.Success -> _state.update { it.copy(isPlacingBid = false, biddingTrip = null) }
+                is ApiResult.Error -> _state.update { it.copy(isPlacingBid = false, bidErrorCode = result.message ?: REASON_BID_FAILED) }
+                is ApiResult.Failure -> _state.update { it.copy(isPlacingBid = false, bidErrorCode = result.error.message ?: REASON_BID_FAILED) }
+            }
+        }
+    }
+
+    /** Won the trip → fetch the assigned trip (`trips/exists` → `trips/socket/{id}`) and navigate to rider. */
+    private fun onBidWon() {
+        _state.update { it.copy(biddingTrip = null) }
+        viewModelScope.launch {
+            when (val result = getOngoingTrip()) {
+                is ApiResult.Success -> result.data?.let { restoreOngoing(it) }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
         }
     }
 
@@ -383,6 +508,8 @@ class CaptainDashboardViewModel @Inject constructor(
         if (stage == CaptainStage.NoRiders) {
             socketService.connect()
             checkOngoingTrip()
+            // Verified → online by default; pull the open-trips snapshot (socket keeps it live).
+            if (_state.value.isOnline) fetchOpenTrips()
         }
     }
 
@@ -421,5 +548,8 @@ class CaptainDashboardViewModel @Inject constructor(
     private companion object {
         const val REQUEST_TIMEOUT_MS = 18_000L
         const val PICKUP_AVG_SPEED_KMH = 20.0
+        const val REASON_LOST = "LOST"
+        const val REASON_CLOSED = "CLOSED"
+        const val REASON_BID_FAILED = "BID_FAILED"
     }
 }

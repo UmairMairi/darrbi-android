@@ -6,9 +6,12 @@ import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.core.common.EnvConfig
 import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.AppliedPromo
+import com.mytm.darrbi.domain.model.Bid
+import com.mytm.darrbi.domain.model.BidTrip
 import com.mytm.darrbi.domain.model.BookedTrip
 import com.mytm.darrbi.domain.model.CabOption
 import com.mytm.darrbi.domain.model.DropChangeQuote
+import com.mytm.darrbi.domain.model.FareRange
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OngoingTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
@@ -21,15 +24,22 @@ import com.mytm.darrbi.domain.repository.SessionRepository
 import com.mytm.darrbi.domain.repository.SocketConnectionState
 import com.mytm.darrbi.domain.repository.SocketService
 import com.mytm.darrbi.domain.repository.TripSocketEvent
+import com.mytm.darrbi.domain.repository.V2SocketEvent
 import com.mytm.darrbi.domain.usecase.AutocompletePlacesUseCase
+import com.mytm.darrbi.domain.usecase.CancelOpenTripUseCase
 import com.mytm.darrbi.domain.usecase.CancelTripUseCase
 import com.mytm.darrbi.domain.usecase.ChangeDestinationUseCase
+import com.mytm.darrbi.domain.usecase.CreateBidTripUseCase
 import com.mytm.darrbi.domain.usecase.CreateTripUseCase
 import com.mytm.darrbi.domain.usecase.EstimateDropChangeUseCase
+import com.mytm.darrbi.domain.usecase.RaiseOfferUseCase
+import com.mytm.darrbi.domain.usecase.RejectBidUseCase
+import com.mytm.darrbi.domain.usecase.SelectBidUseCase
 import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
 import com.mytm.darrbi.domain.usecase.GetBalanceUseCase
 import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
 import com.mytm.darrbi.domain.usecase.GetRecentAddressesUseCase
+import com.mytm.darrbi.domain.usecase.GetTripBidsUseCase
 import com.mytm.darrbi.domain.usecase.GetRideCategoriesUseCase
 import com.mytm.darrbi.domain.usecase.GetRouteUseCase
 import com.mytm.darrbi.domain.usecase.GetCabTypesUseCase
@@ -48,7 +58,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 /** Steps of the rider's booking flow: location selection → ride selection → searching for a captain. */
-enum class RiderStep { Home, DestinationSearch, PickupSearch, MapPicker, ConfirmPickup, SelectRide, Searching, DriverOnWay, DriverArrived, TripStarted, ChangeDropSearch, ChangeDropConfirm, TripCompleted }
+enum class RiderStep { Home, DestinationSearch, PickupSearch, MapPicker, ConfirmPickup, SelectRide, ProposeFare, Bidding, Searching, DriverOnWay, DriverArrived, TripStarted, ChangeDropSearch, ChangeDropConfirm, TripCompleted }
 
 data class RiderBookingUiState(
     val step: RiderStep = RiderStep.Home,
@@ -110,6 +120,19 @@ data class RiderBookingUiState(
     val dropChangeSucceeded: Boolean = false,
     /** One-shot: the captain cancelled the trip → the UI shows a localized notice once. */
     val cancelledByDriver: Boolean = false,
+    // --- V2 bidding ---
+    /** The rider's proposed fare on the ProposeFare step (defaults to the selected cab's recommended fare). */
+    val offeredFare: Double? = null,
+    /** The created BID trip (open trip id + authoritative fare range); set after `POST /v2/trips`. */
+    val bidTrip: BidTrip? = null,
+    /** Live competing bids for the open trip, cheapest-first (from `v2/trip-bids-update`). */
+    val bids: List<Bid> = emptyList(),
+    /** A BID trip create is in flight. */
+    val isCreatingBidTrip: Boolean = false,
+    /** A select/raise/cancel action is in flight. */
+    val isBidActionInFlight: Boolean = false,
+    /** One-shot notice on the bidding screen (no-bids / window timed out). */
+    val bidNotice: String? = null,
     val errorMessage: String? = null,
 ) {
     val selectedCab: CabOption? get() = cabs.firstOrNull { it.id == selectedCabId }
@@ -142,6 +165,17 @@ sealed interface RiderBookingEvent {
     data class ApplyPromo(val code: String) : RiderBookingEvent
     data object RemovePromo : RiderBookingEvent
     data object ConfirmRide : RiderBookingEvent
+    /** V2: submit the proposed fare → create a BID trip. */
+    data class SubmitOffer(val fare: Double) : RiderBookingEvent
+    /** V2: select a competing bid (commit the match). */
+    data class SelectBid(val bidId: String) : RiderBookingEvent
+    /** V2: dismiss a single competing bid. */
+    data class RejectBid(val bidId: String) : RiderBookingEvent
+    /** V2: raise the offered fare to attract more/faster bids. */
+    data class RaiseOffer(val fare: Double) : RiderBookingEvent
+    /** V2: cancel the open (awaiting-bids) request. */
+    data object CancelBidding : RiderBookingEvent
+    data object ConsumeBidNotice : RiderBookingEvent
     /** Re-fetch the wallet balance (e.g. after a successful top-up). */
     data object RefreshBalance : RiderBookingEvent
     /** Retry after no captain was found — returns to ride selection to re-request (ride-android: back). */
@@ -186,6 +220,12 @@ class RiderBookingViewModel @Inject constructor(
     private val rateDriver: RateDriverUseCase,
     private val getRideCategories: GetRideCategoriesUseCase,
     private val getRecentAddresses: GetRecentAddressesUseCase,
+    private val createBidTrip: CreateBidTripUseCase,
+    private val getTripBids: GetTripBidsUseCase,
+    private val selectBidUseCase: SelectBidUseCase,
+    private val rejectBidUseCase: RejectBidUseCase,
+    private val raiseOfferUseCase: RaiseOfferUseCase,
+    private val cancelOpenTrip: CancelOpenTripUseCase,
     private val session: SessionRepository,
     private val env: EnvConfig,
     private val socketService: SocketService,
@@ -247,6 +287,19 @@ class RiderBookingViewModel @Inject constructor(
                 }
             }
         }
+        // V2 bidding events for the rider's open trip: live bids, match committed, no-bids/timeout.
+        viewModelScope.launch {
+            socketService.v2Events.collect { event ->
+                val tripId = _state.value.bidTrip?.tripId
+                when (event) {
+                    is V2SocketEvent.BidsUpdate -> if (event.tripId == tripId) _state.update { it.copy(bids = event.bids) }
+                    is V2SocketEvent.BidAccepted -> if (event.tripId == tripId) onBidMatched()
+                    is V2SocketEvent.NoBids -> if (event.tripId == tripId) _state.update { it.copy(bidNotice = NOTICE_NO_BIDS) }
+                    is V2SocketEvent.BiddingTimeout -> if (event.tripId == tripId) _state.update { it.copy(bidNotice = NOTICE_TIMEOUT) }
+                    else -> Unit // driver-facing events
+                }
+            }
+        }
         // Restore an in-progress ride if one exists (ride-android: `checkOnGoingRide` on dashboard load).
         checkOngoingTrip()
     }
@@ -269,6 +322,27 @@ class RiderBookingViewModel @Inject constructor(
         // Don't clobber a booking the rider has already started while the check was in flight.
         if (_state.value.step != RiderStep.Home) return
         when (trip.stage) {
+            // V2: still collecting bids → restore the bidding screen and refresh the current bids.
+            TripStage.AwaitingBids -> {
+                val offered = trip.offeredFare ?: 0.0
+                _state.update {
+                    it.copy(
+                        step = RiderStep.Bidding,
+                        pickup = trip.pickup ?: it.pickup,
+                        destination = trip.destination ?: it.destination,
+                        offeredFare = offered,
+                        bidTrip = BidTrip(
+                            tripId = trip.tripId,
+                            status = 15,
+                            fareRange = FareRange("SAR", recommended = offered, min = offered, max = offered * RESTORE_MAX_FACTOR, riderOfferedFare = offered),
+                            requestTimeLimit = null,
+                        ),
+                        bids = emptyList(),
+                    )
+                }
+                fetchRoute()
+                fetchTripBids(trip.tripId)
+            }
             TripStage.Searching -> {
                 _state.update {
                     it.copy(
@@ -334,7 +408,13 @@ class RiderBookingViewModel @Inject constructor(
             is RiderBookingEvent.SelectCab -> selectCab(event.cabId)
             is RiderBookingEvent.ApplyPromo -> applyPromo(event.code)
             RiderBookingEvent.RemovePromo -> _state.update { it.copy(promo = null) }
-            RiderBookingEvent.ConfirmRide -> confirmRide()
+            RiderBookingEvent.ConfirmRide -> openProposeFare()
+            is RiderBookingEvent.SubmitOffer -> submitOffer(event.fare)
+            is RiderBookingEvent.SelectBid -> selectBid(event.bidId)
+            is RiderBookingEvent.RejectBid -> rejectBid(event.bidId)
+            is RiderBookingEvent.RaiseOffer -> raiseOffer(event.fare)
+            RiderBookingEvent.CancelBidding -> cancelBidding()
+            RiderBookingEvent.ConsumeBidNotice -> _state.update { it.copy(bidNotice = null) }
             RiderBookingEvent.RefreshBalance -> loadBalance()
             RiderBookingEvent.TryAgainSearch -> tryAgainSearch()
             RiderBookingEvent.CancelRide -> cancelRide()
@@ -618,6 +698,116 @@ class RiderBookingViewModel @Inject constructor(
         }
     }
 
+    /** "Confirm Ride" → V2: go to the propose-fare step, seeded with the selected cab's recommended fare. */
+    private fun openProposeFare() {
+        val cab = _state.value.selectedCab ?: return
+        if (_state.value.pickup == null || _state.value.destination == null) return
+        _state.update { it.copy(step = RiderStep.ProposeFare, offeredFare = it.offeredFare ?: cab.fare, errorMessage = null) }
+    }
+
+    /** Submit the proposed fare → create a BID trip (status 15) and move to the live-bids screen. */
+    private fun submitOffer(fare: Double) {
+        val state = _state.value
+        val cab = state.selectedCab ?: return
+        val pickup = state.pickup ?: return
+        val destination = state.destination ?: return
+        if (state.isCreatingBidTrip) return
+        _state.update { it.copy(isCreatingBidTrip = true, offeredFare = fare, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = createBidTrip(pickup, destination, cab.id, state.selectedCategory?.id, fare)) {
+                is ApiResult.Success -> _state.update {
+                    it.copy(isCreatingBidTrip = false, bidTrip = result.data, bids = emptyList(), bidNotice = null, step = RiderStep.Bidding)
+                }
+                is ApiResult.Error -> _state.update { it.copy(isCreatingBidTrip = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isCreatingBidTrip = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    /** Select a competing bid → commit the match; on success switch to the assigned (on-the-way) flow. */
+    private fun selectBid(bidId: String) {
+        val tripId = _state.value.bidTrip?.tripId ?: return
+        if (_state.value.isBidActionInFlight) return
+        _state.update { it.copy(isBidActionInFlight = true, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = selectBidUseCase(tripId, bidId)) {
+                is ApiResult.Success -> { _state.update { it.copy(isBidActionInFlight = false) }; onBidMatched() }
+                is ApiResult.Error -> _state.update { it.copy(isBidActionInFlight = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isBidActionInFlight = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    /** Dismiss a single competing bid (optimistic; the next bids-update is authoritative). */
+    private fun rejectBid(bidId: String) {
+        val tripId = _state.value.bidTrip?.tripId ?: return
+        _state.update { it.copy(bids = it.bids.filterNot { b -> b.bidId == bidId }) }
+        viewModelScope.launch { rejectBidUseCase(tripId, bidId) }
+    }
+
+    /** Raise the offered fare to attract more/faster bids. */
+    private fun raiseOffer(fare: Double) {
+        val tripId = _state.value.bidTrip?.tripId ?: return
+        if (_state.value.isBidActionInFlight) return
+        _state.update { it.copy(isBidActionInFlight = true, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = raiseOfferUseCase(tripId, fare)) {
+                is ApiResult.Success -> _state.update { st ->
+                    st.copy(
+                        isBidActionInFlight = false,
+                        offeredFare = fare,
+                        bidTrip = st.bidTrip?.let { it.copy(fareRange = it.fareRange.copy(riderOfferedFare = fare)) },
+                    )
+                }
+                is ApiResult.Error -> _state.update { it.copy(isBidActionInFlight = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isBidActionInFlight = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    /** Cancel the open (awaiting-bids) request and return home (cancel is best-effort). */
+    private fun cancelBidding() {
+        val tripId = _state.value.bidTrip?.tripId
+        if (tripId == null) { goHome(); return }
+        if (_state.value.isBidActionInFlight) return
+        _state.update { it.copy(isBidActionInFlight = true, errorMessage = null) }
+        viewModelScope.launch {
+            cancelOpenTrip(tripId, null)
+            clearBidding()
+            goHome()
+        }
+    }
+
+    /** A bid was matched → fetch the assigned trip (`trips/exists` → socket) and go on-the-way. */
+    private fun onBidMatched() {
+        viewModelScope.launch {
+            when (val result = getOngoingTrip()) {
+                is ApiResult.Success -> result.data?.acceptedTrip?.let { accepted ->
+                    val trip = result.data
+                    _state.update {
+                        it.copy(pickup = trip.pickup ?: it.pickup, destination = trip.destination ?: it.destination, bidTrip = null, bids = emptyList())
+                    }
+                    onDriverAccepted(accepted)
+                }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
+    private fun clearBidding() {
+        _state.update { it.copy(bidTrip = null, bids = emptyList(), isBidActionInFlight = false, isCreatingBidTrip = false) }
+    }
+
+    /** Fetch the current competing bids (on restore); the socket keeps them live afterwards. */
+    private fun fetchTripBids(tripId: String) {
+        viewModelScope.launch {
+            when (val result = getTripBids(tripId)) {
+                is ApiResult.Success -> _state.update { if (it.bidTrip?.tripId == tripId) it.copy(bids = result.data) else it }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
     /** Ends the search and shows the "no captain / expired" try-again state (idempotent). */
     private fun failSearch() {
         if (_state.value.step != RiderStep.Searching) return
@@ -672,6 +862,11 @@ class RiderBookingViewModel @Inject constructor(
                 arrivedAtMillis = null,
                 rating = 0,
                 isSubmittingRating = false,
+                bidTrip = null,
+                bids = emptyList(),
+                offeredFare = null,
+                isCreatingBidTrip = false,
+                isBidActionInFlight = false,
                 errorMessage = null,
             )
         }
@@ -912,6 +1107,9 @@ class RiderBookingViewModel @Inject constructor(
                 RiderStep.MapPicker -> state.mapPickerOrigin
                 RiderStep.ConfirmPickup -> RiderStep.PickupSearch
                 RiderStep.SelectRide -> RiderStep.ConfirmPickup
+                // Propose-fare → back to cab selection; bidding has no back-dismiss (use Cancel).
+                RiderStep.ProposeFare -> RiderStep.SelectRide
+                RiderStep.Bidding -> RiderStep.Bidding
                 RiderStep.Searching -> RiderStep.Home
                 // Active-ride views: don't allow back-dismiss (rider uses Cancel Ride / I am coming).
                 RiderStep.DriverOnWay -> RiderStep.DriverOnWay
@@ -932,5 +1130,8 @@ class RiderBookingViewModel @Inject constructor(
         const val DEFAULT_SEARCH_TIMEOUT_MS = 45_000L
         const val MIN_SEARCH_TIMEOUT_MS = 5_000L
         const val MAX_SEARCH_TIMEOUT_MS = 180_000L
+        const val NOTICE_NO_BIDS = "NO_BIDS"
+        const val NOTICE_TIMEOUT = "TIMEOUT"
+        const val RESTORE_MAX_FACTOR = 2.5
     }
 }

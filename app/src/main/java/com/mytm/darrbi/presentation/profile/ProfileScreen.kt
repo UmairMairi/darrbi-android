@@ -58,6 +58,8 @@ fun ProfileScreen(
     onBack: () -> Unit,
     /** When non-null (rider profile), shows a "Drive with Darrbi" entry that switches to captain mode. */
     onSwitchToCaptain: (() -> Unit)? = null,
+    /** When non-null (captain profile), shows a "Switch to Rider" entry that switches to rider mode. */
+    onSwitchToRider: (() -> Unit)? = null,
     onLogout: () -> Unit = onBack,
     onViewBalanceDetails: () -> Unit = {},
     onMyRides: () -> Unit = {},
@@ -87,6 +89,8 @@ fun ProfileScreen(
     val menu = buildList {
         // Rider profile only: switch into captain mode (replaces the old home RIDER/CAPTAIN toggle).
         onSwitchToCaptain?.let { add(ProfileMenuItem(R.drawable.icon_car, R.string.profile_switch_to_captain, it)) }
+        // Captain profile only: switch back to rider mode.
+        onSwitchToRider?.let { add(ProfileMenuItem(R.drawable.icon_car, R.string.profile_switch_to_rider, it)) }
         add(ProfileMenuItem(R.drawable.icon_subscription, R.string.menu_subscription) {})
         add(ProfileMenuItem(R.drawable.icon_car_details, R.string.menu_car_deal_details) {})
         add(ProfileMenuItem(R.drawable.icon_saved_cards, R.string.menu_saved_cards) {})

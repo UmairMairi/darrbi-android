@@ -125,8 +125,6 @@ fun DarrbiRoot() {
                 Route.Dashboard -> CaptainDashboardScreen(
                     onSeeDetails = { route = Route.StatusDetail },
                     onProfile = { profileReturn = Route.Dashboard; route = Route.Profile },
-                    onSwitchToRider = { switchMode(toCaptain = false) },
-                    modeSwitching = modeSwitching,
                 )
                 Route.RiderHome -> RiderFlowScreen(
                     onProfile = { profileReturn = Route.RiderHome; route = Route.Profile },
@@ -144,6 +142,12 @@ fun DarrbiRoot() {
                         // dashboard keeps its own toggle for switching back to rider).
                         onSwitchToCaptain = if (profileReturn == Route.RiderHome) {
                             { switchMode(toCaptain = true) }
+                        } else {
+                            null
+                        },
+                        // Captain profile → switch back to rider mode.
+                        onSwitchToRider = if (profileReturn == Route.Dashboard) {
+                            { switchMode(toCaptain = false) }
                         } else {
                             null
                         },

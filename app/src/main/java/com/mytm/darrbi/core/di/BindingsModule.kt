@@ -12,6 +12,7 @@ import com.mytm.darrbi.data.repository.AuthRepositoryImpl
 import com.mytm.darrbi.data.repository.ChatRepositoryImpl
 import com.mytm.darrbi.data.repository.OnboardingRepositoryImpl
 import com.mytm.darrbi.data.repository.RideRepositoryImpl
+import com.mytm.darrbi.data.repository.V2RideRepositoryImpl
 import com.mytm.darrbi.domain.repository.AuthRepository
 import com.mytm.darrbi.domain.repository.ChatRepository
 import com.mytm.darrbi.domain.repository.MapService
@@ -19,6 +20,7 @@ import com.mytm.darrbi.domain.repository.OnboardingRepository
 import com.mytm.darrbi.domain.repository.PlacesRepository
 import com.mytm.darrbi.domain.repository.RideRepository
 import com.mytm.darrbi.domain.repository.SessionRepository
+import com.mytm.darrbi.domain.repository.V2RideRepository
 import com.mytm.darrbi.domain.repository.SocketService
 import dagger.Binds
 import dagger.Module
@@ -63,6 +65,10 @@ abstract class BindingsModule {
     @Binds
     @Singleton
     abstract fun bindRideRepository(impl: RideRepositoryImpl): RideRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindV2RideRepository(impl: V2RideRepositoryImpl): V2RideRepository
 
     @Binds
     @Singleton

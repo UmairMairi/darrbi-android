@@ -14,29 +14,40 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
+import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.rememberModalBottomSheetState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -71,14 +82,13 @@ import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiTextField
 import com.mytm.darrbi.domain.model.LatLngPoint
+import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.RideRequest
 import com.mytm.darrbi.presentation.common.LocationPermissionDeniedDialog
 import com.mytm.darrbi.presentation.rider.AnimatedCarMarker
 import com.mytm.darrbi.presentation.rider.ContactCircle
 import com.mytm.darrbi.presentation.rider.rememberCarMarkerIcon
 import com.mytm.darrbi.presentation.rider.rememberMarkerIcon
-import com.mytm.darrbi.presentation.common.ModeToggle
-import com.mytm.darrbi.presentation.common.RideMode
 import com.mytm.darrbi.presentation.common.openAppSettings
 import com.mytm.darrbi.presentation.common.rememberLocationPermissionState
 
@@ -91,8 +101,6 @@ import com.mytm.darrbi.presentation.common.rememberLocationPermissionState
 fun CaptainDashboardScreen(
     onSeeDetails: () -> Unit,
     onProfile: () -> Unit = {},
-    onSwitchToRider: () -> Unit = {},
-    modeSwitching: Boolean = false,
     viewModel: CaptainDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -164,11 +172,44 @@ fun CaptainDashboardScreen(
             viewModel.onEvent(CaptainDashboardEvent.ConsumeError)
         }
     }
+    // V2: you lost / the trip closed before you could win.
+    val bidLostMsg = stringResource(R.string.captain_bid_lost)
+    LaunchedEffect(state.bidLostReason) {
+        if (state.bidLostReason != null) {
+            android.widget.Toast.makeText(ctx, bidLostMsg, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.onEvent(CaptainDashboardEvent.ConsumeBidLost)
+        }
+    }
 
     Box(modifier = Modifier.fillMaxSize()) {
         val request = state.incomingRequest
         val active = state.activeTrip
         val mapBusy = request != null || active != null
+        // Verified + idle → the full-screen broadcast list (reference); the map is used for active trips.
+        val showList = state.stage == CaptainStage.NoRiders && !mapBusy
+        if (showList) {
+            DriverOpenTripsView(
+                state = state,
+                onEvent = viewModel::onEvent,
+                onProfile = onProfile,
+                modifier = Modifier.fillMaxSize(),
+            )
+            // Bid sheet for the tapped open trip.
+            state.biddingTrip?.let { trip ->
+                BidSheet(
+                    trip = trip,
+                    isPlacing = state.isPlacingBid,
+                    errorCode = state.bidErrorCode,
+                    onAcceptFare = { viewModel.onEvent(CaptainDashboardEvent.AcceptFare(trip.tripId)) },
+                    onCounter = { fare -> viewModel.onEvent(CaptainDashboardEvent.CounterBid(trip.tripId, fare)) },
+                    onDismiss = { viewModel.onEvent(CaptainDashboardEvent.DismissBidSheet) },
+                )
+            }
+            if (isReady && locationPermission.isPermanentlyDenied) {
+                LocationPermissionDeniedDialog(onOpenSettings = { ctx.openAppSettings() })
+            }
+            return@Box
+        }
         GoogleMap(
             modifier = Modifier.fillMaxSize(),
             cameraPositionState = cameraPositionState,
@@ -229,15 +270,9 @@ fun CaptainDashboardScreen(
             )
         }
 
-        // Top-start: RIDER/CAPTAIN toggle normally; the 3-dot menu (Cancel Ride) while navigating to a rider.
-        if (active == null) {
-            ModeToggle(
-                selected = RideMode.Captain,
-                onSelect = { if (it == RideMode.Rider) onSwitchToRider() },
-                enabled = !modeSwitching,
-                modifier = Modifier.align(Alignment.TopStart).statusBarsPadding().padding(16.dp),
-            )
-        } else {
+        // Top-start: the 3-dot menu (Cancel Ride) while navigating to a rider. (The RIDER/CAPTAIN switch
+        // now lives in the profile screen.)
+        if (active != null) {
             CaptainMenu(
                 showMenu = state.showMenu,
                 onToggle = { viewModel.onEvent(CaptainDashboardEvent.ToggleMenu) },
@@ -440,6 +475,292 @@ private fun NoRidersContent() {
         Spacer(Modifier.height(14.dp))
         DarrbiPrimaryButton(text = stringResource(R.string.no_riders_navigate), onClick = {})
     }
+}
+
+// ---------------------------------------------------------------------------------------------
+// V2 broadcast dispatch: the full-screen driver list (Online/Offline toggle + open-trip cards).
+// ---------------------------------------------------------------------------------------------
+
+@Composable
+private fun DriverOpenTripsView(
+    state: CaptainDashboardUiState,
+    onEvent: (CaptainDashboardEvent) -> Unit,
+    onProfile: () -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    Column(modifier = modifier.background(DarrbiTheme.colors.surface).statusBarsPadding()) {
+        // Top bar: menu (→ profile) · Online/Offline toggle · profile avatar.
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            CircleButton(onClick = onProfile) {
+                Icon(Icons.Filled.Menu, stringResource(R.string.cd_profile), tint = DarrbiTheme.colors.onSurface, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.weight(1f))
+            OnlineToggle(online = state.isOnline, onChange = { onEvent(CaptainDashboardEvent.SetOnline(it)) })
+            Spacer(Modifier.weight(1f))
+            CircleButton(onClick = onProfile) {
+                Icon(Icons.Filled.Person, stringResource(R.string.cd_profile), tint = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.size(24.dp))
+            }
+        }
+        if (!state.isOnline) OfflineBanner()
+        when {
+            state.openTrips.isNotEmpty() -> Column(
+                modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).navigationBarsPadding(),
+                verticalArrangement = Arrangement.spacedBy(14.dp),
+            ) {
+                Spacer(Modifier.height(2.dp))
+                state.openTrips.forEach { trip ->
+                    OpenTripCard(trip = trip, onClick = { onEvent(CaptainDashboardEvent.OpenBidSheet(trip.tripId)) })
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            state.isOnline -> Box(modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp), contentAlignment = Alignment.Center) {
+                Text(
+                    stringResource(R.string.captain_no_open_trips),
+                    style = DarrbiTheme.typography.body,
+                    color = DarrbiTheme.colors.onSurfaceVariant,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(32.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun CircleButton(onClick: () -> Unit, content: @Composable () -> Unit) {
+    Box(
+        modifier = Modifier.size(44.dp).clip(CircleShape).background(DarrbiTheme.colors.surfaceVariant).clickable(onClick = onClick),
+        contentAlignment = Alignment.Center,
+        content = { content() },
+    )
+}
+
+/** Offline / Online segmented pill (Offline = red active, Online = green active), per the reference. */
+@Composable
+private fun OnlineToggle(online: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier.clip(RoundedCornerShape(50)).background(DarrbiTheme.colors.surfaceVariant).padding(3.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ToggleSegment(stringResource(R.string.captain_offline), active = !online, activeColor = DarrbiTheme.colors.error) { onChange(false) }
+        ToggleSegment(stringResource(R.string.captain_online), active = online, activeColor = DarrbiTheme.colors.primary) { onChange(true) }
+    }
+}
+
+@Composable
+private fun ToggleSegment(label: String, active: Boolean, activeColor: Color, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (active) activeColor else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 22.dp, vertical = 8.dp),
+    ) {
+        Text(
+            text = label,
+            style = DarrbiTheme.typography.button.copy(fontSize = 14.sp),
+            color = if (active) DarrbiTheme.colors.onPrimary else DarrbiTheme.colors.onSurfaceVariant,
+        )
+    }
+}
+
+/** Dark "You are currently offline" banner (per the reference). */
+@Composable
+private fun OfflineBanner() {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = DarrbiTheme.colors.buttonContainer,
+    ) {
+        Text(
+            text = stringResource(R.string.captain_offline_banner),
+            style = DarrbiTheme.typography.bodyMedium,
+            color = DarrbiTheme.colors.onButton,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+        )
+    }
+}
+
+/** One broadcast ride-request card (rider, offered fare, distance·time, pickup/drop) — tap to bid. */
+@Composable
+private fun OpenTripCard(trip: OpenTrip, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = DarrbiTheme.colors.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline),
+        shadowElevation = 1.dp,
+    ) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                AsyncImage(
+                    model = trip.riderImageUrl,
+                    contentDescription = null,
+                    modifier = Modifier.size(44.dp).clip(CircleShape),
+                    contentScale = ContentScale.Crop,
+                    placeholder = painterResource(R.drawable.user_placeholder),
+                    error = painterResource(R.drawable.user_placeholder),
+                    fallback = painterResource(R.drawable.user_placeholder),
+                )
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(
+                        text = trip.riderName ?: stringResource(R.string.captain_rider_fallback),
+                        style = DarrbiTheme.typography.title.copy(fontSize = 16.sp),
+                        color = DarrbiTheme.colors.onSurface,
+                        maxLines = 1,
+                    )
+                    Text(
+                        text = relativeAge(trip.createdAtMillis),
+                        style = DarrbiTheme.typography.label,
+                        color = DarrbiTheme.colors.onSurfaceVariant,
+                    )
+                }
+                trip.riderRating?.let { rating ->
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(formatRating(rating), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                    }
+                }
+            }
+            Spacer(Modifier.height(12.dp))
+            HorizontalDivider(color = DarrbiTheme.colors.outline)
+            Spacer(Modifier.height(12.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = stringResource(R.string.captain_sar, formatAmount(trip.riderOfferedFare)),
+                    style = DarrbiTheme.typography.titleLarge.copy(fontSize = 22.sp),
+                    color = DarrbiTheme.colors.onSurface,
+                )
+                Spacer(Modifier.weight(1f))
+                Text(
+                    text = distanceTime(trip),
+                    style = DarrbiTheme.typography.label,
+                    color = DarrbiTheme.colors.onSurfaceVariant,
+                )
+            }
+            Spacer(Modifier.height(14.dp))
+            Surface(shape = RoundedCornerShape(12.dp), color = DarrbiTheme.colors.surface, border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline)) {
+                Column {
+                    AddressRow(stringResource(R.string.captain_pickup), trip.pickup.address, DarrbiTheme.colors.primary)
+                    HorizontalDivider(color = DarrbiTheme.colors.outline)
+                    AddressRow(stringResource(R.string.captain_drop_off), trip.dropoff.address, DarrbiTheme.colors.error)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun AddressRow(label: String, address: String, dotColor: Color) {
+    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.Top) {
+        Box(modifier = Modifier.padding(top = 5.dp).size(10.dp).clip(CircleShape).border(2.dp, dotColor, CircleShape))
+        Spacer(Modifier.width(12.dp))
+        Column {
+            Text(label, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+            Text(
+                text = address.takeIf { it.isNotBlank() } ?: stringResource(R.string.captain_location_point),
+                style = DarrbiTheme.typography.bodyMedium,
+                color = DarrbiTheme.colors.onSurface,
+                maxLines = 2,
+                overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+            )
+        }
+    }
+}
+
+/** Bid bottom sheet: accept the rider's fare or counter within the allowed range. */
+@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+@Composable
+private fun BidSheet(
+    trip: OpenTrip,
+    isPlacing: Boolean,
+    errorCode: String?,
+    onAcceptFare: () -> Unit,
+    onCounter: (Double) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    val sheetState = rememberModalBottomSheetState()
+    val belowMsg = stringResource(R.string.captain_bid_err_range, formatAmount(trip.fareRange.min), formatAmount(trip.fareRange.max))
+    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = DarrbiTheme.colors.surface) {
+        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp).navigationBarsPadding()) {
+            Text(stringResource(R.string.captain_place_bid), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
+            Spacer(Modifier.height(6.dp))
+            Text(
+                text = stringResource(R.string.captain_bid_range, formatAmount(trip.fareRange.min), formatAmount(trip.fareRange.max)),
+                style = DarrbiTheme.typography.body,
+                color = DarrbiTheme.colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(16.dp))
+            var offer by remember { mutableStateOf(formatAmount(trip.riderOfferedFare)) }
+            var localError by remember { mutableStateOf<String?>(null) }
+            DarrbiTextField(
+                value = offer,
+                onValueChange = { input -> offer = input.filter { it.isDigit() || it == '.' }; localError = null },
+                label = stringResource(R.string.captain_your_offer),
+                keyboardType = KeyboardType.Number,
+                isError = localError != null,
+                supportingText = localError ?: errorCode?.let { bidErrorText(it) },
+            )
+            Spacer(Modifier.height(16.dp))
+            DarrbiPrimaryButton(
+                text = stringResource(R.string.captain_accept_fare, formatAmount(trip.riderOfferedFare)),
+                onClick = onAcceptFare,
+                enabled = !isPlacing,
+            )
+            Spacer(Modifier.height(10.dp))
+            DarrbiSecondaryButton(
+                text = stringResource(R.string.captain_submit_bid),
+                onClick = {
+                    val value = offer.toDoubleOrNull()
+                    when {
+                        value == null -> localError = belowMsg
+                        value < trip.fareRange.min || value > trip.fareRange.max -> localError = belowMsg
+                        else -> onCounter(value)
+                    }
+                },
+                enabled = !isPlacing,
+            )
+            Spacer(Modifier.height(8.dp))
+        }
+    }
+}
+
+/** Maps a V2 bid error code to a friendly message. */
+@Composable
+private fun bidErrorText(code: String): String = when (code) {
+    "BID_BELOW_FLOOR" -> stringResource(R.string.captain_bid_err_below)
+    "BID_ABOVE_CEILING" -> stringResource(R.string.captain_bid_err_above)
+    "DRIVER_INELIGIBLE" -> stringResource(R.string.captain_bid_err_ineligible)
+    "DRIVER_OUT_OF_RANGE" -> stringResource(R.string.captain_bid_err_range_out)
+    "TRIP_NOT_OPEN" -> stringResource(R.string.captain_bid_err_closed)
+    else -> stringResource(R.string.captain_bid_err_generic)
+}
+
+private fun formatRating(rating: Double): String = String.format(java.util.Locale.US, "%.1f/5", rating)
+
+private fun clockTime(millis: Long?): String? = millis?.let {
+    runCatching { java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(it)) }.getOrNull()
+}
+
+/** "Just Now" when fresh (or unknown), else "N mins". */
+@Composable
+private fun relativeAge(millis: Long?): String {
+    if (millis == null) return stringResource(R.string.captain_just_now)
+    val mins = ((System.currentTimeMillis() - millis) / 60_000L).toInt()
+    return if (mins <= 0) stringResource(R.string.captain_just_now) else stringResource(R.string.captain_mins_ago, mins)
+}
+
+/** "0.9 km • 3:09 pm" (or just the distance when the time is unknown). */
+@Composable
+private fun distanceTime(trip: OpenTrip): String {
+    val km = formatKm(trip.tripDistanceKm)
+    val clock = clockTime(trip.createdAtMillis)
+    return if (clock != null) stringResource(R.string.captain_km_time, km, clock) else stringResource(R.string.captain_km_only, km)
 }
 
 /** Incoming ride request card: rider, estimated earning, payment, pickup/dest distance, accept/decline. */

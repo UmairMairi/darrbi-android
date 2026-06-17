@@ -20,4 +20,6 @@ data class CaptainDetails(
     val mobileNo: String?,
     val dateOfBirth: String?,
     val overallRating: Double?,
+    /** The captain's cab-type id (from `GET /captains`); used to seed V2 open-in-range / bidding. */
+    val cabId: String? = null,
 )

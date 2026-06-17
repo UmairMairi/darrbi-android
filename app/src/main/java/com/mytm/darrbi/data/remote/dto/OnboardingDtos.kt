@@ -113,6 +113,15 @@ data class CaptainDetailsData(
     val mobileNo: String? = null,
     val dateOfBirth: String? = null,
     val overallRating: Double? = null,
+    /** The captain's assigned cab (`GET /captains` → `cab`); its id seeds V2 open-in-range / bidding. */
+    val cab: CabRefDto? = null,
+)
+
+/** Minimal reference to the captain's cab type from `GET /captains`. */
+@Serializable
+data class CabRefDto(
+    val id: String? = null,
+    val name: String? = null,
 )
 
 /** `POST /captains/become-captain` (mirrors ride-android's request body). */

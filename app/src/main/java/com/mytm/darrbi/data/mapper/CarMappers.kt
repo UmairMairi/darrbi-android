@@ -42,4 +42,5 @@ fun CaptainDetailsData.toDomain(): CaptainDetails = CaptainDetails(
     mobileNo = mobileNo,
     dateOfBirth = dateOfBirth,
     overallRating = overallRating,
+    cabId = cab?.id,
 )

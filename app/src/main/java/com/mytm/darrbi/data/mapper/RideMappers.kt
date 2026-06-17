@@ -97,8 +97,9 @@ fun RecentAddressDto.toDomain(): RecentLocation? {
 fun OngoingTripData.toOngoingTrip(): OngoingTrip = OngoingTrip(
     tripId = id.orEmpty(),
     stage = when (status) {
+        15 -> TripStage.AwaitingBids
         3 -> TripStage.Searching
-        2 -> TripStage.DriverAssigned
+        2, 16 -> TripStage.DriverAssigned
         5 -> TripStage.DriverArrived
         1, 7 -> TripStage.InProgress
         8 -> TripStage.Completed
@@ -159,6 +160,7 @@ fun OngoingTripData.toOngoingTrip(): OngoingTrip = OngoingTrip(
             null
         }
     },
+    offeredFare = riderAmount,
 )
 
 private fun TripPointDto.toPlaceLocation(): PlaceLocation? {

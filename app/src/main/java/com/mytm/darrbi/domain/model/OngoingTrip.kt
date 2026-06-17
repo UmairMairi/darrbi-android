@@ -5,7 +5,7 @@ package com.mytm.darrbi.domain.model
  * trip status (`openRideScreenAccordingToTripStatus`): searching for a captain, a captain assigned and on
  * the way / arrived, the trip in progress, or a terminal state (completed / cancelled / expired).
  */
-enum class TripStage { Searching, DriverAssigned, DriverArrived, InProgress, Completed, Cancelled, Expired, Unknown }
+enum class TripStage { AwaitingBids, Searching, DriverAssigned, DriverArrived, InProgress, Completed, Cancelled, Expired, Unknown }
 
 /**
  * A ride already in progress when the rider returns to the dashboard (`GET trips/exists` →
@@ -22,4 +22,6 @@ data class OngoingTrip(
     val arrivedAtMillis: Long?,
     /** The driver-facing view of this trip (rider + earning + route) — used to restore the captain screen. */
     val rideRequest: RideRequest?,
+    /** The rider's offered fare while awaiting bids (status 15) — used to restore the bidding screen. */
+    val offeredFare: Double? = null,
 )

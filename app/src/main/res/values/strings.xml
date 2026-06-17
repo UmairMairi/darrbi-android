@@ -129,6 +129,34 @@
     <string name="captain_pickup_eta">%1$s km · %2$s</string>
     <string name="captain_cancel_ride">Cancel Ride</string>
     <string name="captain_menu">Menu</string>
+    <!-- Captain: V2 broadcast list + bidding -->
+    <string name="captain_online">Online</string>
+    <string name="captain_offline">Offline</string>
+    <string name="captain_offline_banner">You are currently offline</string>
+    <string name="captain_no_open_trips">No ride requests right now</string>
+    <string name="captain_rider_fallback">Rider</string>
+    <string name="captain_just_now">Just Now</string>
+    <string name="captain_mins_ago">%1$d mins</string>
+    <string name="captain_sar">SAR %1$s</string>
+    <string name="captain_km_time">%1$s km • %2$s</string>
+    <string name="captain_km_only">%1$s km</string>
+    <string name="captain_pickup">Pickup</string>
+    <string name="captain_drop_off">Drop Off</string>
+    <string name="captain_location_point">Location on map</string>
+    <string name="captain_bid_lost">You didn\'t get this ride</string>
+    <string name="captain_place_bid">Place your bid</string>
+    <string name="captain_bid_range">Range: SAR %1$s – %2$s</string>
+    <string name="captain_your_offer">Your offer (SAR)</string>
+    <string name="captain_accept_fare">Accept SAR %1$s</string>
+    <string name="captain_submit_bid">Place counter bid</string>
+    <string name="captain_bid_err_below">Your bid is below the minimum</string>
+    <string name="captain_bid_err_above">Your bid is above the maximum</string>
+    <string name="captain_bid_err_ineligible">Go online and finish verification to bid</string>
+    <string name="captain_bid_err_range_out">This pickup is out of your range</string>
+    <string name="captain_bid_err_closed">This request is no longer available</string>
+    <string name="captain_bid_err_generic">Couldn\'t place your bid</string>
+    <string name="captain_bid_err_range">Enter an amount between SAR %1$s and %2$s</string>
+    <string name="profile_switch_to_rider">Switch to Rider</string>
 
     <!-- Topup details + refund -->
     <string name="topup_details_title">Topup Details</string>
@@ -320,6 +348,20 @@
     <string name="rider_pay_remaining">Pay Remaining %1$s SAR</string>
     <string name="rider_drop_changed">New drop-off location changed successfully.</string>
     <string name="rider_driver_cancelled">The captain cancelled the ride.</string>
+    <!-- Rider: V2 propose fare + bidding -->
+    <string name="rider_set_fare">Set your fare</string>
+    <string name="rider_recommended_fare">Recommended: %1$s SAR</string>
+    <string name="rider_fare_range">%1$s – %2$s SAR</string>
+    <string name="rider_request_ride">Find a ride</string>
+    <string name="rider_live_offers">Choosing your captain</string>
+    <string name="rider_your_offer_fare">Your offer: %1$s SAR</string>
+    <string name="rider_waiting_offers">Waiting for offers…</string>
+    <string name="rider_raise_offer">Raise offer</string>
+    <string name="rider_select">Select</string>
+    <string name="rider_captain_fallback">Captain</string>
+    <string name="rider_eta_min">%1$d min</string>
+    <string name="rider_bid_no_bids">No offers yet — try raising your fare</string>
+    <string name="rider_bid_timeout">No captain accepted in time</string>
     <!-- Rider: in-trip help -->
     <string name="rider_help_call_center">Call Center</string>
     <string name="rider_help_share_ride">Share Ride Details</string>

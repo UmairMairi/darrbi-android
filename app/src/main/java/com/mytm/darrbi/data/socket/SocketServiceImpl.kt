@@ -3,11 +3,17 @@ package com.mytm.darrbi.data.socket
 import android.util.Log
 import com.mytm.darrbi.core.common.EnvConfig
 import com.mytm.darrbi.core.common.UserIdProvider
+import com.mytm.darrbi.data.mapper.toDomain
+import com.mytm.darrbi.data.remote.dto.BidDto
+import com.mytm.darrbi.data.remote.dto.FareRangeDto
+import com.mytm.darrbi.data.remote.dto.OpenTripDto
 import com.mytm.darrbi.domain.model.AcceptedTrip
+import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.ChatMessage
 import com.mytm.darrbi.domain.model.ChatMessageStatus
 import com.mytm.darrbi.domain.model.ChatMessageType
 import com.mytm.darrbi.domain.model.LatLngPoint
+import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.RideRequest
 import com.mytm.darrbi.domain.repository.ChatSocketEvent
@@ -15,6 +21,7 @@ import com.mytm.darrbi.domain.repository.NearbyDriver
 import com.mytm.darrbi.domain.repository.SocketConnectionState
 import com.mytm.darrbi.domain.repository.SocketService
 import com.mytm.darrbi.domain.repository.TripSocketEvent
+import com.mytm.darrbi.domain.repository.V2SocketEvent
 import io.socket.client.IO
 import io.socket.client.Socket
 import kotlinx.coroutines.flow.MutableSharedFlow
@@ -23,6 +30,8 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.update
+import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
 import org.json.JSONObject
 import java.util.concurrent.TimeUnit
@@ -42,6 +51,7 @@ import javax.inject.Singleton
 class SocketServiceImpl @Inject constructor(
     private val env: EnvConfig,
     private val userIdProvider: UserIdProvider,
+    private val json: Json,
 ) : SocketService {
 
     private val _connectionState = MutableStateFlow(SocketConnectionState.Disconnected)
@@ -60,6 +70,13 @@ class SocketServiceImpl @Inject constructor(
     // Buffered so chat pushes from the socket callback thread aren't dropped before the chat screen collects.
     private val _chatEvents = MutableSharedFlow<ChatSocketEvent>(extraBufferCapacity = 64)
     override val chatEvents: SharedFlow<ChatSocketEvent> = _chatEvents.asSharedFlow()
+
+    // V2 broadcast-dispatch: the driver's live open-trips set + the bidding event stream.
+    private val _openTrips = MutableStateFlow<List<OpenTrip>>(emptyList())
+    override val openTrips: StateFlow<List<OpenTrip>> = _openTrips.asStateFlow()
+
+    private val _v2Events = MutableSharedFlow<V2SocketEvent>(extraBufferCapacity = 32)
+    override val v2Events: SharedFlow<V2SocketEvent> = _v2Events.asSharedFlow()
 
     @Volatile
     private var socket: Socket? = null
@@ -145,7 +162,133 @@ class SocketServiceImpl @Inject constructor(
                 Log.d(TAG, "recv $TYPING_EVENT: ${args.joinToString()}")
                 onTypingEvent(args)
             }
+            // --- V2 broadcast-dispatch + bidding (envelope {v,event,emittedAt,data}) ---
+            on(NEW_TRIP_REQUEST) { args -> Log.d(TAG, "recv $NEW_TRIP_REQUEST"); onNewTripRequest(args) }
+            on(OPEN_TRIPS_LIST) { args -> Log.d(TAG, "recv $OPEN_TRIPS_LIST"); onOpenTripsList(args) }
+            on(OPEN_TRIPS_UPDATE) { args -> Log.d(TAG, "recv $OPEN_TRIPS_UPDATE"); onOpenTripsUpdate(args) }
+            on(V2_BIDS_UPDATE) { args -> Log.d(TAG, "recv $V2_BIDS_UPDATE"); onBidsUpdate(args) }
+            on(V2_BID_ACCEPTED) { args -> Log.d(TAG, "recv $V2_BID_ACCEPTED"); onBidAccepted(args) }
+            on(V2_DRIVER_SELECTED) { args -> Log.d(TAG, "recv $V2_DRIVER_SELECTED"); onBidAccepted(args) }
+            on(V2_BID_WON) { args -> Log.d(TAG, "recv $V2_BID_WON"); onBidWon(args) }
+            on(V2_BID_LOST) { args -> Log.d(TAG, "recv $V2_BID_LOST"); onBidLost(args) }
+            on(V2_BID_REJECTED) { args -> Log.d(TAG, "recv $V2_BID_REJECTED"); onBidOutcome(args) { t, b -> V2SocketEvent.BidRejected(t, b) } }
+            on(V2_BID_EXPIRED) { args -> Log.d(TAG, "recv $V2_BID_EXPIRED"); onBidOutcome(args) { t, b -> V2SocketEvent.BidExpired(t, b) } }
+            on(V2_TRIP_CLOSED) { args -> Log.d(TAG, "recv $V2_TRIP_CLOSED"); onTripClosed(args) }
+            on(V2_NO_BIDS) { args -> Log.d(TAG, "recv $V2_NO_BIDS"); v2Data(args)?.optString("tripId")?.takeIf { it.isNotBlank() }?.let { _v2Events.tryEmit(V2SocketEvent.NoBids(it)) } }
+            on(V2_BIDDING_TIMEOUT) { args -> Log.d(TAG, "recv $V2_BIDDING_TIMEOUT"); v2Data(args)?.optString("tripId")?.takeIf { it.isNotBlank() }?.let { _v2Events.tryEmit(V2SocketEvent.BiddingTimeout(it)) } }
         }
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // V2 broadcast-dispatch + bidding (server → client). Each event is wrapped in {v,event,emittedAt,data}.
+    // ---------------------------------------------------------------------------------------------
+
+    /** Extracts the envelope's `data` object (falling back to the root if the payload isn't wrapped). */
+    private fun v2Data(args: Array<out Any?>): JSONObject? {
+        val root = runCatching { JSONObject(args.getOrNull(0).toString()) }.getOrNull() ?: return null
+        return root.optJSONObject("data") ?: root
+    }
+
+    private fun decodeOpenTrip(obj: JSONObject?): OpenTrip? {
+        obj ?: return null
+        return runCatching { json.decodeFromString(OpenTripDto.serializer(), obj.toString()).toDomain() }.getOrNull()
+    }
+
+    private fun decodeBid(obj: JSONObject?): Bid? {
+        obj ?: return null
+        return runCatching { json.decodeFromString(BidDto.serializer(), obj.toString()).toDomain() }.getOrNull()
+    }
+
+    /** `new-trip-request` → append the single trip to the open set (de-duped by id). */
+    private fun onNewTripRequest(args: Array<out Any?>) {
+        val trip = decodeOpenTrip(v2Data(args)?.optJSONObject("trip")) ?: return
+        _openTrips.update { current -> current.filterNot { it.tripId == trip.tripId } + trip }
+        Log.d(TAG, "$NEW_TRIP_REQUEST → +${trip.tripId} (now ${_openTrips.value.size})")
+    }
+
+    /** `open-trips-list` → replace the whole list (snapshot). */
+    private fun onOpenTripsList(args: Array<out Any?>) {
+        val arr = v2Data(args)?.optJSONArray("trips") ?: return
+        val trips = (0 until arr.length()).mapNotNull { decodeOpenTrip(arr.optJSONObject(it)) }
+        _openTrips.value = trips
+        Log.d(TAG, "$OPEN_TRIPS_LIST → ${trips.size} trip(s)")
+    }
+
+    /** `open-trips-update` → apply the removed/added/updated delta by tripId. */
+    private fun onOpenTripsUpdate(args: Array<out Any?>) {
+        val data = v2Data(args) ?: return
+        val removed = data.optJSONArray("removed")?.let { a -> (0 until a.length()).map { a.optString(it) } }?.toSet().orEmpty()
+        val added = data.optJSONArray("added")?.let { a -> (0 until a.length()).mapNotNull { decodeOpenTrip(a.optJSONObject(it)) } }.orEmpty()
+        val updated = data.optJSONArray("updated")?.let { a -> (0 until a.length()).mapNotNull { a.optJSONObject(it) } }.orEmpty()
+        _openTrips.update { current ->
+            val kept = current.filterNot { it.tripId in removed }.map { trip ->
+                val u = updated.firstOrNull { it.optString("tripId") == trip.tripId }
+                val fr = u?.optJSONObject("fareRange")
+                if (fr != null) {
+                    val newRange = runCatching { json.decodeFromString(FareRangeDto.serializer(), fr.toString()).toDomain(trip.fareRange.riderOfferedFare) }.getOrNull()
+                    trip.copy(fareRange = newRange ?: trip.fareRange, riderOfferedFare = fr.optDouble("riderOfferedFare", trip.riderOfferedFare))
+                } else {
+                    trip
+                }
+            }
+            val addedIds = added.map { it.tripId }.toSet()
+            kept.filterNot { it.tripId in addedIds } + added
+        }
+        Log.d(TAG, "$OPEN_TRIPS_UPDATE → -${removed.size} +${added.size} ~${updated.size} (now ${_openTrips.value.size})")
+    }
+
+    /** `v2/trip-bids-update` → emit the full (cheapest-first) bid list for the rider. */
+    private fun onBidsUpdate(args: Array<out Any?>) {
+        val data = v2Data(args) ?: return
+        val tripId = data.optString("tripId").takeIf { it.isNotBlank() } ?: return
+        val arr = data.optJSONArray("bids")
+        val bids = (0 until (arr?.length() ?: 0)).mapNotNull { decodeBid(arr?.optJSONObject(it)) }
+        _v2Events.tryEmit(
+            V2SocketEvent.BidsUpdate(tripId, bids, data.optDouble("riderOfferedFare", 0.0), data.optString("currency").ifBlank { "SAR" }),
+        )
+    }
+
+    /** `v2/bid-accepted` / `driver-selected` → the rider's match was committed. */
+    private fun onBidAccepted(args: Array<out Any?>) {
+        val d = v2Data(args) ?: return
+        val tripId = d.optString("tripId").takeIf { it.isNotBlank() } ?: return
+        _v2Events.tryEmit(
+            V2SocketEvent.BidAccepted(
+                tripId = tripId,
+                bidId = d.optString("bidId"),
+                driverId = d.optString("driverId"),
+                agreedFare = d.optDouble("agreedFare", 0.0),
+                currency = d.optString("currency").ifBlank { "SAR" },
+            ),
+        )
+    }
+
+    /** `v2/bid-won` → the driver won; switch to the assigned/navigate flow. */
+    private fun onBidWon(args: Array<out Any?>) {
+        val d = v2Data(args) ?: return
+        val tripId = d.optString("tripId").takeIf { it.isNotBlank() } ?: return
+        _openTrips.update { it.filterNot { t -> t.tripId == tripId } }
+        _v2Events.tryEmit(V2SocketEvent.BidWon(tripId, d.optString("bidId"), d.optDouble("agreedFare", 0.0)))
+    }
+
+    private fun onBidLost(args: Array<out Any?>) {
+        val d = v2Data(args) ?: return
+        val tripId = d.optString("tripId").takeIf { it.isNotBlank() } ?: return
+        _openTrips.update { it.filterNot { t -> t.tripId == tripId } }
+        _v2Events.tryEmit(V2SocketEvent.BidLost(tripId, d.optString("bidId"), d.optString("reason").takeIf { it.isNotBlank() }))
+    }
+
+    private fun onTripClosed(args: Array<out Any?>) {
+        val d = v2Data(args) ?: return
+        val tripId = d.optString("tripId").takeIf { it.isNotBlank() } ?: return
+        _openTrips.update { it.filterNot { t -> t.tripId == tripId } }
+        _v2Events.tryEmit(V2SocketEvent.TripClosed(tripId, d.optString("reason").takeIf { it.isNotBlank() }))
+    }
+
+    private fun onBidOutcome(args: Array<out Any?>, build: (tripId: String, bidId: String) -> V2SocketEvent) {
+        val d = v2Data(args) ?: return
+        val tripId = d.optString("tripId").takeIf { it.isNotBlank() } ?: return
+        _v2Events.tryEmit(build(tripId, d.optString("bidId")))
     }
 
     /** Parses a `driver-location-updates` push ({driverId, lat, lon}) into the live driver location. */
@@ -571,5 +714,19 @@ class SocketServiceImpl @Inject constructor(
         const val STATUS_SENT = 1
         const val STATUS_DELIVERED = 3
         const val STATUS_READ = 4
+        // V2 broadcast-dispatch + bidding event names (V2_MOBILE_INTEGRATION_GUIDE.md §5–6).
+        const val NEW_TRIP_REQUEST = "new-trip-request"
+        const val OPEN_TRIPS_LIST = "open-trips-list"
+        const val OPEN_TRIPS_UPDATE = "open-trips-update"
+        const val V2_BIDS_UPDATE = "v2/trip-bids-update"
+        const val V2_BID_ACCEPTED = "v2/bid-accepted"
+        const val V2_DRIVER_SELECTED = "driver-selected"
+        const val V2_BID_WON = "v2/bid-won"
+        const val V2_BID_LOST = "v2/bid-lost"
+        const val V2_BID_REJECTED = "v2/bid-rejected"
+        const val V2_BID_EXPIRED = "v2/bid-expired"
+        const val V2_TRIP_CLOSED = "v2/trip-closed"
+        const val V2_NO_BIDS = "v2/no-bids"
+        const val V2_BIDDING_TIMEOUT = "v2/bidding-timeout"
     }
 }

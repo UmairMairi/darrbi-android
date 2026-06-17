@@ -1,0 +1,108 @@
+package com.mytm.darrbi.data.repository
+
+import com.mytm.darrbi.core.common.ApiResult
+import com.mytm.darrbi.core.common.AppError
+import com.mytm.darrbi.core.common.map
+import com.mytm.darrbi.core.network.safeApiCall
+import com.mytm.darrbi.core.network.unwrapMain
+import com.mytm.darrbi.core.network.unwrapV2
+import com.mytm.darrbi.core.network.unwrapV2Unit
+import com.mytm.darrbi.data.mapper.toDomain
+import com.mytm.darrbi.data.remote.dto.CancelOpenTripRequest
+import com.mytm.darrbi.data.remote.dto.CreateBidTripRequest
+import com.mytm.darrbi.data.remote.dto.PlaceBidRequest
+import com.mytm.darrbi.data.remote.dto.RaiseOfferRequest
+import com.mytm.darrbi.data.remote.dto.TripAddressBody
+import com.mytm.darrbi.data.remote.service.V2RideApi
+import com.mytm.darrbi.domain.model.Bid
+import com.mytm.darrbi.domain.model.BidTrip
+import com.mytm.darrbi.domain.model.BidType
+import com.mytm.darrbi.domain.model.OpenTrip
+import com.mytm.darrbi.domain.model.PlaceLocation
+import com.mytm.darrbi.domain.model.SelectedBid
+import com.mytm.darrbi.domain.repository.V2RideRepository
+import javax.inject.Inject
+
+class V2RideRepositoryImpl @Inject constructor(
+    private val api: V2RideApi,
+) : V2RideRepository {
+
+    override suspend fun createBidTrip(
+        pickup: PlaceLocation,
+        destination: PlaceLocation,
+        cabId: String,
+        categoryId: String?,
+        offeredFare: Double,
+    ): ApiResult<BidTrip> =
+        safeApiCall {
+            api.createTrip(
+                CreateBidTripRequest(
+                    cabId = cabId,
+                    categoryId = categoryId?.takeIf { it.isNotBlank() },
+                    paymentMethod = PAYMENT_METHOD_WALLET,
+                    tripType = 1,
+                    riderOfferedFare = offeredFare,
+                    addresses = listOf(
+                        TripAddressBody(pickup.address.ifBlank { pickup.name }, ADDRESS_PICKUP, pickup.latitude, pickup.longitude),
+                        TripAddressBody(destination.address.ifBlank { destination.name }, ADDRESS_DESTINATION, destination.latitude, destination.longitude),
+                    ),
+                ),
+            )
+        }.unwrapMain().map { it.toDomain(offeredFare) }
+
+    override suspend fun getOpenInRange(cabId: String, lat: Double, lng: Double): ApiResult<List<OpenTrip>> =
+        safeApiCall { api.openInRange(cabId, lat.toString(), lng.toString()) }
+            .unwrapV2().map { data -> data.trips.mapNotNull { it.toDomain() } }
+
+    override suspend fun placeBid(
+        tripId: String,
+        bidType: BidType,
+        bidFare: Double?,
+        etaToPickupSec: Int?,
+        message: String?,
+        cabId: String?,
+    ): ApiResult<Bid> {
+        val result = safeApiCall {
+            api.placeBid(
+                tripId,
+                PlaceBidRequest(
+                    bidType = bidType.wire,
+                    bidFare = bidFare?.takeIf { bidType == BidType.Counter },
+                    etaToPickupSec = etaToPickupSec,
+                    message = message?.takeIf { it.isNotBlank() },
+                    cabId = cabId?.takeIf { it.isNotBlank() },
+                ),
+            )
+        }.unwrapV2()
+        return when (result) {
+            is ApiResult.Success -> result.data.toDomain()?.let { ApiResult.Success(it) }
+                ?: ApiResult.Failure(AppError.Serialization("Malformed bid response"))
+            is ApiResult.Error -> result
+            is ApiResult.Failure -> result
+        }
+    }
+
+    override suspend fun withdrawBid(tripId: String, bidId: String): ApiResult<Unit> =
+        safeApiCall { api.withdrawBid(tripId, bidId) }.unwrapV2Unit()
+
+    override suspend fun getTripBids(tripId: String): ApiResult<List<Bid>> =
+        safeApiCall { api.getBids(tripId) }.unwrapV2().map { data -> data.bids.mapNotNull { it.toDomain() } }
+
+    override suspend fun selectBid(tripId: String, bidId: String): ApiResult<SelectedBid> =
+        safeApiCall { api.acceptBid(tripId, bidId) }.unwrapV2().map { it.toDomain() }
+
+    override suspend fun rejectBid(tripId: String, bidId: String): ApiResult<Unit> =
+        safeApiCall { api.rejectBid(tripId, bidId) }.unwrapV2Unit()
+
+    override suspend fun raiseOffer(tripId: String, newOfferedFare: Double): ApiResult<Unit> =
+        safeApiCall { api.raiseOffer(tripId, RaiseOfferRequest(newOfferedFare)) }.unwrapV2Unit()
+
+    override suspend fun cancelOpenTrip(tripId: String, reason: String?): ApiResult<Unit> =
+        safeApiCall { api.cancelTrip(tripId, CancelOpenTripRequest(reason?.takeIf { it.isNotBlank() })) }.unwrapV2Unit()
+
+    private companion object {
+        const val ADDRESS_PICKUP = 1
+        const val ADDRESS_DESTINATION = 2
+        const val PAYMENT_METHOD_WALLET = 2
+    }
+}
