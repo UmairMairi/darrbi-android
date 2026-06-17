@@ -134,6 +134,8 @@
     <string name="captain_offline">غير متصل</string>
     <string name="captain_offline_banner">أنت غير متصل حالياً</string>
     <string name="captain_no_open_trips">لا توجد طلبات رحلات الآن</string>
+    <string name="captain_looking_rides_title">جارٍ البحث عن رحلات…</string>
+    <string name="captain_looking_rides_sub">نبحث عن أفضل العروض القريبة منك. ابقَ على اطلاع!</string>
     <string name="captain_rider_fallback">الراكب</string>
     <string name="captain_just_now">الآن</string>
     <string name="captain_mins_ago">%1$d دقيقة</string>

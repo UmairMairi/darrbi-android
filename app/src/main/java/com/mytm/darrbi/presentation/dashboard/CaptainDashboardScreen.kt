@@ -30,6 +30,7 @@ import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -551,15 +552,7 @@ private fun DriverOpenTripsView(
                 }
                 Spacer(Modifier.height(8.dp))
             }
-            state.isOnline -> Box(modifier = Modifier.fillMaxWidth().heightIn(min = 240.dp), contentAlignment = Alignment.Center) {
-                Text(
-                    stringResource(R.string.captain_no_open_trips),
-                    style = DarrbiTheme.typography.body,
-                    color = DarrbiTheme.colors.onSurfaceVariant,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(32.dp),
-                )
-            }
+            state.isOnline -> LookingForRides(modifier = Modifier.fillMaxWidth().weight(1f))
         }
     }
 }
@@ -615,6 +608,37 @@ private fun OfflineBanner() {
             style = DarrbiTheme.typography.bodyMedium,
             color = DarrbiTheme.colors.onButton,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+        )
+    }
+}
+
+/** Online + no open trips → the "Looking for rides…" searching state (per the reference). */
+@Composable
+private fun LookingForRides(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier.padding(horizontal = 40.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center,
+    ) {
+        Box(
+            modifier = Modifier.size(120.dp).clip(CircleShape).background(DarrbiTheme.colors.primary.copy(alpha = 0.12f)),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(Icons.Filled.Search, null, tint = DarrbiTheme.colors.onSurface, modifier = Modifier.size(48.dp))
+        }
+        Spacer(Modifier.height(20.dp))
+        Text(
+            text = stringResource(R.string.captain_looking_rides_title),
+            style = DarrbiTheme.typography.titleLarge,
+            color = DarrbiTheme.colors.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.captain_looking_rides_sub),
+            style = DarrbiTheme.typography.body,
+            color = DarrbiTheme.colors.onSurfaceVariant,
+            textAlign = TextAlign.Center,
         )
     }
 }
