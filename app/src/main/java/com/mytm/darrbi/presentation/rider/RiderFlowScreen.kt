@@ -1725,7 +1725,11 @@ private fun StepperButton(symbol: String, enabled: Boolean, onClick: () -> Unit)
     }
 }
 
-/** Live-bids sheet: competing offers (cheapest-first) with Select/dismiss, plus Raise offer + Cancel. */
+/**
+ * "Searching For Drivers Nearby" sheet (per the reference): the rider's offer with a +/- stepper and a
+ * Change Price (raise) button, the payment row, the pickup→drop route, and Cancel Request. Competing bids
+ * (when they arrive) appear as a selectable list above the payment row.
+ */
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.BiddingOverlay(
     state: RiderBookingUiState,
@@ -1737,7 +1741,9 @@ private fun androidx.compose.foundation.layout.BoxScope.BiddingOverlay(
 ) {
     val offered = state.offeredFare ?: state.bidTrip?.fareRange?.riderOfferedFare ?: 0.0
     val maxFare = state.bidTrip?.fareRange?.max ?: Double.MAX_VALUE
-    val raiseStep = if (offered >= 50.0) 5.0 else 1.0
+    val step = if (offered >= 50.0) 5f else 1f
+    val inFlight = state.isBidActionInFlight
+    var target by remember(offered) { mutableFloatStateOf(offered.toFloat()) }
     Surface(
         modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().wrapContentHeight().onSizeChanged { onHeight(it.height) },
         shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
@@ -1745,47 +1751,109 @@ private fun androidx.compose.foundation.layout.BoxScope.BiddingOverlay(
         shadowElevation = 8.dp,
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp)) {
-            Text(stringResource(R.string.rider_live_offers), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
-            Spacer(Modifier.height(2.dp))
             Text(
-                stringResource(R.string.rider_your_offer_fare, formatFare(offered)),
-                style = DarrbiTheme.typography.label,
-                color = DarrbiTheme.colors.onSurfaceVariant,
+                stringResource(R.string.rider_searching_drivers),
+                style = DarrbiTheme.typography.titleLarge,
+                color = DarrbiTheme.colors.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             )
-            Spacer(Modifier.height(14.dp))
-            if (state.bids.isEmpty()) {
-                Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(vertical = 18.dp)) {
-                    CircularProgressIndicator(color = DarrbiTheme.colors.primary, modifier = Modifier.size(22.dp))
-                    Spacer(Modifier.width(14.dp))
-                    Text(stringResource(R.string.rider_waiting_offers), style = DarrbiTheme.typography.body, color = DarrbiTheme.colors.onSurfaceVariant)
+            Spacer(Modifier.height(18.dp))
+            Text(stringResource(R.string.rider_your_offer_label), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+            Spacer(Modifier.height(4.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.Bottom) {
+                    Text(stringResource(R.string.rider_sar_label), style = DarrbiTheme.typography.titleLarge.copy(fontSize = 24.sp), color = DarrbiTheme.colors.onSurfaceVariant)
+                    Spacer(Modifier.width(4.dp))
+                    Text(formatFare(target.toDouble()), style = DarrbiTheme.typography.titleLarge.copy(fontSize = 32.sp), color = DarrbiTheme.colors.onSurface)
                 }
-            } else {
-                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 300.dp).verticalScroll(rememberScrollState())) {
+                OfferStepButton("−", accent = false, enabled = !inFlight && target > offered) { target = (target - step).coerceAtLeast(offered.toFloat()) }
+                Spacer(Modifier.width(10.dp))
+                OfferStepButton("+", accent = true, enabled = !inFlight && target < maxFare) { target = (target + step).coerceAtMost(maxFare.toFloat()) }
+            }
+            Spacer(Modifier.height(14.dp))
+            WideTonalButton(
+                text = stringResource(R.string.rider_change_price),
+                textColor = DarrbiTheme.colors.onSurfaceVariant,
+                enabled = !inFlight && target.toDouble() > offered,
+                onClick = { onRaise(target.toDouble()) },
+            )
+            if (state.bids.isNotEmpty()) {
+                Spacer(Modifier.height(14.dp))
+                Column(modifier = Modifier.fillMaxWidth().heightIn(max = 240.dp).verticalScroll(rememberScrollState())) {
                     state.bids.forEachIndexed { index, bid ->
-                        BidRow(bid = bid, enabled = !state.isBidActionInFlight, onSelect = { onSelect(bid.bidId) }, onReject = { onReject(bid.bidId) })
+                        BidRow(bid = bid, enabled = !inFlight, onSelect = { onSelect(bid.bidId) }, onReject = { onReject(bid.bidId) })
                         if (index < state.bids.lastIndex) HorizontalDivider(color = DarrbiTheme.colors.outline)
                     }
                 }
             }
-            Spacer(Modifier.height(14.dp))
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                DarrbiSecondaryButton(
-                    text = stringResource(R.string.rider_raise_offer),
-                    onClick = { onRaise((offered + raiseStep).coerceAtMost(maxFare)) },
-                    enabled = !state.isBidActionInFlight && offered < maxFare,
-                    modifier = Modifier.weight(1f),
-                )
-                Surface(
-                    modifier = Modifier.weight(1f).height(54.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = !state.isBidActionInFlight, onClick = onCancel),
-                    shape = RoundedCornerShape(14.dp),
-                    color = DarrbiTheme.colors.error,
-                ) {
-                    Box(contentAlignment = Alignment.Center) {
-                        Text(stringResource(R.string.common_cancel), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onError)
-                    }
+            Spacer(Modifier.height(16.dp))
+            // Payment row.
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                CashGlyph()
+                Spacer(Modifier.width(12.dp))
+                Column {
+                    Text(stringResource(R.string.rider_sar_amount, formatFare(offered)), style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface)
+                    Text(stringResource(R.string.rider_pays_for_ride), style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
                 }
             }
+            Spacer(Modifier.height(16.dp))
+            Surface(shape = RoundedCornerShape(14.dp), color = DarrbiTheme.colors.surface, border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline)) {
+                Box(Modifier.padding(horizontal = 16.dp, vertical = 14.dp)) {
+                    RouteHeader(
+                        pickup = state.pickup?.address?.takeIf { it.isNotBlank() } ?: stringResource(R.string.rider_current_location),
+                        destination = state.destination?.address.orEmpty(),
+                    )
+                }
+            }
+            Spacer(Modifier.height(16.dp))
+            WideTonalButton(
+                text = stringResource(R.string.rider_cancel_request),
+                textColor = DarrbiTheme.colors.onSurface,
+                enabled = !inFlight,
+                onClick = onCancel,
+            )
         }
+    }
+}
+
+/** Rounded +/- stepper button; [accent] = the filled-green increment per the reference. */
+@Composable
+private fun OfferStepButton(symbol: String, accent: Boolean, enabled: Boolean, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.size(50.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = if (accent) DarrbiTheme.colors.primary else DarrbiTheme.colors.surface,
+        border = if (accent) null else androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(symbol, style = DarrbiTheme.typography.titleLarge, color = if (accent) DarrbiTheme.colors.onPrimary else DarrbiTheme.colors.onSurface)
+        }
+    }
+}
+
+/** Full-width light-grey (tonal) button used for Change Price / Cancel Request. */
+@Composable
+private fun WideTonalButton(text: String, textColor: Color, enabled: Boolean, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(14.dp),
+        color = DarrbiTheme.colors.surfaceVariant,
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(text, style = DarrbiTheme.typography.button, color = if (enabled) textColor else DarrbiTheme.colors.onSurfaceVariant.copy(alpha = 0.5f))
+        }
+    }
+}
+
+/** Small banknote glyph for the payment row (no icon dependency). */
+@Composable
+private fun CashGlyph() {
+    Box(
+        modifier = Modifier.size(30.dp).clip(RoundedCornerShape(6.dp)).border(1.5.dp, DarrbiTheme.colors.onSurfaceVariant, RoundedCornerShape(6.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        Box(Modifier.size(9.dp).clip(CircleShape).background(DarrbiTheme.colors.onSurfaceVariant))
     }
 }
 

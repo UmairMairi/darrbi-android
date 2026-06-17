@@ -360,6 +360,13 @@
     <string name="rider_your_offer_fare">عرضك: %1$s ريال</string>
     <string name="rider_waiting_offers">في انتظار العروض…</string>
     <string name="rider_raise_offer">ارفع العرض</string>
+    <string name="rider_searching_drivers">جارٍ البحث عن سائقين قريبين</string>
+    <string name="rider_your_offer_label">عرضك</string>
+    <string name="rider_sar_label">ر.س</string>
+    <string name="rider_sar_amount">%1$s ر.س</string>
+    <string name="rider_change_price">تغيير السعر</string>
+    <string name="rider_pays_for_ride">الراكب يدفع للرحلة</string>
+    <string name="rider_cancel_request">إلغاء الطلب</string>
     <string name="rider_select">اختيار</string>
     <string name="rider_captain_fallback">الكابتن</string>
     <string name="rider_eta_min">%1$d دقيقة</string>

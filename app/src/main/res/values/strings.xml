@@ -360,6 +360,13 @@
     <string name="rider_your_offer_fare">Your offer: %1$s SAR</string>
     <string name="rider_waiting_offers">Waiting for offers…</string>
     <string name="rider_raise_offer">Raise offer</string>
+    <string name="rider_searching_drivers">Searching For Drivers Nearby</string>
+    <string name="rider_your_offer_label">Your Offer</string>
+    <string name="rider_sar_label">SAR</string>
+    <string name="rider_sar_amount">SAR %1$s</string>
+    <string name="rider_change_price">Change Price</string>
+    <string name="rider_pays_for_ride">Rider pays for ride</string>
+    <string name="rider_cancel_request">Cancel Request</string>
     <string name="rider_select">Select</string>
     <string name="rider_captain_fallback">Captain</string>
     <string name="rider_eta_min">%1$d min</string>
