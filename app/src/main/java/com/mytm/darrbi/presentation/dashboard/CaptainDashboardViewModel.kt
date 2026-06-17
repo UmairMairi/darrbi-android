@@ -24,6 +24,7 @@ import com.mytm.darrbi.domain.usecase.GetRouteUseCase
 import com.mytm.darrbi.domain.usecase.PlaceBidUseCase
 import com.mytm.darrbi.domain.usecase.ReachedPickupUseCase
 import com.mytm.darrbi.domain.usecase.RejectTripUseCase
+import com.mytm.darrbi.domain.usecase.StartTripUseCase
 import com.mytm.darrbi.domain.usecase.StreamLocationUpdatesUseCase
 import com.mytm.darrbi.domain.usecase.ValidateIbanUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -67,6 +68,13 @@ data class CaptainDashboardUiState(
     val activeRoutePoints: List<LatLngPoint> = emptyList(),
     /** True once the captain tapped "Navigate to Rider" → the button becomes "Reached". */
     val navigateStarted: Boolean = false,
+    /** At pickup (`driver_reached`) → show the OTP-entry overlay to start the trip. */
+    val awaitingOtp: Boolean = false,
+    val otpInput: String = "",
+    val isStartingTrip: Boolean = false,
+    val otpError: Boolean = false,
+    /** One-shot: the trip just started after a correct OTP → the UI shows a confirmation once. */
+    val tripStarted: Boolean = false,
     /** Whether the 3-dot menu (with Cancel Ride) is open. */
     val showMenu: Boolean = false,
     // --- V2 broadcast dispatch + bidding ---
@@ -106,6 +114,13 @@ sealed interface CaptainDashboardEvent {
     data object StartNavigate : CaptainDashboardEvent
     /** "Reached" tapped on the navigate screen. */
     data object MarkReached : CaptainDashboardEvent
+    /** OTP field edited on the start-trip overlay. */
+    data class EnterOtp(val value: String) : CaptainDashboardEvent
+    /** Submit the OTP to start the trip. */
+    data object SubmitOtp : CaptainDashboardEvent
+    /** Dismiss the OTP overlay (back to the navigate screen). */
+    data object DismissOtp : CaptainDashboardEvent
+    data object ConsumeTripStarted : CaptainDashboardEvent
     /** Toggle the 3-dot menu (Cancel Ride). */
     data object ToggleMenu : CaptainDashboardEvent
     /** Cancel the accepted trip from the 3-dot menu. */
@@ -136,6 +151,7 @@ class CaptainDashboardViewModel @Inject constructor(
     private val acceptTrip: AcceptTripUseCase,
     private val rejectTrip: RejectTripUseCase,
     private val reachedPickup: ReachedPickupUseCase,
+    private val startTripUseCase: StartTripUseCase,
     private val cancelTripByDriver: CancelTripByDriverUseCase,
     private val getOngoingTrip: GetOngoingTripUseCase,
     private val getOpenTrips: GetOpenTripsUseCase,
@@ -237,6 +253,10 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.DeclineRequest -> declineRequest()
             CaptainDashboardEvent.StartNavigate -> _state.update { it.copy(navigateStarted = true) }
             CaptainDashboardEvent.MarkReached -> markReached()
+            is CaptainDashboardEvent.EnterOtp -> _state.update { it.copy(otpInput = event.value.filter { c -> c.isDigit() }.take(OTP_MAX_LEN), otpError = false) }
+            CaptainDashboardEvent.SubmitOtp -> submitOtp()
+            CaptainDashboardEvent.DismissOtp -> _state.update { it.copy(awaitingOtp = false, otpInput = "", otpError = false) }
+            CaptainDashboardEvent.ConsumeTripStarted -> _state.update { it.copy(tripStarted = false) }
             CaptainDashboardEvent.ToggleMenu -> _state.update { it.copy(showMenu = !it.showMenu) }
             CaptainDashboardEvent.CancelTrip -> cancelTrip()
             CaptainDashboardEvent.ConsumeError -> _state.update { it.copy(errorMessage = null) }
@@ -437,16 +457,37 @@ class CaptainDashboardViewModel @Inject constructor(
         }
     }
 
-    /** "Reached" → tell the server the captain is at pickup; on success leave the navigate screen. */
+    /** "Reached" → tell the server the captain is at pickup; on success show the OTP-entry overlay. */
     private fun markReached() {
         val trip = _state.value.activeTrip ?: return
         if (_state.value.isHandlingRequest) return
         _state.update { it.copy(isHandlingRequest = true, errorMessage = null) }
         viewModelScope.launch {
             when (val result = reachedPickup(trip.tripId)) {
-                is ApiResult.Success -> clearActiveTrip()
+                is ApiResult.Success -> _state.update { it.copy(isHandlingRequest = false, awaitingOtp = true, otpInput = "", otpError = false) }
                 is ApiResult.Error -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.message) }
                 is ApiResult.Failure -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    /** Submit the rider's OTP to start the trip (`PATCH trips/started/{id}`). */
+    private fun submitOtp() {
+        val trip = _state.value.activeTrip ?: return
+        val otp = _state.value.otpInput.toIntOrNull()
+        if (otp == null || _state.value.isStartingTrip) {
+            _state.update { it.copy(otpError = true) }
+            return
+        }
+        _state.update { it.copy(isStartingTrip = true, otpError = false, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = startTripUseCase(trip.tripId, otp)) {
+                is ApiResult.Success -> {
+                    _state.update { it.copy(isStartingTrip = false, tripStarted = true) }
+                    clearActiveTrip()
+                }
+                is ApiResult.Error -> _state.update { it.copy(isStartingTrip = false, otpError = true) }
+                is ApiResult.Failure -> _state.update { it.copy(isStartingTrip = false, otpError = true) }
             }
         }
     }
@@ -469,6 +510,10 @@ class CaptainDashboardViewModel @Inject constructor(
                 isHandlingRequest = false,
                 requestPickupDistanceKm = null,
                 requestPickupTimeMinutes = null,
+                awaitingOtp = false,
+                otpInput = "",
+                otpError = false,
+                isStartingTrip = false,
             )
         }
     }
@@ -556,6 +601,10 @@ class CaptainDashboardViewModel @Inject constructor(
                     it.copy(
                         activeTrip = request,
                         navigateStarted = trip.stage != TripStage.DriverAssigned,
+                        // Restored at `driver_reached` → prompt for the rider's OTP to start the trip.
+                        awaitingOtp = trip.stage == TripStage.DriverArrived,
+                        otpInput = "",
+                        otpError = false,
                         showMenu = false,
                     )
                 }
@@ -571,5 +620,6 @@ class CaptainDashboardViewModel @Inject constructor(
         const val REASON_LOST = "LOST"
         const val REASON_CLOSED = "CLOSED"
         const val REASON_BID_FAILED = "BID_FAILED"
+        const val OTP_MAX_LEN = 6
     }
 }

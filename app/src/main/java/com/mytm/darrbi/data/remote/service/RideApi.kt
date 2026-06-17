@@ -12,6 +12,7 @@ import com.mytm.darrbi.data.remote.dto.PromoData
 import com.mytm.darrbi.data.remote.dto.PromoValidateRequest
 import com.mytm.darrbi.data.remote.dto.RecentAddressesData
 import com.mytm.darrbi.data.remote.dto.ReviewRequest
+import com.mytm.darrbi.data.remote.dto.StartTripRequest
 import com.mytm.darrbi.data.remote.dto.TripExistsData
 import kotlinx.serialization.json.JsonElement
 import retrofit2.http.Body
@@ -77,6 +78,10 @@ interface RideApi {
     /** CAPTAIN reached the pickup point. */
     @PATCH("trips/driver-reached-at-pickup-point/{tripId}")
     suspend fun driverReachedPickup(@Path("tripId") tripId: String): MainEnvelope<JsonElement>
+
+    /** CAPTAIN starts the trip after verifying the rider's OTP (`PATCH trips/started/{tripId}`). */
+    @PATCH("trips/started/{tripId}")
+    suspend fun startTrip(@Path("tripId") tripId: String, @Body body: StartTripRequest): MainEnvelope<JsonElement>
 
     /** CAPTAIN cancels an accepted trip (before/while heading to pickup). */
     @PATCH("trips/driver-cancelled/{tripId}")

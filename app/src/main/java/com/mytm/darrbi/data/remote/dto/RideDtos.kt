@@ -124,6 +124,12 @@ data class DeclineTripRequest(
     )
 }
 
+/** `PATCH trips/started/{tripId}` body — the captain starts the trip with the rider's OTP. */
+@Serializable
+data class StartTripRequest(
+    val tripOtp: Int,
+)
+
 /** `POST reviews/rider` body — the rider's star rating for the captain (ride-android: ReviewRequestModel). */
 @Serializable
 data class ReviewRequest(

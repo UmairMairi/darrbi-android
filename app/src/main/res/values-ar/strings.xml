@@ -129,6 +129,14 @@
     <string name="captain_pickup_eta">%1$s كم · %2$s</string>
     <string name="captain_cancel_ride">إلغاء الرحلة</string>
     <string name="captain_menu">القائمة</string>
+    <!-- Captain: start trip with OTP -->
+    <string name="captain_enter_otp_title">أدخل رمز الراكب</string>
+    <string name="captain_enter_otp_sub">اطلب الرمز من الراكب لبدء الرحلة</string>
+    <string name="captain_enter_otp_sub_named">اطلب الرمز من %1$s لبدء الرحلة</string>
+    <string name="captain_otp_hint">الرمز</string>
+    <string name="captain_otp_invalid">رمز غير صحيح. حاول مرة أخرى.</string>
+    <string name="captain_start_trip">بدء الرحلة</string>
+    <string name="captain_trip_started">بدأت الرحلة</string>
     <!-- Captain: V2 broadcast list + bidding -->
     <string name="captain_online">متصل</string>
     <string name="captain_offline">غير متصل</string>

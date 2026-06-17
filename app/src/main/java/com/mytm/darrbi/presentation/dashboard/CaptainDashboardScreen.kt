@@ -186,6 +186,14 @@ fun CaptainDashboardScreen(
             viewModel.onEvent(CaptainDashboardEvent.ConsumeError)
         }
     }
+    // Trip started after a correct OTP.
+    val tripStartedMsg = stringResource(R.string.captain_trip_started)
+    LaunchedEffect(state.tripStarted) {
+        if (state.tripStarted) {
+            android.widget.Toast.makeText(ctx, tripStartedMsg, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.onEvent(CaptainDashboardEvent.ConsumeTripStarted)
+        }
+    }
     // V2: you lost / the trip closed before you could win.
     val bidLostMsg = stringResource(R.string.captain_bid_lost)
     LaunchedEffect(state.bidLostReason) {
@@ -336,6 +344,19 @@ fun CaptainDashboardScreen(
                     isHandling = state.isHandlingRequest,
                     onAccept = { viewModel.onEvent(CaptainDashboardEvent.AcceptRequest) },
                     onDecline = { viewModel.onEvent(CaptainDashboardEvent.DeclineRequest) },
+                )
+            }
+        } else if (active != null && state.awaitingOtp) {
+            // At pickup → enter the rider's OTP to start the trip.
+            BottomCard {
+                OtpEntryContent(
+                    riderName = active.riderName,
+                    otp = state.otpInput,
+                    isStarting = state.isStartingTrip,
+                    isError = state.otpError,
+                    onOtp = { viewModel.onEvent(CaptainDashboardEvent.EnterOtp(it)) },
+                    onSubmit = { viewModel.onEvent(CaptainDashboardEvent.SubmitOtp) },
+                    onBack = { viewModel.onEvent(CaptainDashboardEvent.DismissOtp) },
                 )
             }
         } else if (active != null) {
@@ -731,6 +752,54 @@ private fun AddressRow(label: String, address: String, dotColor: Color) {
         }
     }
 }
+
+/** OTP-entry card shown at pickup (`driver_reached`): the captain enters the rider's code to start. */
+@Composable
+private fun OtpEntryContent(
+    riderName: String?,
+    otp: String,
+    isStarting: Boolean,
+    isError: Boolean,
+    onOtp: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onBack: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.captain_enter_otp_title), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
+        Spacer(Modifier.height(6.dp))
+        Text(
+            text = riderName?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.captain_enter_otp_sub_named, it) }
+                ?: stringResource(R.string.captain_enter_otp_sub),
+            style = DarrbiTheme.typography.body.copy(fontSize = 13.sp),
+            color = DarrbiTheme.colors.onSurfaceVariant,
+        )
+        Spacer(Modifier.height(16.dp))
+        DarrbiTextField(
+            value = otp,
+            onValueChange = onOtp,
+            label = stringResource(R.string.captain_otp_hint),
+            keyboardType = KeyboardType.Number,
+            isError = isError,
+            supportingText = if (isError) stringResource(R.string.captain_otp_invalid) else null,
+        )
+        Spacer(Modifier.height(16.dp))
+        DarrbiPrimaryButton(
+            text = stringResource(R.string.captain_start_trip),
+            onClick = onSubmit,
+            enabled = !isStarting && otp.length >= OTP_MIN_LEN,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.cd_back),
+            style = DarrbiTheme.typography.button,
+            color = DarrbiTheme.colors.onSurfaceVariant,
+            modifier = Modifier.fillMaxWidth().clickable(onClick = onBack).padding(vertical = 8.dp),
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+private const val OTP_MIN_LEN = 4
 
 /**
  * Open-request detail card (over the route map): rider, offered fare, distance·time, pickup/drop, then

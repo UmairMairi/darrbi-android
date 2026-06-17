@@ -129,6 +129,14 @@
     <string name="captain_pickup_eta">%1$s km · %2$s</string>
     <string name="captain_cancel_ride">Cancel Ride</string>
     <string name="captain_menu">Menu</string>
+    <!-- Captain: start trip with OTP -->
+    <string name="captain_enter_otp_title">Enter Rider\'s OTP</string>
+    <string name="captain_enter_otp_sub">Ask the rider for the code to start the trip</string>
+    <string name="captain_enter_otp_sub_named">Ask %1$s for the code to start the trip</string>
+    <string name="captain_otp_hint">OTP</string>
+    <string name="captain_otp_invalid">Incorrect OTP. Try again.</string>
+    <string name="captain_start_trip">Start Trip</string>
+    <string name="captain_trip_started">Trip started</string>
     <!-- Captain: V2 broadcast list + bidding -->
     <string name="captain_online">Online</string>
     <string name="captain_offline">Offline</string>
