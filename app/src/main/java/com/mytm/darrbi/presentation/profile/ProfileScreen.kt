@@ -56,6 +56,8 @@ private data class ProfileMenuItem(val iconRes: Int, val labelRes: Int, val onCl
 @Composable
 fun ProfileScreen(
     onBack: () -> Unit,
+    /** When non-null (rider profile), shows a "Drive with Darrbi" entry that switches to captain mode. */
+    onSwitchToCaptain: (() -> Unit)? = null,
     onLogout: () -> Unit = onBack,
     onViewBalanceDetails: () -> Unit = {},
     onMyRides: () -> Unit = {},
@@ -82,19 +84,21 @@ fun ProfileScreen(
     val balanceText = state.balance?.let { b ->
         if (b % 1.0 == 0.0) b.toLong().toString() else b.toString()
     } ?: "—"
-    val menu = listOf(
-        ProfileMenuItem(R.drawable.icon_subscription, R.string.menu_subscription) {},
-        ProfileMenuItem(R.drawable.icon_car_details, R.string.menu_car_deal_details) {},
-        ProfileMenuItem(R.drawable.icon_saved_cards, R.string.menu_saved_cards) {},
-        ProfileMenuItem(R.drawable.icon_my_rides, R.string.menu_my_rides, onMyRides),
-        ProfileMenuItem(R.drawable.iv_report, R.string.menu_my_reports, onMyReports),
-        ProfileMenuItem(R.drawable.icon_app_settings, R.string.menu_app_settings, onAppSettings),
-        ProfileMenuItem(R.drawable.icon_customer_care, R.string.menu_customer_care, onCustomerCare),
-        ProfileMenuItem(R.drawable.icon_terms_conditions, R.string.menu_terms_conditions, onTerms),
-        ProfileMenuItem(R.drawable.icon_privacy_policy, R.string.menu_privacy_policy, onPrivacy),
-        ProfileMenuItem(R.drawable.icon_share_friends, R.string.menu_invite_friends) { shareInvite(context, inviteMessage) },
-        ProfileMenuItem(R.drawable.icon_logout, R.string.menu_log_out) { showLogout = true },
-    )
+    val menu = buildList {
+        // Rider profile only: switch into captain mode (replaces the old home RIDER/CAPTAIN toggle).
+        onSwitchToCaptain?.let { add(ProfileMenuItem(R.drawable.icon_car, R.string.profile_switch_to_captain, it)) }
+        add(ProfileMenuItem(R.drawable.icon_subscription, R.string.menu_subscription) {})
+        add(ProfileMenuItem(R.drawable.icon_car_details, R.string.menu_car_deal_details) {})
+        add(ProfileMenuItem(R.drawable.icon_saved_cards, R.string.menu_saved_cards) {})
+        add(ProfileMenuItem(R.drawable.icon_my_rides, R.string.menu_my_rides, onMyRides))
+        add(ProfileMenuItem(R.drawable.iv_report, R.string.menu_my_reports, onMyReports))
+        add(ProfileMenuItem(R.drawable.icon_app_settings, R.string.menu_app_settings, onAppSettings))
+        add(ProfileMenuItem(R.drawable.icon_customer_care, R.string.menu_customer_care, onCustomerCare))
+        add(ProfileMenuItem(R.drawable.icon_terms_conditions, R.string.menu_terms_conditions, onTerms))
+        add(ProfileMenuItem(R.drawable.icon_privacy_policy, R.string.menu_privacy_policy, onPrivacy))
+        add(ProfileMenuItem(R.drawable.icon_share_friends, R.string.menu_invite_friends) { shareInvite(context, inviteMessage) })
+        add(ProfileMenuItem(R.drawable.icon_logout, R.string.menu_log_out) { showLogout = true })
+    }
 
     if (showLogout) {
         LogoutConfirmSheet(

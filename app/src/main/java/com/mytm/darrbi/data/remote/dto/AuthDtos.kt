@@ -32,6 +32,11 @@ data class VerifyOtpData(
     @Serializable
     data class UserDetails(
         val id: String? = null,
+        /**
+         * The canonical user id used for ALL socket/chat routing (ride-android: `data.details.userId`).
+         * This is the numeric account id (the trip's riderId), NOT the top-level session [userId].
+         */
+        val userId: String? = null,
         /** Whether the user has set their name/profile (false = brand-new user, continue onboarding). */
         val isNameUpdated: Boolean? = null,
         /** 1 = rider, 2 = captain. */

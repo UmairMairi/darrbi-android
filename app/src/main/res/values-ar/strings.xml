@@ -87,6 +87,7 @@
     <string name="profile_bank">البنك</string>
     <string name="profile_update_iban">تحديث الآيبان</string>
     <string name="profile_version">الإصدار 1.1</string>
+    <string name="profile_switch_to_captain">قُد مع دربي</string>
     <string name="menu_subscription">الاشتراك</string>
     <string name="menu_car_deal_details">تفاصيل السيارة</string>
     <string name="menu_saved_cards">البطاقات المحفوظة</string>
@@ -109,6 +110,25 @@
     <string name="no_riders_title">لا يوجد ركاب بالقرب منك</string>
     <string name="no_riders_subtitle">توجّه إلى المناطق عالية الطلب للعثور على المزيد من الركاب</string>
     <string name="no_riders_navigate">التوجه إلى منطقة عالية الطلب</string>
+    <!-- Captain: incoming ride request -->
+    <string name="captain_estimate_earning">الأرباح المقدرة</string>
+    <string name="captain_payment_method">طريقة الدفع</string>
+    <string name="captain_pickup_distance">مسافة الالتقاط</string>
+    <string name="captain_dest_distance">مسافة الوجهة</string>
+    <string name="captain_earning_sar">%1$s ريال</string>
+    <string name="captain_distance_time">%1$s كم · %2$d دقيقة</string>
+    <string name="captain_payment_cash">نقداً</string>
+    <string name="captain_payment_card">بطاقة</string>
+    <string name="captain_accept">قبول</string>
+    <string name="captain_decline">رفض</string>
+    <string name="captain_request_accepted">تم قبول الرحلة</string>
+    <!-- Captain: navigate to rider -->
+    <string name="captain_navigate_to_rider">التوجه إلى الراكب</string>
+    <string name="captain_reached">وصلت</string>
+    <string name="captain_eta_mins">%1$d دقيقة</string>
+    <string name="captain_pickup_eta">%1$s كم · %2$s</string>
+    <string name="captain_cancel_ride">إلغاء الرحلة</string>
+    <string name="captain_menu">القائمة</string>
 
     <!-- Topup details + refund -->
     <string name="topup_details_title">تفاصيل الشحن</string>
@@ -241,6 +261,25 @@
     <string name="rider_set_location_from_map">تحديد الموقع من الخريطة</string>
     <string name="rider_confirm_location">تأكيد الموقع</string>
     <string name="cd_recenter">موقعي</string>
+    <!-- Rider home dashboard -->
+    <string name="rider_greeting_morning">صباح الخير، %1$s</string>
+    <string name="rider_greeting_afternoon">نهارك سعيد، %1$s</string>
+    <string name="rider_greeting_evening">مساء الخير، %1$s</string>
+    <string name="rider_default_user">صديقي</string>
+    <string name="rider_what_today">ماذا تريد اليوم؟</string>
+    <string name="rider_your_location">موقعك</string>
+    <string name="rider_where_to_fare">إلى أين وبكم؟</string>
+    <string name="rider_captains_near">%1$d كباتن بالقرب منك</string>
+    <string name="rider_home_promo_title">احجز وادفع الآن</string>
+    <string name="rider_home_promo_offer">احصل على خصم إضافي 5%</string>
+    <string name="rider_recent">الأماكن الأخيرة</string>
+    <string name="rider_categories_retry">تعذّر تحميل الخدمات. اضغط لإعادة المحاولة.</string>
+    <!-- Category taglines (the API provides no subtitle; matched by service type) -->
+    <string name="cat_sub_taxi">حدّد أجرتك بنفسك</string>
+    <string name="cat_sub_rental">قيادة ذاتية</string>
+    <string name="cat_sub_cargo">شحنات كبيرة</string>
+    <string name="cat_sub_delivery">سريع ومحلي</string>
+    <string name="cat_sub_scheduled">جدول رحلاتك</string>
     <!-- Rider ride selection -->
     <string name="rider_current_location">الموقع الحالي</string>
     <string name="rider_recommended">موصى به لك</string>
@@ -258,6 +297,57 @@
     <string name="rider_searching_cancel">إلغاء الرحلة</string>
     <string name="rider_no_captain_title">عذراً! حاول مرة أخرى، لم يتم العثور على كابتن</string>
     <string name="rider_try_again">حاول مرة أخرى</string>
+    <!-- Rider: captain on the way -->
+    <string name="rider_share_pin">شارك هذا الرمز مع الكابتن</string>
+    <string name="rider_onway_message">سيارتك في الطريق، ستصل إليك خلال %1$d دقائق</string>
+    <string name="rider_onway_message_no_eta">سيارتك في الطريق</string>
+    <string name="rider_cancellation_fee">رسوم إلغاء الرحلة %1$s ر.س</string>
+    <string name="rider_eta_minutes">%1$d دقائق</string>
+    <!-- Rider: captain arrived / trip started -->
+    <string name="rider_arrived_title">لقد وصلت سيارتك</string>
+    <string name="rider_im_coming">أنا قادم</string>
+    <string name="rider_trip_started_title">في الطريق إلى وجهتك</string>
+    <string name="rider_riding_with">أنت تركب مع</string>
+    <string name="rider_change_destination">تغيير</string>
+    <string name="rider_help">مساعدة</string>
+    <!-- Rider: change drop-off -->
+    <string name="rider_change_dropoff">تغيير وجهة النزول</string>
+    <string name="rider_your_new_fare">أجرتك الجديدة هي</string>
+    <string name="rider_original_ride">الرحلة الأصلية</string>
+    <string name="rider_new_fare">الأجرة الجديدة</string>
+    <string name="rider_fare_sar">%1$s ريال</string>
+    <string name="rider_arrival_at">الوصول %1$s</string>
+    <string name="rider_pay_remaining">ادفع المتبقي %1$s ريال</string>
+    <string name="rider_drop_changed">تم تغيير وجهة النزول بنجاح.</string>
+    <string name="rider_driver_cancelled">قام الكابتن بإلغاء الرحلة.</string>
+    <!-- Rider: in-trip help -->
+    <string name="rider_help_call_center">مركز الاتصال</string>
+    <string name="rider_help_share_ride">مشاركة تفاصيل الرحلة</string>
+    <string name="rider_emergency_help">مساعدة طارئة</string>
+    <string name="rider_call_police">اتصل بالشرطة - 999</string>
+    <string name="rider_share_ride_details_title">تفاصيل رحلتي مع دربي</string>
+    <!-- Rider: trip completed / rating -->
+    <string name="rider_rate_captain">قيّم الكابتن</string>
+    <string name="rider_total_payment">إجمالي الدفع</string>
+    <string name="rider_loyalty_points">إجمالي نقاط الولاء المكتسبة</string>
+    <string name="rider_download_invoice">تنزيل فاتورة الضريبة</string>
+    <string name="rider_submit_rating">إرسال التقييم</string>
+    <string name="cd_chat">محادثة</string>
+    <string name="cd_call">اتصال</string>
+    <!-- Rider ↔ Captain chat -->
+    <string name="chat_input_hint">اكتب رسالة…</string>
+    <string name="chat_typing">يكتب…</string>
+    <string name="chat_send">إرسال</string>
+    <string name="chat_attach">إرفاق</string>
+    <string name="chat_send_image">إرسال صورة</string>
+    <string name="chat_record_voice">تسجيل رسالة صوتية</string>
+    <string name="chat_media_coming_soon">مشاركة الوسائط قادمة قريبًا</string>
+    <string-array name="chat_quick_replies">
+        <item>أنا في موقع الانطلاق</item>
+        <item>أمهلني دقيقتين</item>
+        <item>أنا في الطريق</item>
+        <item>حسنًا</item>
+    </string-array>
     <!-- Location permission -->
     <string name="location_denied_title">إذن الموقع مطلوب</string>
     <string name="location_denied_message">يحتاج دربي إلى موقعك لعرض مكانك على الخريطة والعثور على الرحلات القريبة منك. لقد رفضت الإذن، يُرجى تفعيل الموقع من الإعدادات.</string>

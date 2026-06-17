@@ -16,6 +16,44 @@ data class CabTypeData(
     val estimate: EstimateDto? = null,
 )
 
+/**
+ * `GET captains/cab-type-category/all` → one rider home service category. Field names are unconfirmed
+ * (the sample tokens were expired), so every field is nullable and the mapper picks the first non-null
+ * icon field; unknown keys are ignored (`Json.ignoreUnknownKeys = true`).
+ */
+@Serializable
+data class CabCategoryDto(
+    val id: String? = null,
+    val name: String? = null,
+    val nameArabic: String? = null,
+    val description: String? = null,
+    val descriptionArabic: String? = null,
+    val categoryIcon: String? = null,
+    val categoryIconUrl: String? = null,
+    val icon: String? = null,
+    val image: String? = null,
+    /** A stable key/type ("taxi", "rental", …) when the server provides one; used to spot the taxi tile. */
+    val type: String? = null,
+    val order: Int? = null,
+    val status: Boolean? = null,
+)
+
+/** `GET trips/rider-recent-addresses` → `data` wraps the list under `recentAddresses`. */
+@Serializable
+data class RecentAddressesData(
+    val recentAddresses: List<RecentAddressDto> = emptyList(),
+)
+
+/** One recent address row. The live API provides no label — just the address + coordinates. */
+@Serializable
+data class RecentAddressDto(
+    val label: String? = null,
+    val address: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val addressType: String? = null,
+)
+
 @Serializable
 data class CabDto(
     val id: String? = null,
@@ -72,6 +110,40 @@ data class CreateTripRequest(
     val cardId: String? = null,
 )
 
+/** `PATCH trips/driver-rejected/{tripId}` body — the captain declines a request (ride-android: DeclineRequestModel). */
+@Serializable
+data class DeclineTripRequest(
+    val declinedReason: String,
+    val dropAddress: DropAddress,
+) {
+    @Serializable
+    data class DropAddress(
+        val address: String,
+        val latitude: Double,
+        val longitude: Double,
+    )
+}
+
+/** `POST reviews/rider` body — the rider's star rating for the captain (ride-android: ReviewRequestModel). */
+@Serializable
+data class ReviewRequest(
+    val title: String,
+    val description: String,
+    val rating: Float,
+    val tripId: String,
+)
+
+/** `PATCH trips/change-destination/{tripId}` body — the new drop-off (ride-android: ChangeDestinationRequestModel). */
+@Serializable
+data class ChangeDestinationRequest(
+    val address: String,
+    val cityNameInArabic: String,
+    val latitude: Double,
+    val longitude: Double,
+    /** 1 = card, 2 = wallet/cash. */
+    val paymentMethod: Int,
+)
+
 @Serializable
 data class TripAddressBody(
     val address: String,
@@ -86,4 +158,86 @@ data class CreateTripData(
     val id: String? = null,
     val message: String? = null,
     val tripRequestTimeLimit: String? = null,
+)
+
+/**
+ * `GET trips/exists` → the active trip id (nested in the envelope's `data`), or null when no ride is in
+ * progress. ride-android reads it recursively as `tripId`; some payloads carry it as `id` instead.
+ */
+@Serializable
+data class TripExistsData(
+    val tripId: String? = null,
+    val id: String? = null,
+)
+
+/**
+ * `GET trips/socket/{tripId}` → the live trip snapshot (same shape as the `trip-detail` socket push).
+ * The numeric [status] is mapped to the rider's restored screen on dashboard entry (ride-android:
+ * `openRideScreenAccordingToTripStatus`); cab/driver/source/destination populate the on-the-way screen.
+ */
+@Serializable
+data class OngoingTripData(
+    val id: String? = null,
+    val status: Int? = null,
+    val action: String? = null,
+    val driverId: String? = null,
+    /** The current rider fare (SAR) — baseline for a drop-change "pay remaining". */
+    val riderAmount: Double? = null,
+    /** Loyalty points earned (shown on the completed/rating screen). */
+    val loyaltyPoints: Int? = null,
+    /** ISO-8601 timestamp the captain reached pickup (e.g. "2026-06-15T11:00:05.000Z"). */
+    val driverReachedAt: String? = null,
+    val tripOtp: String? = null,
+    /** The captain's earning (SAR) — used to restore the driver's navigate screen. */
+    val driverAmount: Double? = null,
+    /** 1 = card, 2 = wallet/cash (or `tripType`). */
+    val paymentMethod: Int? = null,
+    val tripType: Int? = null,
+    /** Pickup → destination distance (km) and time (minutes). */
+    val tripDistance: Double? = null,
+    val estimatedTripTime: Double? = null,
+    val source: TripPointDto? = null,
+    val destination: TripPointDto? = null,
+    @SerialName("destinationNew") val destinationNew: TripPointDto? = null,
+    val cabInfo: TripCabInfoDto? = null,
+    val driverInfo: TripDriverInfoDto? = null,
+    val riderInfo: TripRiderInfoDto? = null,
+)
+
+@Serializable
+data class TripRiderInfoDto(
+    val id: String? = null,
+    val name: String? = null,
+    val profileImage: String? = null,
+    val mobile: String? = null,
+    val rating: Double? = null,
+)
+
+@Serializable
+data class TripPointDto(
+    val address: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+)
+
+@Serializable
+data class TripCabInfoDto(
+    val id: String? = null,
+    val name: String? = null,
+    val description: String? = null,
+    val noOfSeats: Int? = null,
+    val estimatedTimeArrival: Int? = null,
+    val cancellationCharge: Double? = null,
+)
+
+@Serializable
+data class TripDriverInfoDto(
+    val id: String? = null,
+    val name: String? = null,
+    val carPlateNo: String? = null,
+    val latitude: Double? = null,
+    val longitude: Double? = null,
+    val profileImage: String? = null,
+    val rating: Double? = null,
+    val mobile: String? = null,
 )

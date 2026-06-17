@@ -38,3 +38,10 @@ class GetRouteUseCase @Inject constructor(
     suspend operator fun invoke(origin: PlaceLocation, destination: PlaceLocation): ApiResult<List<LatLngPoint>> =
         repository.getRoute(origin, destination)
 }
+
+/** Continuous device-location stream for live captain tracking. */
+class StreamLocationUpdatesUseCase @Inject constructor(
+    private val repository: PlacesRepository,
+) {
+    operator fun invoke(): kotlinx.coroutines.flow.Flow<LatLngPoint> = repository.locationUpdates()
+}

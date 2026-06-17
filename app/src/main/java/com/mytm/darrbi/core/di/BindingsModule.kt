@@ -9,9 +9,11 @@ import com.mytm.darrbi.data.location.MapServiceImpl
 import com.mytm.darrbi.data.location.PlacesRepositoryImpl
 import com.mytm.darrbi.data.socket.SocketServiceImpl
 import com.mytm.darrbi.data.repository.AuthRepositoryImpl
+import com.mytm.darrbi.data.repository.ChatRepositoryImpl
 import com.mytm.darrbi.data.repository.OnboardingRepositoryImpl
 import com.mytm.darrbi.data.repository.RideRepositoryImpl
 import com.mytm.darrbi.domain.repository.AuthRepository
+import com.mytm.darrbi.domain.repository.ChatRepository
 import com.mytm.darrbi.domain.repository.MapService
 import com.mytm.darrbi.domain.repository.OnboardingRepository
 import com.mytm.darrbi.domain.repository.PlacesRepository
@@ -61,6 +63,10 @@ abstract class BindingsModule {
     @Binds
     @Singleton
     abstract fun bindRideRepository(impl: RideRepositoryImpl): RideRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindChatRepository(impl: ChatRepositoryImpl): ChatRepository
 
     @Binds
     @Singleton

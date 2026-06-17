@@ -23,7 +23,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.mytm.darrbi.R
+import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.Ride
+import com.mytm.darrbi.presentation.chat.ChatScreen
 import com.mytm.darrbi.presentation.dashboard.CaptainDashboardScreen
 import com.mytm.darrbi.presentation.dashboard.CaptainStatusDetailScreen
 import com.mytm.darrbi.presentation.legal.LegalPage
@@ -51,7 +53,7 @@ private const val CUSTOMER_CARE_NUMBER = "+966500000000"
 private enum class Route {
     Onboarding, Dashboard, RiderHome, StatusDetail, Profile, TopupDetails,
     MyRides, RideDetails, ReportProblem, MyReports, Terms, Privacy,
-    AppSettings, CustomerCare, Notifications,
+    AppSettings, CustomerCare, Notifications, Chat,
 }
 
 /**
@@ -89,6 +91,8 @@ fun DarrbiRoot() {
             }
         }
     }
+    // The accepted trip whose captain the rider is chatting with (passed to the chat screen).
+    var chatTrip by remember { mutableStateOf<AcceptedTrip?>(null) }
     // Ride selected from the My Rides list, passed to the details screen.
     var selectedRide by remember { mutableStateOf<Ride?>(null) }
     var selectedRideGiven by remember { mutableStateOf(false) }
@@ -126,8 +130,7 @@ fun DarrbiRoot() {
                 )
                 Route.RiderHome -> RiderFlowScreen(
                     onProfile = { profileReturn = Route.RiderHome; route = Route.Profile },
-                    onSwitchToCaptain = { switchMode(toCaptain = true) },
-                    modeSwitching = modeSwitching,
+                    onChat = { trip -> chatTrip = trip; route = Route.Chat },
                 )
                 Route.StatusDetail -> {
                     BackHandler { route = Route.Dashboard }
@@ -137,6 +140,13 @@ fun DarrbiRoot() {
                     BackHandler { route = profileReturn }
                     ProfileScreen(
                         onBack = { route = profileReturn },
+                        // RIDER/CAPTAIN switch now lives in the profile menu (rider side only; the captain
+                        // dashboard keeps its own toggle for switching back to rider).
+                        onSwitchToCaptain = if (profileReturn == Route.RiderHome) {
+                            { switchMode(toCaptain = true) }
+                        } else {
+                            null
+                        },
                         onLogout = {
                             // Clear prefs, then navigate home and reset every ViewModel/StateFlow.
                             sessionViewModel.logout {
@@ -222,6 +232,15 @@ fun DarrbiRoot() {
                 Route.Privacy -> {
                     BackHandler { route = Route.Profile }
                     LegalScreen(titleRes = R.string.menu_privacy_policy, page = LegalPage.Privacy, onBack = { route = Route.Profile })
+                }
+                Route.Chat -> {
+                    BackHandler { route = Route.RiderHome }
+                    val trip = chatTrip
+                    if (trip == null) {
+                        route = Route.RiderHome
+                    } else {
+                        ChatScreen(trip = trip, onBack = { route = Route.RiderHome })
+                    }
                 }
             }
         }

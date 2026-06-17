@@ -105,6 +105,11 @@ object NetworkModule {
     fun provideCmsApi(@CmsApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.CmsApi =
         retrofit.create(com.mytm.darrbi.data.remote.service.CmsApi::class.java)
 
+    @Provides
+    @Singleton
+    fun provideChatApi(@MainApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.ChatApi =
+        retrofit.create(com.mytm.darrbi.data.remote.service.ChatApi::class.java)
+
     private fun buildRetrofit(baseUrl: String, client: OkHttpClient, factory: Converter.Factory): Retrofit =
         Retrofit.Builder()
             .baseUrl(baseUrl.ensureTrailingSlash())

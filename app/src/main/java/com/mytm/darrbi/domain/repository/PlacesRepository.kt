@@ -4,6 +4,7 @@ import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.PlaceSuggestion
+import kotlinx.coroutines.flow.Flow
 
 /** Location search + resolution via the Google Places SDK and device location. */
 interface PlacesRepository {
@@ -21,4 +22,7 @@ interface PlacesRepository {
 
     /** Driving route polyline from [origin] to [destination] (Google Routes API). */
     suspend fun getRoute(origin: PlaceLocation, destination: PlaceLocation): ApiResult<List<LatLngPoint>>
+
+    /** Continuous device-location stream for live captain tracking (empty if permission not granted). */
+    fun locationUpdates(): Flow<LatLngPoint>
 }

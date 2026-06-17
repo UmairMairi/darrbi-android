@@ -4,12 +4,26 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.CaptainDetails
+import com.mytm.darrbi.domain.model.LatLngPoint
+import com.mytm.darrbi.domain.model.OngoingTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
-import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
+import com.mytm.darrbi.domain.model.RideRequest
+import com.mytm.darrbi.domain.model.TripStage
 import com.mytm.darrbi.domain.repository.SocketService
+import com.mytm.darrbi.domain.repository.TripSocketEvent
+import com.mytm.darrbi.domain.usecase.AcceptTripUseCase
+import com.mytm.darrbi.domain.usecase.CancelTripByDriverUseCase
+import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
 import com.mytm.darrbi.domain.usecase.GetCaptainDetailsUseCase
+import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
+import com.mytm.darrbi.domain.usecase.GetRouteUseCase
+import com.mytm.darrbi.domain.usecase.ReachedPickupUseCase
+import com.mytm.darrbi.domain.usecase.RejectTripUseCase
+import com.mytm.darrbi.domain.usecase.StreamLocationUpdatesUseCase
 import com.mytm.darrbi.domain.usecase.ValidateIbanUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,6 +45,25 @@ data class CaptainDashboardUiState(
     val bankName: String? = null,
     /** Device location, once the captain is set up and grants permission, used to centre the map. */
     val myLocation: PlaceLocation? = null,
+    /** Incoming ride request to accept/decline (`trip_request`); null when none is pending. */
+    val incomingRequest: RideRequest? = null,
+    /** Pickup → destination route polyline for the incoming request. */
+    val requestRoutePoints: List<LatLngPoint> = emptyList(),
+    /** Captain → pickup distance (km) and time (minutes), computed from the captain's current location. */
+    val requestPickupDistanceKm: Double? = null,
+    val requestPickupTimeMinutes: Int? = null,
+    /** Accept/decline request in flight. */
+    val isHandlingRequest: Boolean = false,
+    /** One-shot: a request was just accepted → the UI shows a confirmation once. */
+    val tripAccepted: Boolean = false,
+    /** The accepted trip the captain is heading to (navigate-to-rider screen); null when none. */
+    val activeTrip: RideRequest? = null,
+    /** Captain → pickup route polyline for the navigate-to-rider map. */
+    val activeRoutePoints: List<LatLngPoint> = emptyList(),
+    /** True once the captain tapped "Navigate to Rider" → the button becomes "Reached". */
+    val navigateStarted: Boolean = false,
+    /** Whether the 3-dot menu (with Cancel Ride) is open. */
+    val showMenu: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val canSubmitIban: Boolean
@@ -45,7 +78,20 @@ sealed interface CaptainDashboardEvent {
     data object StartNow : CaptainDashboardEvent
     data class IbanChanged(val value: String) : CaptainDashboardEvent
     data object SubmitIban : CaptainDashboardEvent
+    /** Accept the incoming ride request. */
+    data object AcceptRequest : CaptainDashboardEvent
+    /** Decline the incoming ride request. */
+    data object DeclineRequest : CaptainDashboardEvent
+    /** "Navigate to Rider" tapped (external navigation launched by the screen). */
+    data object StartNavigate : CaptainDashboardEvent
+    /** "Reached" tapped on the navigate screen. */
+    data object MarkReached : CaptainDashboardEvent
+    /** Toggle the 3-dot menu (Cancel Ride). */
+    data object ToggleMenu : CaptainDashboardEvent
+    /** Cancel the accepted trip from the 3-dot menu. */
+    data object CancelTrip : CaptainDashboardEvent
     data object ConsumeError : CaptainDashboardEvent
+    data object ConsumeAccepted : CaptainDashboardEvent
 }
 
 @HiltViewModel
@@ -53,14 +99,48 @@ class CaptainDashboardViewModel @Inject constructor(
     private val getCaptainDetails: GetCaptainDetailsUseCase,
     private val validateIban: ValidateIbanUseCase,
     private val currentLocation: CurrentLocationUseCase,
+    private val streamLocationUpdates: StreamLocationUpdatesUseCase,
+    private val getRoute: GetRouteUseCase,
+    private val acceptTrip: AcceptTripUseCase,
+    private val rejectTrip: RejectTripUseCase,
+    private val reachedPickup: ReachedPickupUseCase,
+    private val cancelTripByDriver: CancelTripByDriverUseCase,
+    private val getOngoingTrip: GetOngoingTripUseCase,
     private val socketService: SocketService,
 ) : ViewModel() {
 
     private val _state = MutableStateFlow(CaptainDashboardUiState())
     val state: StateFlow<CaptainDashboardUiState> = _state.asStateFlow()
 
+    /** Active location → socket streaming job (only while the verified captain is on the dashboard). */
+    private var locationStreamJob: Job? = null
+
+    /** Auto-expire the incoming request after a fixed window (matches ride-android's 18s countdown). */
+    private var requestTimeoutJob: Job? = null
+
     init {
         refresh()
+        // Listen for incoming ride requests on the shared socket (captain side).
+        viewModelScope.launch {
+            socketService.tripEvents.collect { event ->
+                if (event is TripSocketEvent.TripRequest) onTripRequest(event.request)
+            }
+        }
+    }
+
+    /**
+     * Start streaming the captain's location to the server over the socket. Called once the captain is
+     * verified (NoRiders) and location permission is granted; idempotent. Each fused-location update is
+     * emitted via `update-captain-location` (mirrors ride-android's continuous driver-location updates).
+     */
+    fun startLocationStreaming() {
+        if (locationStreamJob?.isActive == true) return
+        socketService.connect()
+        locationStreamJob = viewModelScope.launch {
+            streamLocationUpdates().collect { point ->
+                socketService.updateCaptainLocation(point.latitude, point.longitude)
+            }
+        }
     }
 
     /** Centre the map on the device location (called once permission is granted on the ready dashboard). */
@@ -90,7 +170,161 @@ class CaptainDashboardViewModel @Inject constructor(
                 )
             }
             CaptainDashboardEvent.SubmitIban -> submitIban()
+            CaptainDashboardEvent.AcceptRequest -> acceptRequest()
+            CaptainDashboardEvent.DeclineRequest -> declineRequest()
+            CaptainDashboardEvent.StartNavigate -> _state.update { it.copy(navigateStarted = true) }
+            CaptainDashboardEvent.MarkReached -> markReached()
+            CaptainDashboardEvent.ToggleMenu -> _state.update { it.copy(showMenu = !it.showMenu) }
+            CaptainDashboardEvent.CancelTrip -> cancelTrip()
             CaptainDashboardEvent.ConsumeError -> _state.update { it.copy(errorMessage = null) }
+            CaptainDashboardEvent.ConsumeAccepted -> _state.update { it.copy(tripAccepted = false) }
+        }
+    }
+
+    /** A ride request arrived → compute the captain→pickup estimate, draw the route, and start the timer. */
+    private fun onTripRequest(request: RideRequest) {
+        // Only while online/idle on the dashboard, and don't replace one already showing.
+        if (_state.value.stage != CaptainStage.NoRiders || _state.value.incomingRequest != null) return
+        val pickup = computePickup(request)
+        _state.update {
+            it.copy(
+                incomingRequest = request,
+                requestRoutePoints = emptyList(),
+                requestPickupDistanceKm = pickup?.first,
+                requestPickupTimeMinutes = pickup?.second,
+                isHandlingRequest = false,
+            )
+        }
+        fetchRequestRoute(request)
+        requestTimeoutJob?.cancel()
+        requestTimeoutJob = viewModelScope.launch {
+            delay(REQUEST_TIMEOUT_MS)
+            // Timed out → just dismiss (no reject call), like ride-android returning to the waiting state.
+            clearRequest()
+        }
+    }
+
+    /** Captain → pickup distance (km) + a rough ETA (minutes) from the captain's current location. */
+    private fun computePickup(request: RideRequest): Pair<Double, Int>? {
+        val me = _state.value.myLocation ?: return null
+        val out = FloatArray(1)
+        android.location.Location.distanceBetween(me.latitude, me.longitude, request.pickup.latitude, request.pickup.longitude, out)
+        val km = out[0] / 1000.0
+        val mins = Math.ceil(km / PICKUP_AVG_SPEED_KMH * 60.0).toInt().coerceAtLeast(1)
+        return km to mins
+    }
+
+    private fun fetchRequestRoute(request: RideRequest) {
+        viewModelScope.launch {
+            val points = when (val result = getRoute(request.pickup, request.destination)) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error, is ApiResult.Failure -> emptyList()
+            }
+            val path = points.ifEmpty {
+                listOf(
+                    LatLngPoint(request.pickup.latitude, request.pickup.longitude),
+                    LatLngPoint(request.destination.latitude, request.destination.longitude),
+                )
+            }
+            // Only apply if this is still the request being shown.
+            _state.update { if (it.incomingRequest?.tripId == request.tripId) it.copy(requestRoutePoints = path) else it }
+        }
+    }
+
+    private fun acceptRequest() {
+        val request = _state.value.incomingRequest ?: return
+        if (_state.value.isHandlingRequest) return
+        _state.update { it.copy(isHandlingRequest = true, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = acceptTrip(request.tripId)) {
+                is ApiResult.Success -> {
+                    requestTimeoutJob?.cancel()
+                    // Move to the navigate-to-rider screen for the accepted trip.
+                    _state.update {
+                        it.copy(
+                            incomingRequest = null,
+                            requestRoutePoints = emptyList(),
+                            isHandlingRequest = false,
+                            activeTrip = request,
+                            navigateStarted = false,
+                            showMenu = false,
+                        )
+                    }
+                    fetchActiveRoute(request)
+                }
+                is ApiResult.Error -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    private fun declineRequest() {
+        val request = _state.value.incomingRequest ?: return
+        requestTimeoutJob?.cancel()
+        // Dismiss immediately; tell the server in the background.
+        _state.update { it.copy(incomingRequest = null, requestRoutePoints = emptyList(), isHandlingRequest = false) }
+        viewModelScope.launch { rejectTrip(request.tripId, request.destination) }
+    }
+
+    private fun clearRequest() {
+        requestTimeoutJob?.cancel()
+        _state.update { it.copy(incomingRequest = null, requestRoutePoints = emptyList(), isHandlingRequest = false) }
+    }
+
+    /** Draws the captain → pickup route on the navigate-to-rider map, and refreshes the pickup estimate. */
+    private fun fetchActiveRoute(request: RideRequest) {
+        computePickup(request)?.let { (km, mins) ->
+            _state.update { it.copy(requestPickupDistanceKm = km, requestPickupTimeMinutes = mins) }
+        }
+        val origin = _state.value.myLocation ?: return
+        viewModelScope.launch {
+            val points = when (val result = getRoute(origin, request.pickup)) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error, is ApiResult.Failure -> emptyList()
+            }
+            val path = points.ifEmpty {
+                listOf(
+                    LatLngPoint(origin.latitude, origin.longitude),
+                    LatLngPoint(request.pickup.latitude, request.pickup.longitude),
+                )
+            }
+            _state.update { if (it.activeTrip?.tripId == request.tripId) it.copy(activeRoutePoints = path) else it }
+        }
+    }
+
+    /** "Reached" → tell the server the captain is at pickup; on success leave the navigate screen. */
+    private fun markReached() {
+        val trip = _state.value.activeTrip ?: return
+        if (_state.value.isHandlingRequest) return
+        _state.update { it.copy(isHandlingRequest = true, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = reachedPickup(trip.tripId)) {
+                is ApiResult.Success -> clearActiveTrip()
+                is ApiResult.Error -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    /** Cancel Ride (3-dot menu) → cancel server-side and return to the idle dashboard. */
+    private fun cancelTrip() {
+        val trip = _state.value.activeTrip ?: return
+        _state.update { it.copy(showMenu = false) }
+        viewModelScope.launch { cancelTripByDriver(trip.tripId, trip.destination) }
+        clearActiveTrip()
+    }
+
+    private fun clearActiveTrip() {
+        _state.update {
+            it.copy(
+                activeTrip = null,
+                activeRoutePoints = emptyList(),
+                navigateStarted = false,
+                showMenu = false,
+                isHandlingRequest = false,
+                requestPickupDistanceKm = null,
+                requestPickupTimeMinutes = null,
+            )
         }
     }
 
@@ -146,6 +380,46 @@ class CaptainDashboardViewModel @Inject constructor(
 
     /** Connect the real-time socket only when the captain is fully verified (WASL approved + IBAN set). */
     private fun connectSocketIfReady(stage: CaptainStage) {
-        if (stage == CaptainStage.NoRiders) socketService.connect()
+        if (stage == CaptainStage.NoRiders) {
+            socketService.connect()
+            checkOngoingTrip()
+        }
+    }
+
+    /** On dashboard entry, restore an in-progress accepted trip (`trips/exists` → `trips/socket/{id}`). */
+    private var ongoingChecked = false
+    private fun checkOngoingTrip() {
+        if (ongoingChecked) return
+        ongoingChecked = true
+        viewModelScope.launch {
+            when (val result = getOngoingTrip()) {
+                is ApiResult.Success -> result.data?.let { restoreOngoing(it) }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
+    /** Restores the captain to the navigate-to-rider screen for an accepted/arrived/in-progress trip. */
+    private fun restoreOngoing(trip: OngoingTrip) {
+        if (_state.value.activeTrip != null || _state.value.incomingRequest != null) return
+        val request = trip.rideRequest ?: return
+        when (trip.stage) {
+            TripStage.DriverAssigned, TripStage.DriverArrived, TripStage.InProgress -> {
+                _state.update {
+                    it.copy(
+                        activeTrip = request,
+                        navigateStarted = trip.stage != TripStage.DriverAssigned,
+                        showMenu = false,
+                    )
+                }
+                fetchActiveRoute(request)
+            }
+            else -> Unit
+        }
+    }
+
+    private companion object {
+        const val REQUEST_TIMEOUT_MS = 18_000L
+        const val PICKUP_AVG_SPEED_KMH = 20.0
     }
 }

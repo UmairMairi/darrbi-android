@@ -13,7 +13,9 @@ fun SendOtpData.toDomain(): OtpRequest = OtpRequest(
 
 fun VerifyOtpData.toDomain(): AuthSession = AuthSession(
     token = token.orEmpty(),
-    userId = userId ?: details?.id,
+    // Use the canonical account id (`details.userId`, the numeric riderId) for socket/chat routing —
+    // matches ride-android. The top-level [userId] is a different session id and must NOT be used here.
+    userId = details?.userId ?: userId ?: details?.id,
     isNameUpdated = details?.isNameUpdated ?: false,
     userType = details?.userType,
     profile = details.toUserProfile(),

@@ -3,6 +3,7 @@ package com.mytm.darrbi.domain.repository
 import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.PlaceLocation
+import kotlinx.coroutines.flow.Flow
 
 /**
  * Single entry point for every device map/location operation: permission state, the device's current
@@ -24,4 +25,10 @@ interface MapService {
      * (same as ride-android). Returns the decoded path points (origin → destination).
      */
     suspend fun routeBetween(origin: PlaceLocation, destination: PlaceLocation): ApiResult<List<LatLngPoint>>
+
+    /**
+     * Continuous device-location stream (fused provider) for live captain tracking — emits on each
+     * location update (interval/displacement match ride-android). Empty if permission isn't granted.
+     */
+    fun locationUpdates(): Flow<LatLngPoint>
 }

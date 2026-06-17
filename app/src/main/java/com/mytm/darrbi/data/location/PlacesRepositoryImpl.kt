@@ -1,6 +1,7 @@
 package com.mytm.darrbi.data.location
 
 import android.content.Context
+import android.util.Log
 import com.google.android.libraries.places.api.Places
 import com.google.android.libraries.places.api.model.AutocompleteSessionToken
 import com.google.android.libraries.places.api.model.Place
@@ -36,15 +37,21 @@ class PlacesRepositoryImpl @Inject constructor(
                 .setSessionToken(sessionToken)
                 .setQuery(query)
                 .build()
+            Log.d(TAG, "autocomplete request: query=\"$query\" country=$AUTOCOMPLETE_COUNTRY")
             val response = placesClient.findAutocompletePredictions(request).await()
-            response.autocompletePredictions.map {
+            val predictions = response.autocompletePredictions
+            Log.d(TAG, "autocomplete response: ${predictions.size} prediction(s)")
+            predictions.forEachIndexed { i, p ->
+                Log.d(TAG, "  [$i] placeId=${p.placeId} | primary=\"${p.getPrimaryText(null)}\" | secondary=\"${p.getSecondaryText(null)}\" | full=\"${p.getFullText(null)}\"")
+            }
+            predictions.map {
                 PlaceSuggestion(
                     id = it.placeId,
                     primaryText = it.getPrimaryText(null).toString(),
                     secondaryText = it.getSecondaryText(null).toString(),
                 )
             }
-        }.toApiResult()
+        }.onFailure { Log.w(TAG, "autocomplete failed for \"$query\": ${it.message}") }.toApiResult()
     }
 
     override suspend fun placeDetails(placeId: String): ApiResult<PlaceLocation> = runCatching {
@@ -70,7 +77,10 @@ class PlacesRepositoryImpl @Inject constructor(
     override suspend fun getRoute(origin: PlaceLocation, destination: PlaceLocation): ApiResult<List<LatLngPoint>> =
         mapService.routeBetween(origin, destination)
 
+    override fun locationUpdates(): kotlinx.coroutines.flow.Flow<LatLngPoint> = mapService.locationUpdates()
+
     private companion object {
+        const val TAG = "PlacesAutocomplete"
         // Country to bias autocomplete to (matches ride-android's WhereToGo/Pickup test region).
         // Switch to "SA" for the Saudi production market.
         const val AUTOCOMPLETE_COUNTRY = "PK"

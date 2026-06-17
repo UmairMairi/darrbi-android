@@ -87,6 +87,7 @@
     <string name="profile_bank">Bank</string>
     <string name="profile_update_iban">Update IBAN</string>
     <string name="profile_version">version 1.1</string>
+    <string name="profile_switch_to_captain">Drive with Darrbi</string>
     <string name="menu_subscription">Subscription</string>
     <string name="menu_car_deal_details">Car Deal Details</string>
     <string name="menu_saved_cards">Saved Cards</string>
@@ -109,6 +110,25 @@
     <string name="no_riders_title">There are no riders around</string>
     <string name="no_riders_subtitle">Drive to high-demand zones to find more riders</string>
     <string name="no_riders_navigate">Navigate to high demand zone</string>
+    <!-- Captain: incoming ride request -->
+    <string name="captain_estimate_earning">Estimate Earning</string>
+    <string name="captain_payment_method">Payment Method</string>
+    <string name="captain_pickup_distance">Pickup Distance</string>
+    <string name="captain_dest_distance">Dest. Distance</string>
+    <string name="captain_earning_sar">SAR %1$s</string>
+    <string name="captain_distance_time">%1$s km · %2$d mins</string>
+    <string name="captain_payment_cash">Cash</string>
+    <string name="captain_payment_card">Card</string>
+    <string name="captain_accept">Accept</string>
+    <string name="captain_decline">Decline</string>
+    <string name="captain_request_accepted">Trip accepted</string>
+    <!-- Captain: navigate to rider -->
+    <string name="captain_navigate_to_rider">Navigate to Rider</string>
+    <string name="captain_reached">Reached</string>
+    <string name="captain_eta_mins">%1$d mins</string>
+    <string name="captain_pickup_eta">%1$s km · %2$s</string>
+    <string name="captain_cancel_ride">Cancel Ride</string>
+    <string name="captain_menu">Menu</string>
 
     <!-- Topup details + refund -->
     <string name="topup_details_title">Topup Details</string>
@@ -241,6 +261,25 @@
     <string name="rider_set_location_from_map">Set Location From Map</string>
     <string name="rider_confirm_location">Confirm Location</string>
     <string name="cd_recenter">My location</string>
+    <!-- Rider home dashboard -->
+    <string name="rider_greeting_morning">Good morning, %1$s</string>
+    <string name="rider_greeting_afternoon">Good afternoon, %1$s</string>
+    <string name="rider_greeting_evening">Good evening, %1$s</string>
+    <string name="rider_default_user">there</string>
+    <string name="rider_what_today">What do you want today?</string>
+    <string name="rider_your_location">Your location</string>
+    <string name="rider_where_to_fare">Where to and for how much?</string>
+    <string name="rider_captains_near">%1$d captains near you</string>
+    <string name="rider_home_promo_title">Book &amp; Pay Now</string>
+    <string name="rider_home_promo_offer">Get Extra 5% Off</string>
+    <string name="rider_recent">Recent</string>
+    <string name="rider_categories_retry">Couldn\'t load services. Tap to retry.</string>
+    <!-- Category taglines (the API provides no subtitle; matched by service type) -->
+    <string name="cat_sub_taxi">Set your own Fare</string>
+    <string name="cat_sub_rental">Self Drive</string>
+    <string name="cat_sub_cargo">Large shipments</string>
+    <string name="cat_sub_delivery">Fast &amp; Local</string>
+    <string name="cat_sub_scheduled">Schedule your rides</string>
     <!-- Rider ride selection -->
     <string name="rider_current_location">Current Location</string>
     <string name="rider_recommended">Recommended for you</string>
@@ -258,6 +297,57 @@
     <string name="rider_searching_cancel">Cancel Ride</string>
     <string name="rider_no_captain_title">Oops! Please try again no captain found</string>
     <string name="rider_try_again">Try Again</string>
+    <!-- Rider: captain on the way -->
+    <string name="rider_share_pin">Share this PIN with your captain</string>
+    <string name="rider_onway_message">Your ride is on the way, will reach you in %1$d mins</string>
+    <string name="rider_onway_message_no_eta">Your ride is on the way</string>
+    <string name="rider_cancellation_fee">Ride Cancellation Fee Is %1$s SAR</string>
+    <string name="rider_eta_minutes">%1$d mins</string>
+    <!-- Rider: captain arrived / trip started -->
+    <string name="rider_arrived_title">Your ride has arrived</string>
+    <string name="rider_im_coming">I am coming</string>
+    <string name="rider_trip_started_title">On the way to your destination</string>
+    <string name="rider_riding_with">You are riding with</string>
+    <string name="rider_change_destination">Change</string>
+    <string name="rider_help">Help</string>
+    <!-- Rider: change drop-off -->
+    <string name="rider_change_dropoff">Change drop-off</string>
+    <string name="rider_your_new_fare">Your new fare is</string>
+    <string name="rider_original_ride">Original Ride</string>
+    <string name="rider_new_fare">New fare</string>
+    <string name="rider_fare_sar">%1$s SAR</string>
+    <string name="rider_arrival_at">Arrival %1$s</string>
+    <string name="rider_pay_remaining">Pay Remaining %1$s SAR</string>
+    <string name="rider_drop_changed">New drop-off location changed successfully.</string>
+    <string name="rider_driver_cancelled">The captain cancelled the ride.</string>
+    <!-- Rider: in-trip help -->
+    <string name="rider_help_call_center">Call Center</string>
+    <string name="rider_help_share_ride">Share Ride Details</string>
+    <string name="rider_emergency_help">Emergency Help</string>
+    <string name="rider_call_police">Call The Police - 999</string>
+    <string name="rider_share_ride_details_title">My Darrbi ride details</string>
+    <!-- Rider: trip completed / rating -->
+    <string name="rider_rate_captain">Rate Your Captain</string>
+    <string name="rider_total_payment">Total Payment</string>
+    <string name="rider_loyalty_points">Total Loyalty Points Earned</string>
+    <string name="rider_download_invoice">Download VAT Invoice</string>
+    <string name="rider_submit_rating">Submit Rating</string>
+    <string name="cd_chat">Chat</string>
+    <string name="cd_call">Call</string>
+    <!-- Rider ↔ Captain chat -->
+    <string name="chat_input_hint">Write a message…</string>
+    <string name="chat_typing">Typing…</string>
+    <string name="chat_send">Send</string>
+    <string name="chat_attach">Attach</string>
+    <string name="chat_send_image">Send image</string>
+    <string name="chat_record_voice">Record voice message</string>
+    <string name="chat_media_coming_soon">Media sharing is coming soon</string>
+    <string-array name="chat_quick_replies">
+        <item>I am at pickup location</item>
+        <item>Give me 2 mins</item>
+        <item>I\'m on my way</item>
+        <item>Okay</item>
+    </string-array>
     <!-- Location permission -->
     <string name="location_denied_title">Location Access Needed</string>
     <string name="location_denied_message">Darbi needs your location to show your position on the map and find rides near you. You\'ve denied it, so please enable Location in Settings.</string>

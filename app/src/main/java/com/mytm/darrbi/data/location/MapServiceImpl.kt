@@ -5,9 +5,13 @@ import android.content.Context
 import android.content.pm.PackageManager
 import android.location.Geocoder
 import androidx.core.content.ContextCompat
+import com.google.android.gms.location.LocationCallback
+import com.google.android.gms.location.LocationRequest
+import com.google.android.gms.location.LocationResult
 import com.google.android.gms.location.LocationServices
 import com.google.android.gms.location.Priority
 import com.google.android.gms.tasks.CancellationTokenSource
+import android.os.Looper
 import com.mytm.darrbi.BuildConfig
 import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.core.common.AppError
@@ -16,6 +20,10 @@ import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.repository.MapService
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.emptyFlow
 import kotlinx.coroutines.withContext
 import org.json.JSONObject
 import java.io.BufferedReader
@@ -117,6 +125,22 @@ class MapServiceImpl @Inject constructor(
         }.toApiResult()
     }
 
+    override fun locationUpdates(): Flow<LatLngPoint> {
+        if (!hasLocationPermission()) return emptyFlow()
+        return callbackFlow {
+            val request = LocationRequest.Builder(Priority.PRIORITY_HIGH_ACCURACY, LOCATION_INTERVAL_MS)
+                .setMinUpdateDistanceMeters(LOCATION_DISPLACEMENT_M)
+                .build()
+            val callback = object : LocationCallback() {
+                override fun onLocationResult(result: LocationResult) {
+                    result.lastLocation?.let { trySend(LatLngPoint(it.latitude, it.longitude)) }
+                }
+            }
+            fusedClient.requestLocationUpdates(request, callback, Looper.getMainLooper())
+            awaitClose { fusedClient.removeLocationUpdates(callback) }
+        }
+    }
+
     private fun waypoint(lat: Double, lng: Double): JSONObject =
         JSONObject().put("location", JSONObject().put("latLng", JSONObject().put("latitude", lat).put("longitude", lng)))
 
@@ -153,5 +177,8 @@ class MapServiceImpl @Inject constructor(
 
     private companion object {
         const val ROUTES_API_URL = "https://routes.googleapis.com/directions/v2:computeRoutes"
+        // Live captain tracking cadence (matches ride-android: 1s interval, 20m displacement).
+        const val LOCATION_INTERVAL_MS = 1000L
+        const val LOCATION_DISPLACEMENT_M = 20f
     }
 }
