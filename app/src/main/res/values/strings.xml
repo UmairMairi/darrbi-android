@@ -145,6 +145,7 @@
     <string name="captain_location_point">Location on map</string>
     <string name="captain_bid_lost">You didn\'t get this ride</string>
     <string name="captain_place_bid">Place your bid</string>
+    <string name="captain_offer_your_fare">Offer your fare</string>
     <string name="captain_bid_range">Range: SAR %1$s – %2$s</string>
     <string name="captain_your_offer">Your offer (SAR)</string>
     <string name="captain_accept_fare">Accept SAR %1$s</string>

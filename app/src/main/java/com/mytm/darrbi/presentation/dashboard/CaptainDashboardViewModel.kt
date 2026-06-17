@@ -74,8 +74,10 @@ data class CaptainDashboardUiState(
     val isOnline: Boolean = true,
     /** Live broadcast list of open (awaiting-bids) trips, from the socket. */
     val openTrips: List<OpenTrip> = emptyList(),
-    /** The open trip whose bid sheet is showing; null when closed. */
+    /** The open trip whose detail view is showing (map + bid actions); null when closed. */
     val biddingTrip: OpenTrip? = null,
+    /** Pickup → destination route polyline for the open-trip detail map. */
+    val biddingRoutePoints: List<LatLngPoint> = emptyList(),
     /** A bid POST is in flight. */
     val isPlacingBid: Boolean = false,
     /** V2 bid error code to surface in the sheet (e.g. BID_BELOW_FLOOR, DRIVER_INELIGIBLE). */
@@ -240,9 +242,8 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.ConsumeError -> _state.update { it.copy(errorMessage = null) }
             CaptainDashboardEvent.ConsumeAccepted -> _state.update { it.copy(tripAccepted = false) }
             is CaptainDashboardEvent.SetOnline -> setOnline(event.online)
-            is CaptainDashboardEvent.OpenBidSheet ->
-                _state.update { st -> st.copy(biddingTrip = st.openTrips.firstOrNull { it.tripId == event.tripId }, bidErrorCode = null) }
-            CaptainDashboardEvent.DismissBidSheet -> _state.update { it.copy(biddingTrip = null, bidErrorCode = null) }
+            is CaptainDashboardEvent.OpenBidSheet -> openBidDetail(event.tripId)
+            CaptainDashboardEvent.DismissBidSheet -> _state.update { it.copy(biddingTrip = null, bidErrorCode = null, biddingRoutePoints = emptyList()) }
             is CaptainDashboardEvent.AcceptFare -> submitBid(event.tripId, BidType.AcceptFare, null)
             is CaptainDashboardEvent.CounterBid -> submitBid(event.tripId, BidType.Counter, event.fare)
             CaptainDashboardEvent.ConsumeBidError -> _state.update { it.copy(bidErrorCode = null) }
@@ -276,6 +277,25 @@ class CaptainDashboardViewModel @Inject constructor(
         }
     }
 
+    /** Tapped a request card → open its detail view and fetch the pickup → destination route for the map. */
+    private fun openBidDetail(tripId: String) {
+        val trip = _state.value.openTrips.firstOrNull { it.tripId == tripId } ?: return
+        _state.update { it.copy(biddingTrip = trip, bidErrorCode = null, biddingRoutePoints = emptyList()) }
+        viewModelScope.launch {
+            val points = when (val result = getRoute(trip.pickup, trip.dropoff)) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error, is ApiResult.Failure -> emptyList()
+            }
+            val path = points.ifEmpty {
+                listOf(
+                    LatLngPoint(trip.pickup.latitude, trip.pickup.longitude),
+                    LatLngPoint(trip.dropoff.latitude, trip.dropoff.longitude),
+                )
+            }
+            _state.update { if (it.biddingTrip?.tripId == trip.tripId) it.copy(biddingRoutePoints = path) else it }
+        }
+    }
+
     /** Place a bid (ACCEPT the fare or COUNTER). Surfaces the V2 error code on failure. */
     private fun submitBid(tripId: String, bidType: BidType, fare: Double?) {
         if (_state.value.isPlacingBid) return
@@ -288,7 +308,7 @@ class CaptainDashboardViewModel @Inject constructor(
                 cabId = _state.value.captain?.cabId,
             )
             when (result) {
-                is ApiResult.Success -> _state.update { it.copy(isPlacingBid = false, biddingTrip = null) }
+                is ApiResult.Success -> _state.update { it.copy(isPlacingBid = false, biddingTrip = null, biddingRoutePoints = emptyList()) }
                 is ApiResult.Error -> _state.update { it.copy(isPlacingBid = false, bidErrorCode = result.message ?: REASON_BID_FAILED) }
                 is ApiResult.Failure -> _state.update { it.copy(isPlacingBid = false, bidErrorCode = result.error.message ?: REASON_BID_FAILED) }
             }

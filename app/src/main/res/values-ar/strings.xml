@@ -145,6 +145,7 @@
     <string name="captain_location_point">موقع على الخريطة</string>
     <string name="captain_bid_lost">لم تحصل على هذه الرحلة</string>
     <string name="captain_place_bid">قدّم عرضك</string>
+    <string name="captain_offer_your_fare">اعرض أجرتك</string>
     <string name="captain_bid_range">النطاق: %1$s – %2$s ر.س</string>
     <string name="captain_your_offer">عرضك (ر.س)</string>
     <string name="captain_accept_fare">قبول %1$s ر.س</string>

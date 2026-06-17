@@ -1,5 +1,6 @@
 package com.mytm.darrbi.presentation.dashboard
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -157,6 +158,18 @@ fun CaptainDashboardScreen(
         val bounds = LatLngBounds.builder().apply { pts.forEach { include(it) } }.build()
         runCatching { cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, REQUEST_BOUNDS_PADDING_PX), 700) }
     }
+    // Open-trip detail → frame pickup + destination (+ route + captain).
+    LaunchedEffect(state.biddingTrip?.tripId, state.biddingRoutePoints, state.myLocation) {
+        val bidding = state.biddingTrip ?: return@LaunchedEffect
+        val pts = buildList {
+            add(LatLng(bidding.pickup.latitude, bidding.pickup.longitude))
+            add(LatLng(bidding.dropoff.latitude, bidding.dropoff.longitude))
+            state.myLocation?.let { add(LatLng(it.latitude, it.longitude)) }
+            addAll(state.biddingRoutePoints.map { LatLng(it.latitude, it.longitude) })
+        }
+        val bounds = LatLngBounds.builder().apply { pts.forEach { include(it) } }.build()
+        runCatching { cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, REQUEST_BOUNDS_PADDING_PX), 700) }
+    }
     // Toasts: accepted confirmation + transient errors.
     val ctx = LocalContext.current
     val acceptedMsg = stringResource(R.string.captain_request_accepted)
@@ -181,11 +194,15 @@ fun CaptainDashboardScreen(
         }
     }
 
+    // System-back closes an open request detail (back to the list) instead of leaving the dashboard.
+    BackHandler(enabled = state.biddingTrip != null) { viewModel.onEvent(CaptainDashboardEvent.DismissBidSheet) }
+
     Box(modifier = Modifier.fillMaxSize()) {
         val request = state.incomingRequest
         val active = state.activeTrip
-        val mapBusy = request != null || active != null
-        // Verified + idle → the full-screen broadcast list (reference); the map is used for active trips.
+        val bidding = state.biddingTrip
+        val mapBusy = request != null || active != null || bidding != null
+        // Verified + idle (no request open) → the full-screen broadcast list (reference).
         val showList = state.stage == CaptainStage.NoRiders && !mapBusy
         if (showList) {
             DriverOpenTripsView(
@@ -194,17 +211,6 @@ fun CaptainDashboardScreen(
                 onProfile = onProfile,
                 modifier = Modifier.fillMaxSize(),
             )
-            // Bid sheet for the tapped open trip.
-            state.biddingTrip?.let { trip ->
-                BidSheet(
-                    trip = trip,
-                    isPlacing = state.isPlacingBid,
-                    errorCode = state.bidErrorCode,
-                    onAcceptFare = { viewModel.onEvent(CaptainDashboardEvent.AcceptFare(trip.tripId)) },
-                    onCounter = { fare -> viewModel.onEvent(CaptainDashboardEvent.CounterBid(trip.tripId, fare)) },
-                    onDismiss = { viewModel.onEvent(CaptainDashboardEvent.DismissBidSheet) },
-                )
-            }
             if (isReady && locationPermission.isPermanentlyDenied) {
                 LocationPermissionDeniedDialog(onOpenSettings = { ctx.openAppSettings() })
             }
@@ -254,6 +260,23 @@ fun CaptainDashboardScreen(
                 )
                 state.myLocation?.let {
                     AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "act_driver")
+                }
+            } else if (bidding != null) {
+                // Open-trip detail → pickup→destination route + pickup/destination pins + the captain's car.
+                val route = remember(state.biddingRoutePoints) {
+                    state.biddingRoutePoints.map { LatLng(it.latitude, it.longitude) }
+                }
+                if (route.size >= 2) Polyline(points = route, color = routeColor, width = 6f)
+                Marker(
+                    state = rememberMarkerState(key = "bid_pickup", position = LatLng(bidding.pickup.latitude, bidding.pickup.longitude)),
+                    icon = pinIcon, anchor = Offset(0.5f, 0.5f),
+                )
+                Marker(
+                    state = rememberMarkerState(key = "bid_dest", position = LatLng(bidding.dropoff.latitude, bidding.dropoff.longitude)),
+                    icon = pinIcon, anchor = Offset(0.5f, 0.5f),
+                )
+                state.myLocation?.let {
+                    AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "bid_driver")
                 }
             }
         }
@@ -332,6 +355,18 @@ fun CaptainDashboardScreen(
                         viewModel.onEvent(CaptainDashboardEvent.StartNavigate)
                     },
                     onReached = { viewModel.onEvent(CaptainDashboardEvent.MarkReached) },
+                )
+            }
+        } else if (bidding != null) {
+            // Tapped an open request → its detail card over the route map (accept the fare or counter).
+            BottomCard {
+                RequestDetailContent(
+                    trip = bidding,
+                    isPlacing = state.isPlacingBid,
+                    errorCode = state.bidErrorCode,
+                    onAccept = { viewModel.onEvent(CaptainDashboardEvent.AcceptFare(bidding.tripId)) },
+                    onOffer = { fare -> viewModel.onEvent(CaptainDashboardEvent.CounterBid(bidding.tripId, fare)) },
+                    onCancel = { viewModel.onEvent(CaptainDashboardEvent.DismissBidSheet) },
                 )
             }
         } else {
@@ -673,62 +708,132 @@ private fun AddressRow(label: String, address: String, dotColor: Color) {
     }
 }
 
-/** Bid bottom sheet: accept the rider's fare or counter within the allowed range. */
-@OptIn(androidx.compose.material3.ExperimentalMaterial3Api::class)
+/**
+ * Open-request detail card (over the route map): rider, offered fare, distance·time, pickup/drop, then
+ * "Accept for SAR X" + quick "Offer your fare" chips + Cancel (matches the reference).
+ */
 @Composable
-private fun BidSheet(
+private fun RequestDetailContent(
     trip: OpenTrip,
     isPlacing: Boolean,
     errorCode: String?,
-    onAcceptFare: () -> Unit,
-    onCounter: (Double) -> Unit,
-    onDismiss: () -> Unit,
+    onAccept: () -> Unit,
+    onOffer: (Double) -> Unit,
+    onCancel: () -> Unit,
 ) {
-    val sheetState = rememberModalBottomSheetState()
-    val belowMsg = stringResource(R.string.captain_bid_err_range, formatAmount(trip.fareRange.min), formatAmount(trip.fareRange.max))
-    ModalBottomSheet(onDismissRequest = onDismiss, sheetState = sheetState, containerColor = DarrbiTheme.colors.surface) {
-        Column(modifier = Modifier.fillMaxWidth().padding(horizontal = 20.dp).padding(bottom = 12.dp).navigationBarsPadding()) {
-            Text(stringResource(R.string.captain_place_bid), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
-            Spacer(Modifier.height(6.dp))
+    Column(modifier = Modifier.fillMaxWidth()) {
+        // Rider row.
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = trip.riderImageUrl,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(R.drawable.user_placeholder),
+                error = painterResource(R.drawable.user_placeholder),
+                fallback = painterResource(R.drawable.user_placeholder),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = trip.riderName ?: stringResource(R.string.captain_rider_fallback),
+                    style = DarrbiTheme.typography.title.copy(fontSize = 16.sp),
+                    color = DarrbiTheme.colors.onSurface,
+                    maxLines = 1,
+                )
+                Text(relativeAge(trip.createdAtMillis), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+            }
+            trip.riderRating?.let { rating ->
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(16.dp))
+                    Spacer(Modifier.width(4.dp))
+                    Text(formatRating(rating), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                }
+            }
+        }
+        Spacer(Modifier.height(14.dp))
+        HorizontalDivider(color = DarrbiTheme.colors.outline)
+        Spacer(Modifier.height(14.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
             Text(
-                text = stringResource(R.string.captain_bid_range, formatAmount(trip.fareRange.min), formatAmount(trip.fareRange.max)),
-                style = DarrbiTheme.typography.body,
-                color = DarrbiTheme.colors.onSurfaceVariant,
+                text = stringResource(R.string.captain_sar, formatAmount(trip.riderOfferedFare)),
+                style = DarrbiTheme.typography.titleLarge.copy(fontSize = 24.sp),
+                color = DarrbiTheme.colors.onSurface,
             )
-            Spacer(Modifier.height(16.dp))
-            var offer by remember { mutableStateOf(formatAmount(trip.riderOfferedFare)) }
-            var localError by remember { mutableStateOf<String?>(null) }
-            DarrbiTextField(
-                value = offer,
-                onValueChange = { input -> offer = input.filter { it.isDigit() || it == '.' }; localError = null },
-                label = stringResource(R.string.captain_your_offer),
-                keyboardType = KeyboardType.Number,
-                isError = localError != null,
-                supportingText = localError ?: errorCode?.let { bidErrorText(it) },
-            )
-            Spacer(Modifier.height(16.dp))
-            DarrbiPrimaryButton(
-                text = stringResource(R.string.captain_accept_fare, formatAmount(trip.riderOfferedFare)),
-                onClick = onAcceptFare,
-                enabled = !isPlacing,
-            )
+            Spacer(Modifier.weight(1f))
+            Text(distanceTime(trip), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+        }
+        Spacer(Modifier.height(14.dp))
+        Surface(shape = RoundedCornerShape(12.dp), color = DarrbiTheme.colors.surface, border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline)) {
+            Column {
+                AddressRow(stringResource(R.string.captain_pickup), trip.pickup.address, DarrbiTheme.colors.primary)
+                HorizontalDivider(color = DarrbiTheme.colors.outline)
+                AddressRow(stringResource(R.string.captain_drop_off), trip.dropoff.address, DarrbiTheme.colors.error)
+            }
+        }
+        if (errorCode != null) {
             Spacer(Modifier.height(10.dp))
-            DarrbiSecondaryButton(
-                text = stringResource(R.string.captain_submit_bid),
-                onClick = {
-                    val value = offer.toDoubleOrNull()
-                    when {
-                        value == null -> localError = belowMsg
-                        value < trip.fareRange.min || value > trip.fareRange.max -> localError = belowMsg
-                        else -> onCounter(value)
-                    }
-                },
-                enabled = !isPlacing,
+            InfoPill(text = bidErrorText(errorCode), error = true)
+        }
+        Spacer(Modifier.height(16.dp))
+        DarrbiPrimaryButton(
+            text = stringResource(R.string.captain_accept_fare, formatAmount(trip.riderOfferedFare)),
+            onClick = onAccept,
+            enabled = !isPlacing,
+        )
+        val chips = offerChips(trip.riderOfferedFare, trip.fareRange.max)
+        if (chips.isNotEmpty()) {
+            Spacer(Modifier.height(16.dp))
+            Text(
+                stringResource(R.string.captain_offer_your_fare),
+                style = DarrbiTheme.typography.title.copy(fontSize = 16.sp),
+                color = DarrbiTheme.colors.onSurface,
+                modifier = Modifier.fillMaxWidth(),
+                textAlign = TextAlign.Center,
             )
-            Spacer(Modifier.height(8.dp))
+            Spacer(Modifier.height(12.dp))
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                chips.forEach { amount ->
+                    OfferChip(amount = amount, enabled = !isPlacing, onClick = { onOffer(amount.toDouble()) }, modifier = Modifier.weight(1f))
+                }
+            }
+        }
+        Spacer(Modifier.height(12.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(52.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = !isPlacing, onClick = onCancel),
+            shape = RoundedCornerShape(14.dp),
+            color = DarrbiTheme.colors.surfaceVariant,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.common_cancel), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onSurface)
+            }
         }
     }
 }
+
+@Composable
+private fun OfferChip(amount: Int, enabled: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.height(48.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled, onClick = onClick),
+        shape = RoundedCornerShape(12.dp),
+        color = DarrbiTheme.colors.surface,
+        border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline),
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Text(
+                stringResource(R.string.captain_sar, amount.toString()),
+                style = DarrbiTheme.typography.bodyMedium,
+                color = DarrbiTheme.colors.onSurfaceVariant,
+            )
+        }
+    }
+}
+
+/** Three quick higher-fare offers, rounded to the nearest 5 and clamped to the trip's max. */
+private fun offerChips(offered: Double, max: Double): List<Int> =
+    (1..3).map { (Math.round((offered + 5 * it) / 5.0) * 5).toInt() }
+        .filter { it > offered.toInt() && it.toDouble() <= max }
+        .distinct()
 
 /** Maps a V2 bid error code to a friendly message. */
 @Composable
