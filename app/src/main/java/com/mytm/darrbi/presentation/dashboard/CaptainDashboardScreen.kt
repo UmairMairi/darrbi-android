@@ -653,12 +653,12 @@ private fun OpenTripCard(trip: OpenTrip, onClick: () -> Unit) {
         border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline),
         shadowElevation = 1.dp,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = trip.riderImageUrl,
                     contentDescription = null,
-                    modifier = Modifier.size(44.dp).clip(CircleShape),
+                    modifier = Modifier.size(40.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop,
                     placeholder = painterResource(R.drawable.user_placeholder),
                     error = painterResource(R.drawable.user_placeholder),
@@ -686,9 +686,9 @@ private fun OpenTripCard(trip: OpenTrip, onClick: () -> Unit) {
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             HorizontalDivider(color = DarrbiTheme.colors.outline)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.captain_sar, formatAmount(trip.riderOfferedFare)),
@@ -702,7 +702,7 @@ private fun OpenTripCard(trip: OpenTrip, onClick: () -> Unit) {
                     color = DarrbiTheme.colors.onSurfaceVariant,
                 )
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(10.dp))
             Surface(shape = RoundedCornerShape(12.dp), color = DarrbiTheme.colors.surface, border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline)) {
                 Column {
                     AddressRow(stringResource(R.string.captain_pickup), trip.pickup.address, DarrbiTheme.colors.primary)
@@ -716,7 +716,7 @@ private fun OpenTripCard(trip: OpenTrip, onClick: () -> Unit) {
 
 @Composable
 private fun AddressRow(label: String, address: String, dotColor: Color) {
-    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 12.dp), verticalAlignment = Alignment.Top) {
+    Row(modifier = Modifier.padding(horizontal = 14.dp, vertical = 10.dp), verticalAlignment = Alignment.Top) {
         Box(modifier = Modifier.padding(top = 5.dp).size(10.dp).clip(CircleShape).border(2.dp, dotColor, CircleShape))
         Spacer(Modifier.width(12.dp))
         Column {

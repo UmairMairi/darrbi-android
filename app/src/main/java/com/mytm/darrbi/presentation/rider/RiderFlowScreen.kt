@@ -1920,12 +1920,12 @@ private fun OfferCard(
         color = DarrbiTheme.colors.surface,
         shadowElevation = 2.dp,
     ) {
-        Column(modifier = Modifier.padding(16.dp)) {
+        Column(modifier = Modifier.padding(14.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 AsyncImage(
                     model = bid.driverImageUrl,
                     contentDescription = null,
-                    modifier = Modifier.size(48.dp).clip(CircleShape),
+                    modifier = Modifier.size(44.dp).clip(CircleShape),
                     contentScale = ContentScale.Crop,
                     placeholder = painterResource(R.drawable.user_placeholder),
                     error = painterResource(R.drawable.user_placeholder),
@@ -1952,13 +1952,13 @@ private fun OfferCard(
                     }
                 }
             }
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             TtlBar(bidId = bid.bidId)
-            Spacer(Modifier.height(12.dp))
+            Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
                     text = stringResource(R.string.rider_sar_amount, formatFare(bid.fare)),
-                    style = DarrbiTheme.typography.titleLarge.copy(fontSize = 24.sp),
+                    style = DarrbiTheme.typography.titleLarge.copy(fontSize = 22.sp),
                     color = DarrbiTheme.colors.onSurface,
                 )
                 Spacer(Modifier.weight(1f))
@@ -1967,7 +1967,7 @@ private fun OfferCard(
                 val sub = listOfNotNull(dist, eta).joinToString(" • ")
                 if (sub.isNotBlank()) Text(sub, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
             }
-            Spacer(Modifier.height(14.dp))
+            Spacer(Modifier.height(12.dp))
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Surface(
                     modifier = Modifier.weight(1f).height(54.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = enabled, onClick = onDecline),
