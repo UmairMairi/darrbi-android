@@ -34,8 +34,12 @@ data class OpenTrip(
     val riderOfferedFare: Double,
     val expiresAtMillis: Long?,
     val createdAtMillis: Long?,
+    /** Rider PII (guide §5.1) shown on the broadcast card so the captain knows who's requesting. */
+    val riderId: String?,
     val riderName: String?,
+    val riderArabicName: String?,
     val riderRating: Double?,
+    val riderTotalReviews: Int?,
     val riderImageUrl: String?,
 )
 
@@ -50,11 +54,16 @@ data class Bid(
     val etaToPickupSec: Int?,
     val pickupDistanceKm: Double?,
     val message: String?,
+    /** Driver PII (guide §6.2) shown on the bid card so the rider can choose. */
     val driverName: String?,
+    val driverArabicName: String? = null,
+    val driverMobile: String? = null,
     val driverRating: Double?,
+    val driverTotalReviews: Int? = null,
     val driverImageUrl: String?,
-    /** Driver's vehicle, e.g. "Toyota - Corolla" (when the backend provides it). */
+    /** Driver's vehicle, e.g. "Camry · Grey" (built from the bid's vehicle block when provided). */
     val driverCar: String? = null,
+    val driverPlateNo: String? = null,
 )
 
 /** Result of creating a BID trip: the open trip id, status, and the authoritative fare range. */

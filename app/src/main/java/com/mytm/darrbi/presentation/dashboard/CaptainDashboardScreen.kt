@@ -764,7 +764,7 @@ private fun OpenTripCard(trip: OpenTrip, onClick: () -> Unit) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(formatRating(rating), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                        Text(ratingLabel(rating, trip.riderTotalReviews), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
                     }
                 }
             }
@@ -1183,7 +1183,7 @@ private fun RequestDetailContent(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(4.dp))
-                    Text(formatRating(rating), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                    Text(ratingLabel(rating, trip.riderTotalReviews), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
                 }
             }
         }
@@ -1283,6 +1283,12 @@ private fun bidErrorText(code: String): String = when (code) {
 }
 
 private fun formatRating(rating: Double): String = String.format(java.util.Locale.US, "%.1f/5", rating)
+
+/** Rating with the review count appended ("4.8 (36)") when reviews are known; bare rating otherwise. */
+@Composable
+private fun ratingLabel(rating: Double, reviews: Int?): String =
+    if (reviews != null && reviews > 0) stringResource(R.string.captain_rating_reviews, formatRating(rating), reviews)
+    else formatRating(rating)
 
 private fun clockTime(millis: Long?): String? = millis?.let {
     runCatching { java.text.SimpleDateFormat("h:mm a", java.util.Locale.getDefault()).format(java.util.Date(it)) }.getOrNull()

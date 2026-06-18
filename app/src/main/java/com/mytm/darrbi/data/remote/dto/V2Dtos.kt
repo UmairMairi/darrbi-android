@@ -24,6 +24,45 @@ data class V2PointDto(
     val longitude: Double? = null,
 )
 
+/**
+ * Rider PII embedded in every driver-facing open-trip item (guide §5.1, rev 2026-06-18) so the captain
+ * sees who is requesting before bidding. `rating`/`totalReviews` are 0 for a brand-new rider.
+ */
+@Serializable
+data class RiderProfileDto(
+    val riderId: String? = null,
+    val name: String? = null,
+    val arabicName: String? = null,
+    val profileImage: String? = null,
+    val rating: Double? = null,
+    val totalReviews: Int? = null,
+)
+
+/** The driver's vehicle embedded in the `driver` bid block (`null` when no cab/plate on file yet). */
+@Serializable
+data class VehicleDto(
+    val plateNo: String? = null,
+    val sequenceNo: String? = null,
+    val model: String? = null,
+    val color: String? = null,
+)
+
+/**
+ * Driver PII embedded in every rider-facing bid (guide §6.2) so the rider can choose a driver. Includes
+ * the vehicle; `rating`/`totalReviews` are 0 for a new driver.
+ */
+@Serializable
+data class DriverProfileDto(
+    val driverId: String? = null,
+    val name: String? = null,
+    val arabicName: String? = null,
+    val profileImage: String? = null,
+    val mobile: String? = null,
+    val rating: Double? = null,
+    val totalReviews: Int? = null,
+    val vehicle: VehicleDto? = null,
+)
+
 /** One open (awaiting-bids) trip in the driver's broadcast list. */
 @Serializable
 data class OpenTripDto(
@@ -39,7 +78,9 @@ data class OpenTripDto(
     val riderOfferedFare: Double? = null,
     val requestExpiresAt: String? = null,
     val createdAt: String? = null,
-    // Tolerant optional — the reference card shows these but they aren't in the documented payload yet.
+    /** Rider PII block (guide §5.1). Preferred over the legacy flat fields below. */
+    val rider: RiderProfileDto? = null,
+    // Legacy flat fields — kept as a fallback for older payloads that don't nest the rider block.
     val riderName: String? = null,
     val riderRating: Double? = null,
     val riderImage: String? = null,
@@ -66,13 +107,14 @@ data class BidDto(
     val etaToPickupSec: Int? = null,
     val pickupDistanceKm: Double? = null,
     val message: String? = null,
-    // Tolerant optional driver display info for the rider's bid list.
+    /** Driver PII block incl. vehicle (guide §6.2). Preferred over the legacy flat fields below. */
+    val driver: DriverProfileDto? = null,
+    // Legacy flat fields — kept as a fallback for older payloads that don't nest the driver block.
     val driverName: String? = null,
     val driverRating: Double? = null,
     val driverImage: String? = null,
     val driverCar: String? = null,
     val carName: String? = null,
-    val vehicle: String? = null,
 )
 
 /** `GET v2/trips/:id/bids` → `data:{ tripId, tripStatus, riderOfferedFare, currency, bids }`. */

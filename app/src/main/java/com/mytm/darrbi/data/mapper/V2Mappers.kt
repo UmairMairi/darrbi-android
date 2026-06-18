@@ -5,6 +5,7 @@ import com.mytm.darrbi.data.remote.dto.CreateBidTripData
 import com.mytm.darrbi.data.remote.dto.FareRangeDto
 import com.mytm.darrbi.data.remote.dto.OpenTripDto
 import com.mytm.darrbi.data.remote.dto.SelectBidData
+import com.mytm.darrbi.data.remote.dto.VehicleDto
 import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.BidStatus
 import com.mytm.darrbi.domain.model.BidTrip
@@ -45,9 +46,13 @@ fun OpenTripDto.toDomain(): OpenTrip? {
         riderOfferedFare = riderOfferedFare ?: fareRange?.riderOfferedFare ?: 0.0,
         expiresAtMillis = parseV2IsoMillis(requestExpiresAt),
         createdAtMillis = parseV2IsoMillis(createdAt),
-        riderName = riderName?.takeIf { it.isNotBlank() },
-        riderRating = riderRating,
-        riderImageUrl = riderImage?.takeIf { it.isNotBlank() },
+        // Prefer the nested rider PII block (guide §5.1); fall back to the legacy flat fields.
+        riderId = rider?.riderId?.takeIf { it.isNotBlank() },
+        riderName = (rider?.name ?: riderName)?.takeIf { it.isNotBlank() },
+        riderArabicName = rider?.arabicName?.takeIf { it.isNotBlank() },
+        riderRating = (rider?.rating ?: riderRating)?.takeIf { it > 0.0 },
+        riderTotalReviews = rider?.totalReviews,
+        riderImageUrl = (rider?.profileImage ?: riderImage)?.takeIf { it.isNotBlank() },
     )
 }
 
@@ -64,12 +69,23 @@ fun BidDto.toDomain(): Bid? {
         etaToPickupSec = etaToPickupSec,
         pickupDistanceKm = pickupDistanceKm,
         message = message?.takeIf { it.isNotBlank() },
-        driverName = driverName?.takeIf { it.isNotBlank() },
-        driverRating = driverRating,
-        driverImageUrl = driverImage?.takeIf { it.isNotBlank() },
-        driverCar = listOfNotNull(driverCar, carName, vehicle).firstOrNull { it.isNotBlank() },
+        // Prefer the nested driver PII block (guide §6.2); fall back to the legacy flat fields.
+        driverName = (driver?.name ?: driverName)?.takeIf { it.isNotBlank() },
+        driverArabicName = driver?.arabicName?.takeIf { it.isNotBlank() },
+        driverMobile = driver?.mobile?.takeIf { it.isNotBlank() },
+        driverRating = (driver?.rating ?: driverRating)?.takeIf { it > 0.0 },
+        driverTotalReviews = driver?.totalReviews,
+        driverImageUrl = (driver?.profileImage ?: driverImage)?.takeIf { it.isNotBlank() },
+        driverCar = driver?.vehicle?.displayName()
+            ?: listOfNotNull(driverCar, carName).firstOrNull { it.isNotBlank() },
+        driverPlateNo = driver?.vehicle?.plateNo?.takeIf { it.isNotBlank() },
     )
 }
+
+/** "Model · Color" (whichever parts are present), or null when the vehicle carries no displayable text. */
+private fun VehicleDto.displayName(): String? =
+    listOfNotNull(model?.takeIf { it.isNotBlank() }, color?.takeIf { it.isNotBlank() })
+        .joinToString(" · ").takeIf { it.isNotBlank() }
 
 fun CreateBidTripData.toDomain(offeredFallback: Double): BidTrip = BidTrip(
     tripId = id.orEmpty(),

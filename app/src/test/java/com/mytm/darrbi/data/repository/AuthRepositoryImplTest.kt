@@ -38,7 +38,10 @@ class AuthRepositoryImplTest {
             .create(AuthApi::class.java)
         repository = AuthRepositoryImpl(
             authApi = api,
-            deviceInfoProvider = object : DeviceInfoProvider { override val deviceId = "test-device" },
+            deviceInfoProvider = object : DeviceInfoProvider {
+                override val deviceId = "test-device"
+                override suspend fun fcmToken() = "test-fcm-token"
+            },
         )
     }
 

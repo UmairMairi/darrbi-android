@@ -1945,10 +1945,16 @@ private fun OfferCard(
                     }
                 }
                 bid.driverRating?.let { rating ->
+                    val ratingText = String.format(Locale.US, "%.1f/5", rating)
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.width(4.dp))
-                        Text(String.format(Locale.US, "%.1f/5", rating), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                        Text(
+                            text = bid.driverTotalReviews?.takeIf { it > 0 }
+                                ?.let { stringResource(R.string.rider_rating_reviews, ratingText, it) } ?: ratingText,
+                            style = DarrbiTheme.typography.label,
+                            color = DarrbiTheme.colors.onSurfaceVariant,
+                        )
                     }
                 }
             }

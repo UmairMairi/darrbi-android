@@ -431,7 +431,8 @@ class SocketServiceImpl @Inject constructor(
             ACTION_TRIP_REQUEST -> {
                 val request = parseRideRequest(json)
                 if (request != null) {
-                    Log.d(TAG, "$TRIP_DETAIL → TripRequest(rider=${request.riderName}, earn=${request.estimateEarning})")
+                    // Don't log the rider's name (PII) — just the trip id and earning.
+                    Log.d(TAG, "$TRIP_DETAIL → TripRequest(trip=${request.tripId}, earn=${request.estimateEarning})")
                     _tripEvents.tryEmit(TripSocketEvent.TripRequest(request))
                 } else {
                     Log.w(TAG, "$TRIP_DETAIL trip_request: could not parse request")
