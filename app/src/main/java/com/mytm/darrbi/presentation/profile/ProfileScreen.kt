@@ -9,6 +9,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -36,7 +37,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
@@ -326,7 +326,7 @@ private fun WalletCard(balance: String, onClick: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Image(
-                painter = painterResource(R.mipmap.ic_launcher_foreground),
+                painter = painterResource(R.drawable.icon_darrbi),
                 contentDescription = null,
                 modifier = Modifier.size(36.dp),
             )
@@ -383,37 +383,46 @@ private fun EhsanDonationRow(checked: Boolean, onCheckedChange: (Boolean) -> Uni
     }
 }
 
-/** RIDER / CAPTAIN segmented toggle — the active mode's half is filled green (per the reference). */
+/**
+ * RIDER / CAPTAIN segmented toggle (per the reference): a grey rounded track with the active mode shown as
+ * a raised bright-green pill (shadow), dark label on green, light label on the grey side.
+ */
 @Composable
 private fun ModeToggle(isCaptain: Boolean, onRider: () -> Unit, onCaptain: () -> Unit) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(50))
-            .background(DarrbiTheme.colors.surfaceVariant)
-            .padding(4.dp),
+            .height(56.dp)
+            // Background carries the rounded shape WITHOUT clipping, so the active pill's shadow shows.
+            .background(DarrbiTheme.colors.modeTrack, RoundedCornerShape(28.dp))
+            .padding(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        ModeSegment(stringResource(R.string.mode_rider), active = !isCaptain, modifier = Modifier.weight(1f), onClick = onRider)
-        ModeSegment(stringResource(R.string.mode_captain), active = isCaptain, modifier = Modifier.weight(1f), onClick = onCaptain)
+        ModeSegment(stringResource(R.string.mode_rider), active = !isCaptain, modifier = Modifier.weight(1f).fillMaxHeight(), onClick = onRider)
+        ModeSegment(stringResource(R.string.mode_captain), active = isCaptain, modifier = Modifier.weight(1f).fillMaxHeight(), onClick = onCaptain)
     }
 }
 
 @Composable
 private fun ModeSegment(label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
-    Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (active) DarrbiTheme.colors.primary else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(vertical = 12.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Text(
-            text = label,
-            style = DarrbiTheme.typography.button,
-            color = if (active) DarrbiTheme.colors.onPrimary else DarrbiTheme.colors.onSurfaceVariant,
-        )
+    if (active) {
+        Surface(
+            modifier = modifier.clickable(onClick = onClick),
+            shape = RoundedCornerShape(24.dp),
+            color = DarrbiTheme.colors.modeAccent,
+            shadowElevation = 4.dp,
+        ) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text(text = label, style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onModeAccent)
+            }
+        }
+    } else {
+        Box(
+            modifier = modifier.clickable(onClick = onClick),
+            contentAlignment = Alignment.Center,
+        ) {
+            Text(text = label, style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onModeTrack)
+        }
     }
 }
 

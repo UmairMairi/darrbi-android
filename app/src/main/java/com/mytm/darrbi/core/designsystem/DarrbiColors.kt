@@ -35,6 +35,12 @@ data class DarrbiColors(
     val splashBackground: Color,
     /** Bright accent green for the RIDER/CAPTAIN mode toggle's active segment (per the design). */
     val modeAccent: Color,
+    /** Label on the active (green) mode segment — dark, since [modeAccent] is bright. */
+    val onModeAccent: Color,
+    /** Grey track behind the RIDER/CAPTAIN toggle. */
+    val modeTrack: Color,
+    /** Label on the inactive (grey) mode segment. */
+    val onModeTrack: Color,
     /** Pastel background tints for the rider home category tiles, applied cyclically by tile index. */
     val categoryTints: List<Color>,
 )
@@ -68,6 +74,9 @@ val LightDarrbiColors = DarrbiColors(
     inputBorder = Color(0xFFE2E2E2),
     splashBackground = Black,
     modeAccent = ModeGreen,
+    onModeAccent = NearBlack,
+    modeTrack = Color(0xFF8E8E8E),
+    onModeTrack = White,
     categoryTints = listOf(
         Color(0xFFE7F6EC), // mint  — Derrbi Taxi
         Color(0xFFF1F2F4), // grey  — Car Rental
@@ -99,6 +108,9 @@ val DarkDarrbiColors = DarrbiColors(
     inputBorder = Color(0xFF545454),
     splashBackground = Black,
     modeAccent = ModeGreen,
+    onModeAccent = NearBlack,
+    modeTrack = Color(0xFF3A3A3A),
+    onModeTrack = White,
     categoryTints = listOf(
         Color(0xFF15301E), // muted green — Derrbi Taxi
         Color(0xFF262829), // muted grey  — Car Rental
