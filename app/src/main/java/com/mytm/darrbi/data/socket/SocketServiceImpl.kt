@@ -85,7 +85,10 @@ class SocketServiceImpl @Inject constructor(
     override fun connect() {
         socket?.let {
             if (it.connected()) {
-                Log.d(TAG, "connect(): already connected")
+                // Already connected → re-assert the user's room so user-targeted pushes (bid updates,
+                // trip-detail) reach the CURRENT user even if the socket connected before login/with a stale id.
+                Log.d(TAG, "connect(): already connected; re-subscribing")
+                subscribeUser()
                 return
             }
             Log.d(TAG, "connect(): reconnecting existing socket")

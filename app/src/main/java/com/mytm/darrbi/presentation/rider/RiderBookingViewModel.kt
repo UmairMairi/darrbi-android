@@ -715,6 +715,9 @@ class RiderBookingViewModel @Inject constructor(
         val pickup = state.pickup ?: return
         val destination = state.destination ?: return
         if (state.isCreatingBidTrip) return
+        // Ensure the rider's socket is connected + subscribed to their room so the `v2/trip-bids-update`
+        // pushes (and the eventual bid-accepted) are delivered while bidding.
+        socketService.connect()
         _state.update { it.copy(isCreatingBidTrip = true, offeredFare = fare, errorMessage = null) }
         viewModelScope.launch {
             when (val result = createBidTrip(pickup, destination, cab.id, state.selectedCategory?.id, fare)) {
