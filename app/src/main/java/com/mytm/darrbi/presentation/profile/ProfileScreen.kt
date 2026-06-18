@@ -23,9 +23,12 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -33,6 +36,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.res.painterResource
@@ -74,6 +78,7 @@ fun ProfileScreen(
     var showLogout by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var showAddBalance by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var showUpdateIban by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    var ehsanDonation by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
     val context = androidx.compose.ui.platform.LocalContext.current
     val inviteMessage = stringResource(R.string.invite_share_message)
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -86,16 +91,11 @@ fun ProfileScreen(
     val balanceText = state.balance?.let { b ->
         if (b % 1.0 == 0.0) b.toLong().toString() else b.toString()
     } ?: "—"
+    // RIDER/CAPTAIN now lives in the segmented toggle below the wallet (per the reference), not the menu.
     val menu = buildList {
-        // Rider profile only: switch into captain mode (replaces the old home RIDER/CAPTAIN toggle).
-        onSwitchToCaptain?.let { add(ProfileMenuItem(R.drawable.icon_car, R.string.profile_switch_to_captain, it)) }
-        // Captain profile only: switch back to rider mode.
-        onSwitchToRider?.let { add(ProfileMenuItem(R.drawable.icon_car, R.string.profile_switch_to_rider, it)) }
-        add(ProfileMenuItem(R.drawable.icon_subscription, R.string.menu_subscription) {})
         add(ProfileMenuItem(R.drawable.icon_car_details, R.string.menu_car_deal_details) {})
         add(ProfileMenuItem(R.drawable.icon_saved_cards, R.string.menu_saved_cards) {})
         add(ProfileMenuItem(R.drawable.icon_my_rides, R.string.menu_my_rides, onMyRides))
-        add(ProfileMenuItem(R.drawable.iv_report, R.string.menu_my_reports, onMyReports))
         add(ProfileMenuItem(R.drawable.icon_app_settings, R.string.menu_app_settings, onAppSettings))
         add(ProfileMenuItem(R.drawable.icon_customer_care, R.string.menu_customer_care, onCustomerCare))
         add(ProfileMenuItem(R.drawable.icon_terms_conditions, R.string.menu_terms_conditions, onTerms))
@@ -133,8 +133,17 @@ fun ProfileScreen(
                     .padding(horizontal = 20.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp),
             ) {
-                ProfileHeaderCard(userName, dateOfBirth, referralCode)
-                BalanceCard(balanceText, onViewBalanceDetails) { showAddBalance = true }
+                ProfileHeaderCard(userName, dateOfBirth, user?.rating, referralCode)
+                WalletCard(balanceText) { showAddBalance = true }
+                EhsanDonationRow(checked = ehsanDonation, onCheckedChange = { ehsanDonation = it })
+                // RIDER/CAPTAIN segmented toggle — captain profile exposes onSwitchToRider; rider, onSwitchToCaptain.
+                if (onSwitchToRider != null || onSwitchToCaptain != null) {
+                    ModeToggle(
+                        isCaptain = onSwitchToRider != null,
+                        onRider = { onSwitchToRider?.invoke() },
+                        onCaptain = { onSwitchToCaptain?.invoke() },
+                    )
+                }
                 // IBAN card appears only when the user has a saved IBAN (from get-iban).
                 state.iban?.takeIf { it.isNotBlank() }?.let { iban ->
                     IbanCard(iban, state.bank.orEmpty()) { showUpdateIban = true }
@@ -210,7 +219,7 @@ private fun ProfileCard(content: @Composable androidx.compose.foundation.layout.
 }
 
 @Composable
-private fun ProfileHeaderCard(userName: String, dateOfBirth: String, referralCode: String) {
+private fun ProfileHeaderCard(userName: String, dateOfBirth: String, rating: Double?, referralCode: String) {
     ProfileCard {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Box(modifier = Modifier.size(60.dp)) {
@@ -239,23 +248,38 @@ private fun ProfileHeaderCard(userName: String, dateOfBirth: String, referralCod
                 )
                 Spacer(Modifier.height(4.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Image(
-                        painter = painterResource(R.drawable.icon_dob),
-                        contentDescription = null,
-                        modifier = Modifier.size(18.dp),
-                    )
-                    Spacer(Modifier.width(6.dp))
-                    Text(
-                        text = dateOfBirth,
-                        style = DarrbiTheme.typography.label,
-                        color = DarrbiTheme.colors.onSurfaceVariant,
-                    )
-                    Spacer(Modifier.width(10.dp))
-                    Text(
-                        text = stringResource(R.string.profile_status_good),
-                        style = DarrbiTheme.typography.label,
-                        color = DarrbiTheme.colors.onSurfaceVariant,
-                    )
+                    if (dateOfBirth.isNotBlank()) {
+                        Image(
+                            painter = painterResource(R.drawable.icon_dob),
+                            contentDescription = null,
+                            modifier = Modifier.size(18.dp),
+                        )
+                        Spacer(Modifier.width(6.dp))
+                        Text(
+                            text = dateOfBirth,
+                            style = DarrbiTheme.typography.label,
+                            color = DarrbiTheme.colors.onSurfaceVariant,
+                        )
+                    }
+                    if (rating != null) {
+                        if (dateOfBirth.isNotBlank()) {
+                            Spacer(Modifier.width(10.dp))
+                            Box(modifier = Modifier.width(1.dp).height(14.dp).background(DarrbiTheme.colors.outline))
+                            Spacer(Modifier.width(10.dp))
+                        }
+                        Icon(
+                            imageVector = Icons.Filled.Star,
+                            contentDescription = null,
+                            tint = DarrbiTheme.colors.warning,
+                            modifier = Modifier.size(16.dp),
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = stringResource(R.string.profile_rating, formatRating(rating)),
+                            style = DarrbiTheme.typography.label,
+                            color = DarrbiTheme.colors.onSurfaceVariant,
+                        )
+                    }
                 }
             }
         }
@@ -287,11 +311,33 @@ private fun ProfileHeaderCard(userName: String, dateOfBirth: String, referralCod
     }
 }
 
+/** Green "Derrbi Wallet" card: brand mark + name on the left, Balance/SAR on the right; tap to top up. */
 @Composable
-private fun BalanceCard(balance: String, onViewDetails: () -> Unit, onTopup: () -> Unit = {}) {
-    ProfileCard {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Column {
+private fun WalletCard(balance: String, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable(onClick = onClick),
+        shape = RoundedCornerShape(16.dp),
+        color = DarrbiTheme.colors.primary.copy(alpha = 0.12f),
+    ) {
+        Row(
+            modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Image(
+                painter = painterResource(R.mipmap.ic_launcher_foreground),
+                contentDescription = null,
+                modifier = Modifier.size(36.dp),
+            )
+            Spacer(Modifier.width(8.dp))
+            Text(
+                text = stringResource(R.string.profile_wallet_name),
+                style = DarrbiTheme.typography.title,
+                color = DarrbiTheme.colors.onSurface,
+            )
+            Spacer(Modifier.weight(1f))
+            Column(horizontalAlignment = Alignment.End) {
                 Text(
                     text = stringResource(R.string.profile_balance),
                     style = DarrbiTheme.typography.label,
@@ -303,18 +349,76 @@ private fun BalanceCard(balance: String, onViewDetails: () -> Unit, onTopup: () 
                     color = DarrbiTheme.colors.onSurface,
                 )
             }
-            Spacer(Modifier.weight(1f))
-            Text(
-                text = stringResource(R.string.profile_view_details),
-                style = DarrbiTheme.typography.button,
-                color = DarrbiTheme.colors.primary,
-                modifier = Modifier.clickable(onClick = onViewDetails),
-            )
         }
-        Spacer(Modifier.height(14.dp))
-        TonalGreenButton(text = stringResource(R.string.profile_topup), onClick = onTopup)
     }
 }
+
+/** "Ehsan Donation" round-up toggle row (standalone over the grey background, per the reference). */
+@Composable
+private fun EhsanDonationRow(checked: Boolean, onCheckedChange: (Boolean) -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Text(
+            text = stringResource(R.string.profile_ehsan_donation),
+            style = DarrbiTheme.typography.bodyMedium,
+            color = DarrbiTheme.colors.onSurface,
+            modifier = Modifier.weight(1f),
+        )
+        Switch(
+            checked = checked,
+            onCheckedChange = onCheckedChange,
+            colors = SwitchDefaults.colors(
+                checkedThumbColor = DarrbiTheme.colors.onPrimary,
+                checkedTrackColor = DarrbiTheme.colors.primary,
+                checkedBorderColor = DarrbiTheme.colors.primary,
+                uncheckedThumbColor = DarrbiTheme.colors.surface,
+                uncheckedTrackColor = DarrbiTheme.colors.outline,
+                uncheckedBorderColor = DarrbiTheme.colors.outline,
+            ),
+        )
+    }
+}
+
+/** RIDER / CAPTAIN segmented toggle — the active mode's half is filled green (per the reference). */
+@Composable
+private fun ModeToggle(isCaptain: Boolean, onRider: () -> Unit, onCaptain: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(50))
+            .background(DarrbiTheme.colors.surfaceVariant)
+            .padding(4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        ModeSegment(stringResource(R.string.mode_rider), active = !isCaptain, modifier = Modifier.weight(1f), onClick = onRider)
+        ModeSegment(stringResource(R.string.mode_captain), active = isCaptain, modifier = Modifier.weight(1f), onClick = onCaptain)
+    }
+}
+
+@Composable
+private fun ModeSegment(label: String, active: Boolean, modifier: Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(50))
+            .background(if (active) DarrbiTheme.colors.primary else Color.Transparent)
+            .clickable(onClick = onClick)
+            .padding(vertical = 12.dp),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = label,
+            style = DarrbiTheme.typography.button,
+            color = if (active) DarrbiTheme.colors.onPrimary else DarrbiTheme.colors.onSurfaceVariant,
+        )
+    }
+}
+
+/** Formats a rating to one decimal place (e.g. 4.2). */
+private fun formatRating(rating: Double): String = String.format(java.util.Locale.US, "%.1f", rating)
 
 /** Opens the Android share sheet to invite friends (ride-android's invite action). */
 private fun shareInvite(context: android.content.Context, message: String) {

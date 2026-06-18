@@ -83,6 +83,9 @@
     <string name="profile_view_details">View Details</string>
     <string name="profile_topup">Topup</string>
     <string name="profile_currency_sar">SAR</string>
+    <string name="profile_rating">%1$s/5</string>
+    <string name="profile_wallet_name">Derrbi Wallet</string>
+    <string name="profile_ehsan_donation">Ehsan Donation</string>
     <string name="profile_iban">IBAN</string>
     <string name="profile_bank">Bank</string>
     <string name="profile_update_iban">Update IBAN</string>

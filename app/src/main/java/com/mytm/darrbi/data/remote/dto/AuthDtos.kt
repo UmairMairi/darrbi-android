@@ -48,5 +48,7 @@ data class VerifyOtpData(
         val referralCode: String? = null,
         val mobileNo: String? = null,
         val profileImage: String? = null,
+        /** Average rating (shown on the profile header); present for users who have it on file. */
+        val rating: Double? = null,
     )
 }

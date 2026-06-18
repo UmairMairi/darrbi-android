@@ -10,4 +10,6 @@ data class UserProfile(
     val referralCode: String?,
     val mobileNo: String?,
     val profileImageUrl: String?,
+    /** Average rating shown on the profile header (null when not provided by the backend). */
+    val rating: Double? = null,
 )

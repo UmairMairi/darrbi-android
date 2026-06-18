@@ -30,5 +30,6 @@ private fun VerifyOtpData.UserDetails?.toUserProfile(): UserProfile {
         referralCode = this?.referralCode,
         mobileNo = this?.mobileNo,
         profileImageUrl = this?.profileImage,
+        rating = this?.rating?.takeIf { it > 0.0 },
     )
 }

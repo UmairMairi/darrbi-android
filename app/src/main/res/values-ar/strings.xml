@@ -83,6 +83,9 @@
     <string name="profile_view_details">عرض التفاصيل</string>
     <string name="profile_topup">شحن الرصيد</string>
     <string name="profile_currency_sar">ر.س</string>
+    <string name="profile_rating">%1$s/5</string>
+    <string name="profile_wallet_name">محفظة دربي</string>
+    <string name="profile_ehsan_donation">تبرع إحسان</string>
     <string name="profile_iban">رقم الآيبان</string>
     <string name="profile_bank">البنك</string>
     <string name="profile_update_iban">تحديث الآيبان</string>
