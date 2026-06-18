@@ -73,6 +73,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -119,6 +120,7 @@ import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.repository.NearbyDriver
 import com.mytm.darrbi.core.designsystem.DarrbiTheme
 import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
+import com.mytm.darrbi.presentation.components.CancelReasonsSheet
 import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.domain.model.PlaceSuggestion
 import com.mytm.darrbi.presentation.common.LocationPermissionDeniedDialog
@@ -184,6 +186,8 @@ fun RiderFlowScreen(
     BackHandler(enabled = state.step != RiderStep.Home) { viewModel.onEvent(RiderBookingEvent.Back) }
     // While the Help sheet is open, system-back closes it (takes precedence over the step handler).
     BackHandler(enabled = state.showHelp) { viewModel.onEvent(RiderBookingEvent.CloseHelp) }
+    // While the cancellation sheet is open, system-back closes it instead of leaving the trip.
+    BackHandler(enabled = state.showCancelSheet) { viewModel.onEvent(RiderBookingEvent.DismissCancelSheet) }
 
     // One shared camera for every map-backed step, so the recenter button can move it.
     val defaultLocation = LatLng(24.7136, 46.6753)
@@ -352,13 +356,27 @@ fun RiderFlowScreen(
                 onHeight = { routeSheetHeightPx = it },
             )
             RiderStep.DriverOnWay -> state.acceptedTrip?.let { trip ->
-                DriverOnWayOverlay(
-                    trip = trip,
-                    onCall = { trip.driverMobile?.let { dialNumber(errorContext, it) } },
-                    onChat = { onChat(trip) },
-                    onCancel = { viewModel.onEvent(RiderBookingEvent.CancelRide) },
-                    onHeight = { routeSheetHeightPx = it },
-                )
+                when {
+                    state.rideCancelled -> RideCancelledOverlay(onDone = { viewModel.onEvent(RiderBookingEvent.CancelDone) })
+                    state.cancelSubmitting -> CancellingOverlay()
+                    state.showCancelSheet -> CancelReasonsSheet(
+                        reasons = state.cancelReasons,
+                        selectedId = state.selectedCancelReasonId,
+                        isLoading = state.cancelReasonsLoading,
+                        isSubmitting = state.cancelSubmitting,
+                        confirmText = stringResource(R.string.cancel_ride_confirm_fee, formatFare(trip.cancellationFee)),
+                        onSelect = { viewModel.onEvent(RiderBookingEvent.SelectCancelReason(it)) },
+                        onSubmit = { viewModel.onEvent(RiderBookingEvent.SubmitCancel) },
+                        modifier = Modifier.align(Alignment.BottomCenter),
+                    )
+                    else -> DriverOnWayOverlay(
+                        trip = trip,
+                        onCall = { trip.driverMobile?.let { dialNumber(errorContext, it) } },
+                        onChat = { onChat(trip) },
+                        onCancel = { viewModel.onEvent(RiderBookingEvent.OpenCancelSheet) },
+                        onHeight = { routeSheetHeightPx = it },
+                    )
+                }
             }
             RiderStep.DriverArrived -> state.acceptedTrip?.let { trip ->
                 DriverArrivedOverlay(
@@ -2040,6 +2058,76 @@ private fun dialNumber(context: android.content.Context, number: String) {
         context.startActivity(
             android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$number")),
         )
+    }
+}
+
+/** "We are cancelling your ride" — shown while the rider-cancelled request is in flight (per the reference). */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.CancellingOverlay() {
+    Surface(
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = DarrbiTheme.colors.surface,
+        shadowElevation = 8.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Image(painterResource(R.drawable.image_car), contentDescription = null, modifier = Modifier.height(72.dp), contentScale = ContentScale.Fit)
+            Spacer(Modifier.height(18.dp))
+            Text(
+                text = stringResource(R.string.cancel_in_progress),
+                style = DarrbiTheme.typography.titleLarge,
+                color = DarrbiTheme.colors.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(16.dp))
+            CircularProgressIndicator(color = DarrbiTheme.colors.primary, modifier = Modifier.size(26.dp), strokeWidth = 2.dp)
+        }
+    }
+}
+
+/** "Your ride is cancelled" + Done — the final cancellation confirmation (per the reference). */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.RideCancelledOverlay(onDone: () -> Unit) {
+    Surface(
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth(),
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = DarrbiTheme.colors.surface,
+        shadowElevation = 8.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 24.dp, vertical = 28.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+        ) {
+            Box(contentAlignment = Alignment.BottomEnd) {
+                Image(painterResource(R.drawable.image_car), contentDescription = null, modifier = Modifier.height(72.dp), contentScale = ContentScale.Fit)
+                Box(
+                    modifier = Modifier.size(26.dp).clip(CircleShape).background(DarrbiTheme.colors.buttonContainer),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.Close, contentDescription = null, tint = DarrbiTheme.colors.onButton, modifier = Modifier.size(16.dp))
+                }
+            }
+            Spacer(Modifier.height(18.dp))
+            Text(
+                text = stringResource(R.string.cancel_done_title),
+                style = DarrbiTheme.typography.titleLarge,
+                color = DarrbiTheme.colors.onSurface,
+                textAlign = TextAlign.Center,
+            )
+            Spacer(Modifier.height(22.dp))
+            Surface(
+                modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(14.dp)).clickable(onClick = onDone),
+                shape = RoundedCornerShape(14.dp),
+                color = DarrbiTheme.colors.buttonContainer,
+            ) {
+                Box(contentAlignment = Alignment.Center) {
+                    Text(stringResource(R.string.common_done), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onButton)
+                }
+            }
+        }
     }
 }
 

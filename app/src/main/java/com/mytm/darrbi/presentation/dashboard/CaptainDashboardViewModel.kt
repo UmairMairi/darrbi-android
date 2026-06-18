@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.BidType
+import com.mytm.darrbi.domain.model.CancelReason
+import com.mytm.darrbi.domain.model.CancelReasonType
 import com.mytm.darrbi.domain.model.CaptainDetails
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OngoingTrip
@@ -18,6 +20,7 @@ import com.mytm.darrbi.domain.usecase.AcceptTripUseCase
 import com.mytm.darrbi.domain.usecase.CancelTripByDriverUseCase
 import com.mytm.darrbi.domain.usecase.CompleteTripUseCase
 import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
+import com.mytm.darrbi.domain.usecase.GetCancelReasonsUseCase
 import com.mytm.darrbi.domain.usecase.GetCaptainDetailsUseCase
 import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
 import com.mytm.darrbi.domain.usecase.GetOpenTripsUseCase
@@ -98,6 +101,12 @@ data class CaptainDashboardUiState(
     val isSubmittingReview: Boolean = false,
     /** Whether the 3-dot menu (with Cancel Ride) is open. */
     val showMenu: Boolean = false,
+    /** The cancellation-reasons sheet (shown when the captain taps Cancel Ride). */
+    val showCancelSheet: Boolean = false,
+    val cancelReasons: List<CancelReason> = emptyList(),
+    val cancelReasonsLoading: Boolean = false,
+    val selectedCancelReasonId: String? = null,
+    val isCancelling: Boolean = false,
     // --- V2 broadcast dispatch + bidding ---
     /** Online (accepting/showing broadcast trips) vs offline (banner). Verified → online by default. */
     val isOnline: Boolean = true,
@@ -156,8 +165,14 @@ sealed interface CaptainDashboardEvent {
     data object SubmitRiderRating : CaptainDashboardEvent
     /** Toggle the 3-dot menu (Cancel Ride). */
     data object ToggleMenu : CaptainDashboardEvent
-    /** Cancel the accepted trip from the 3-dot menu. */
+    /** Cancel Ride tapped (3-dot menu) → open the cancellation-reasons sheet. */
     data object CancelTrip : CaptainDashboardEvent
+    /** Pick a cancellation reason in the sheet. */
+    data class SelectCancelReason(val id: String) : CaptainDashboardEvent
+    /** Confirm the cancellation with the selected reason. */
+    data object SubmitCancel : CaptainDashboardEvent
+    /** Dismiss the cancellation-reasons sheet without cancelling. */
+    data object DismissCancelSheet : CaptainDashboardEvent
     data object ConsumeError : CaptainDashboardEvent
     data object ConsumeAccepted : CaptainDashboardEvent
     // --- V2 ---
@@ -188,6 +203,7 @@ class CaptainDashboardViewModel @Inject constructor(
     private val completeTripUseCase: CompleteTripUseCase,
     private val rateRiderUseCase: RateRiderUseCase,
     private val cancelTripByDriver: CancelTripByDriverUseCase,
+    private val getCancelReasons: GetCancelReasonsUseCase,
     private val getOngoingTrip: GetOngoingTripUseCase,
     private val getOpenTrips: GetOpenTripsUseCase,
     private val placeBid: PlaceBidUseCase,
@@ -303,7 +319,10 @@ class CaptainDashboardViewModel @Inject constructor(
             is CaptainDashboardEvent.SelectRiderRating -> _state.update { it.copy(riderStars = event.stars) }
             CaptainDashboardEvent.SubmitRiderRating -> submitRiderRating()
             CaptainDashboardEvent.ToggleMenu -> _state.update { it.copy(showMenu = !it.showMenu) }
-            CaptainDashboardEvent.CancelTrip -> cancelTrip()
+            CaptainDashboardEvent.CancelTrip -> openCancelSheet()
+            is CaptainDashboardEvent.SelectCancelReason -> _state.update { it.copy(selectedCancelReasonId = event.id) }
+            CaptainDashboardEvent.SubmitCancel -> submitCancel()
+            CaptainDashboardEvent.DismissCancelSheet -> _state.update { it.copy(showCancelSheet = false, selectedCancelReasonId = null) }
             CaptainDashboardEvent.ConsumeError -> _state.update { it.copy(errorMessage = null) }
             CaptainDashboardEvent.ConsumeAccepted -> _state.update { it.copy(tripAccepted = false) }
             is CaptainDashboardEvent.SetOnline -> setOnline(event.online)
@@ -650,12 +669,32 @@ class CaptainDashboardViewModel @Inject constructor(
         return km to mins
     }
 
-    /** Cancel Ride (3-dot menu) → cancel server-side and return to the idle dashboard. */
-    private fun cancelTrip() {
+    /** Cancel Ride (3-dot menu) → open the reasons sheet and fetch the captain cancellation reasons. */
+    private fun openCancelSheet() {
+        if (_state.value.activeTrip == null) return
+        _state.update { it.copy(showMenu = false, showCancelSheet = true, selectedCancelReasonId = null, cancelReasonsLoading = _state.value.cancelReasons.isEmpty()) }
+        if (_state.value.cancelReasons.isNotEmpty()) return
+        viewModelScope.launch {
+            when (val result = getCancelReasons(CancelReasonType.CAPTAIN)) {
+                is ApiResult.Success -> _state.update { it.copy(cancelReasons = result.data, cancelReasonsLoading = false) }
+                is ApiResult.Error, is ApiResult.Failure -> _state.update { it.copy(cancelReasonsLoading = false) }
+            }
+        }
+    }
+
+    /** Confirm the cancellation with the selected reason → cancel server-side and return to the dashboard. */
+    private fun submitCancel() {
         val trip = _state.value.activeTrip ?: return
-        _state.update { it.copy(showMenu = false) }
-        viewModelScope.launch { cancelTripByDriver(trip.tripId, trip.destination) }
-        clearActiveTrip()
+        val reason = _state.value.cancelReasons.firstOrNull { it.id == _state.value.selectedCancelReasonId } ?: return
+        if (_state.value.isCancelling) return
+        _state.update { it.copy(isCancelling = true, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = cancelTripByDriver(trip.tripId, reason.text, trip.destination)) {
+                is ApiResult.Success -> clearActiveTrip()
+                is ApiResult.Error -> _state.update { it.copy(isCancelling = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isCancelling = false, errorMessage = result.error.message) }
+            }
+        }
     }
 
     private fun clearActiveTrip() {
@@ -680,6 +719,9 @@ class CaptainDashboardViewModel @Inject constructor(
                 ratingRider = false,
                 riderStars = 0,
                 isSubmittingReview = false,
+                showCancelSheet = false,
+                selectedCancelReasonId = null,
+                isCancelling = false,
             )
         }
     }

@@ -12,6 +12,7 @@ import com.mytm.darrbi.data.remote.dto.OngoingTripData
 import com.mytm.darrbi.data.remote.dto.PromoData
 import com.mytm.darrbi.data.remote.dto.PromoValidateRequest
 import com.mytm.darrbi.data.remote.dto.RecentAddressesData
+import com.mytm.darrbi.data.remote.dto.RejectedReasonDto
 import com.mytm.darrbi.data.remote.dto.ReviewRequest
 import com.mytm.darrbi.data.remote.dto.StartTripRequest
 import com.mytm.darrbi.data.remote.dto.TripExistsData
@@ -95,6 +96,14 @@ interface RideApi {
     /** CAPTAIN cancels an accepted trip (before/while heading to pickup). */
     @PATCH("trips/driver-cancelled/{tripId}")
     suspend fun driverCancelTrip(@Path("tripId") tripId: String, @Body body: DeclineTripRequest): MainEnvelope<JsonElement>
+
+    /** RIDER cancels an accepted trip with a reason. */
+    @PATCH("trips/rider-cancelled/{tripId}")
+    suspend fun riderCancelTrip(@Path("tripId") tripId: String, @Body body: DeclineTripRequest): MainEnvelope<JsonElement>
+
+    /** Cancellation reasons for the picker — `reasonType` 2 = captain, 3 = rider. */
+    @GET("master/rejected-reason/type/{reasonType}")
+    suspend fun getCancelReasons(@Path("reasonType") reasonType: Int): MainEnvelope<List<RejectedReasonDto>>
 
     /** Returns the active trip id when a ride is in progress (used to restore the screen on dashboard entry). */
     @GET("trips/exists")

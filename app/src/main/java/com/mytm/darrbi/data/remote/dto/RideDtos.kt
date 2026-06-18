@@ -110,6 +110,16 @@ data class CreateTripRequest(
     val cardId: String? = null,
 )
 
+/** `GET master/rejected-reason/type/{reasonType}` item — a selectable cancellation reason. */
+@Serializable
+data class RejectedReasonDto(
+    val id: String? = null,
+    val reason: String? = null,
+    val reasonArabic: String? = null,
+    val reasonType: Int? = null,
+    val status: Boolean? = null,
+)
+
 /** `PATCH trips/driver-rejected/{tripId}` body — the captain declines a request (ride-android: DeclineRequestModel). */
 @Serializable
 data class DeclineTripRequest(

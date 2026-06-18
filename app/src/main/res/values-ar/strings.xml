@@ -128,6 +128,13 @@
     <string name="captain_eta_mins">%1$d دقيقة</string>
     <string name="captain_pickup_eta">%1$s كم · %2$s</string>
     <string name="captain_cancel_ride">إلغاء الرحلة</string>
+    <!-- Cancellation reasons sheet (rider + captain) -->
+    <string name="cancel_reasons_title">إلغاء الرحلة؟</string>
+    <string name="cancel_reasons_subtitle">يرجى اختيار سبب الإلغاء</string>
+    <string name="cancel_ride_confirm">إلغاء الرحلة</string>
+    <string name="cancel_ride_confirm_fee">إلغاء الرحلة مقابل %1$s ر.س</string>
+    <string name="cancel_in_progress">جارٍ إلغاء رحلتك</string>
+    <string name="cancel_done_title">تم إلغاء رحلتك</string>
     <string name="captain_menu">القائمة</string>
     <!-- Captain: start trip with OTP -->
     <string name="captain_enter_pin_title">أدخل رمز الراكب لبدء الرحلة</string>

@@ -94,6 +94,7 @@ import com.mytm.darrbi.core.designsystem.components.DarrbiCard
 import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiTextField
+import com.mytm.darrbi.presentation.components.CancelReasonsSheet
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.RideRequest
@@ -218,6 +219,7 @@ fun CaptainDashboardScreen(
 
     // System-back closes an open request detail (back to the list) instead of leaving the dashboard.
     BackHandler(enabled = state.biddingTrip != null) { viewModel.onEvent(CaptainDashboardEvent.DismissBidSheet) }
+    BackHandler(enabled = state.showCancelSheet) { viewModel.onEvent(CaptainDashboardEvent.DismissCancelSheet) }
 
     Box(modifier = Modifier.fillMaxSize()) {
         val request = state.incomingRequest
@@ -367,6 +369,18 @@ fun CaptainDashboardScreen(
                     onDecline = { viewModel.onEvent(CaptainDashboardEvent.DeclineRequest) },
                 )
             }
+        } else if (active != null && state.showCancelSheet) {
+            // Cancel Ride → reasons picker over the route map (driver-cancelled with the chosen reason).
+            CancelReasonsSheet(
+                reasons = state.cancelReasons,
+                selectedId = state.selectedCancelReasonId,
+                isLoading = state.cancelReasonsLoading,
+                isSubmitting = state.isCancelling,
+                confirmText = stringResource(R.string.cancel_ride_confirm),
+                onSelect = { viewModel.onEvent(CaptainDashboardEvent.SelectCancelReason(it)) },
+                onSubmit = { viewModel.onEvent(CaptainDashboardEvent.SubmitCancel) },
+                modifier = Modifier.align(Alignment.BottomCenter),
+            )
         } else if (active != null && newDrop != null) {
             // Rider changed the drop-off mid-trip → "Drop-off Address Changed!" overlay (over the route map).
             BottomCard {

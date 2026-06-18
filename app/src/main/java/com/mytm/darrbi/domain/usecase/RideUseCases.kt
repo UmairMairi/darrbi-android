@@ -4,6 +4,7 @@ import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.BookedTrip
 import com.mytm.darrbi.domain.model.CabOption
+import com.mytm.darrbi.domain.model.CancelReason
 import com.mytm.darrbi.domain.model.DropChangeQuote
 import com.mytm.darrbi.domain.model.OngoingTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
@@ -108,8 +109,19 @@ class CompleteTripUseCase @Inject constructor(private val repository: RideReposi
         repository.completeTrip(tripId, dropOff)
 }
 
-/** CAPTAIN cancels an accepted trip. */
+/** CAPTAIN cancels an accepted trip with a [reason]. */
 class CancelTripByDriverUseCase @Inject constructor(private val repository: RideRepository) {
-    suspend operator fun invoke(tripId: String, destination: PlaceLocation): ApiResult<Unit> =
-        repository.cancelTripByDriver(tripId, destination)
+    suspend operator fun invoke(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit> =
+        repository.cancelTripByDriver(tripId, reason, destination)
+}
+
+/** RIDER cancels an accepted trip with a [reason]. */
+class CancelTripByRiderUseCase @Inject constructor(private val repository: RideRepository) {
+    suspend operator fun invoke(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit> =
+        repository.cancelTripByRider(tripId, reason, destination)
+}
+
+/** Fetches the cancellation reasons for the picker (`reasonType` 2 = captain, 3 = rider). */
+class GetCancelReasonsUseCase @Inject constructor(private val repository: RideRepository) {
+    suspend operator fun invoke(reasonType: Int): ApiResult<List<CancelReason>> = repository.getCancelReasons(reasonType)
 }

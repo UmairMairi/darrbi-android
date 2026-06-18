@@ -6,6 +6,7 @@ import com.mytm.darrbi.core.common.map
 import com.mytm.darrbi.core.network.safeApiCall
 import com.mytm.darrbi.core.network.unwrapMain
 import com.mytm.darrbi.core.network.unwrapMainUnit
+import com.mytm.darrbi.data.mapper.toCancelReason
 import com.mytm.darrbi.data.mapper.toDomain
 import com.mytm.darrbi.data.mapper.toOngoingTrip
 import com.mytm.darrbi.data.remote.dto.ChangeDestinationRequest
@@ -20,6 +21,7 @@ import com.mytm.darrbi.data.remote.service.RideApi
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.BookedTrip
 import com.mytm.darrbi.domain.model.CabOption
+import com.mytm.darrbi.domain.model.CancelReason
 import com.mytm.darrbi.domain.model.DropChangeQuote
 import com.mytm.darrbi.domain.model.OngoingTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
@@ -207,11 +209,18 @@ class RideRepositoryImpl @Inject constructor(
             )
         }.unwrapMainUnit()
 
-    override suspend fun cancelTripByDriver(tripId: String, destination: PlaceLocation): ApiResult<Unit> =
-        safeApiCall { api.driverCancelTrip(tripId, declineBody(destination)) }.unwrapMainUnit()
+    override suspend fun cancelTripByDriver(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit> =
+        safeApiCall { api.driverCancelTrip(tripId, declineBody(destination, reason)) }.unwrapMainUnit()
 
-    private fun declineBody(destination: PlaceLocation) = DeclineTripRequest(
-        declinedReason = DECLINE_REASON_NONE,
+    override suspend fun cancelTripByRider(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit> =
+        safeApiCall { api.riderCancelTrip(tripId, declineBody(destination, reason)) }.unwrapMainUnit()
+
+    override suspend fun getCancelReasons(reasonType: Int): ApiResult<List<CancelReason>> =
+        safeApiCall { api.getCancelReasons(reasonType) }.unwrapMain()
+            .map { list -> list.mapNotNull { it.toCancelReason() } }
+
+    private fun declineBody(destination: PlaceLocation, reason: String = DECLINE_REASON_NONE) = DeclineTripRequest(
+        declinedReason = reason,
         dropAddress = DeclineTripRequest.DropAddress(
             address = destination.address.ifBlank { destination.name },
             latitude = destination.latitude,

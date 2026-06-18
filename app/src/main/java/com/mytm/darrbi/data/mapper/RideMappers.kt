@@ -5,12 +5,14 @@ import com.mytm.darrbi.data.remote.dto.CabDto
 import com.mytm.darrbi.data.remote.dto.OngoingTripData
 import com.mytm.darrbi.data.remote.dto.RecentAddressDto
 import com.mytm.darrbi.data.remote.dto.PromoData
+import com.mytm.darrbi.data.remote.dto.RejectedReasonDto
 import com.mytm.darrbi.data.remote.dto.TripDto
 import com.mytm.darrbi.data.remote.dto.TripPersonDto
 import com.mytm.darrbi.data.remote.dto.TripPointDto
 import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.CabOption
+import com.mytm.darrbi.domain.model.CancelReason
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OngoingTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
@@ -75,6 +77,13 @@ fun CabCategoryDto.toDomain(): RideCategory? {
         order = order ?: Int.MAX_VALUE,
         key = (type?.takeIf { it.isNotBlank() } ?: safeName).lowercase(),
     )
+}
+
+/** Maps a cancellation-reason row to [CancelReason]; null when it has no id or display text. */
+fun RejectedReasonDto.toCancelReason(): CancelReason? {
+    val rid = id?.takeIf { it.isNotBlank() } ?: return null
+    val text = reason?.takeIf { it.isNotBlank() } ?: return null
+    return CancelReason(id = rid, text = text, textArabic = reasonArabic?.takeIf { it.isNotBlank() })
 }
 
 /** Maps a recent-address row to a [RecentLocation]; null when it has no usable coordinates/address. */

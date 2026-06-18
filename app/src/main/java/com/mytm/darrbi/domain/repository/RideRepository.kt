@@ -4,6 +4,7 @@ import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.BookedTrip
 import com.mytm.darrbi.domain.model.CabOption
+import com.mytm.darrbi.domain.model.CancelReason
 import com.mytm.darrbi.domain.model.DropChangeQuote
 import com.mytm.darrbi.domain.model.OngoingTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
@@ -80,6 +81,12 @@ interface RideRepository {
     /** CAPTAIN completes the trip at [dropOff] (`PATCH trips/completed/{tripId}`). */
     suspend fun completeTrip(tripId: String, dropOff: PlaceLocation): ApiResult<Unit>
 
-    /** CAPTAIN cancels an accepted trip (`PATCH trips/driver-cancelled/{tripId}`). */
-    suspend fun cancelTripByDriver(tripId: String, destination: PlaceLocation): ApiResult<Unit>
+    /** CAPTAIN cancels an accepted trip with a [reason] (`PATCH trips/driver-cancelled/{tripId}`). */
+    suspend fun cancelTripByDriver(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit>
+
+    /** RIDER cancels an accepted trip with a [reason] (`PATCH trips/rider-cancelled/{tripId}`). */
+    suspend fun cancelTripByRider(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit>
+
+    /** Cancellation reasons for the picker (`reasonType` 2 = captain, 3 = rider). */
+    suspend fun getCancelReasons(reasonType: Int): ApiResult<List<CancelReason>>
 }

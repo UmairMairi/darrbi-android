@@ -10,6 +10,8 @@ import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.BidTrip
 import com.mytm.darrbi.domain.model.BookedTrip
 import com.mytm.darrbi.domain.model.CabOption
+import com.mytm.darrbi.domain.model.CancelReason
+import com.mytm.darrbi.domain.model.CancelReasonType
 import com.mytm.darrbi.domain.model.DropChangeQuote
 import com.mytm.darrbi.domain.model.FareRange
 import com.mytm.darrbi.domain.model.LatLngPoint
@@ -27,7 +29,9 @@ import com.mytm.darrbi.domain.repository.TripSocketEvent
 import com.mytm.darrbi.domain.repository.V2SocketEvent
 import com.mytm.darrbi.domain.usecase.AutocompletePlacesUseCase
 import com.mytm.darrbi.domain.usecase.CancelOpenTripUseCase
+import com.mytm.darrbi.domain.usecase.CancelTripByRiderUseCase
 import com.mytm.darrbi.domain.usecase.CancelTripUseCase
+import com.mytm.darrbi.domain.usecase.GetCancelReasonsUseCase
 import com.mytm.darrbi.domain.usecase.ChangeDestinationUseCase
 import com.mytm.darrbi.domain.usecase.CreateBidTripUseCase
 import com.mytm.darrbi.domain.usecase.CreateTripUseCase
@@ -92,6 +96,15 @@ data class RiderBookingUiState(
     val noCaptainFound: Boolean = false,
     /** Cancel-trip request in flight (Cancel Ride tapped during an active search). */
     val isCancelling: Boolean = false,
+    /** Cancellation-reasons flow after the captain is assigned (Cancel Ride on the on-the-way screen). */
+    val showCancelSheet: Boolean = false,
+    val cancelReasons: List<CancelReason> = emptyList(),
+    val cancelReasonsLoading: Boolean = false,
+    val selectedCancelReasonId: String? = null,
+    /** "We are cancelling your ride" loading screen is showing. */
+    val cancelSubmitting: Boolean = false,
+    /** "Your ride is cancelled" confirmation screen is showing (Done → home). */
+    val rideCancelled: Boolean = false,
     /** Device location, once permission is granted, used to centre the map. */
     val myLocation: PlaceLocation? = null,
     /** Decoded route polyline (pickup → destination) drawn on the confirm-pickup / select-ride maps. */
@@ -182,6 +195,16 @@ sealed interface RiderBookingEvent {
     data object TryAgainSearch : RiderBookingEvent
     /** Cancel Ride on the searching screen — cancels the active request server-side, then goes home. */
     data object CancelRide : RiderBookingEvent
+    /** Cancel Ride on the on-the-way screen → open the cancellation-reasons sheet. */
+    data object OpenCancelSheet : RiderBookingEvent
+    /** Pick a cancellation reason in the sheet. */
+    data class SelectCancelReason(val id: String) : RiderBookingEvent
+    /** Confirm cancellation with the selected reason. */
+    data object SubmitCancel : RiderBookingEvent
+    /** Dismiss the cancellation-reasons sheet. */
+    data object DismissCancelSheet : RiderBookingEvent
+    /** "Done" on the "Your ride is cancelled" screen → return home. */
+    data object CancelDone : RiderBookingEvent
     /** "I am coming" on the captain-arrived screen — returns to the on-the-way (ride-accepted) view. */
     data object ImComing : RiderBookingEvent
     /** "Change" on the in-trip screen — opens the change-drop-off search. */
@@ -212,6 +235,8 @@ class RiderBookingViewModel @Inject constructor(
     private val validatePromo: ValidatePromoUseCase,
     private val createTrip: CreateTripUseCase,
     private val cancelTrip: CancelTripUseCase,
+    private val cancelTripByRider: CancelTripByRiderUseCase,
+    private val getCancelReasons: GetCancelReasonsUseCase,
     private val getBalance: GetBalanceUseCase,
     private val getRoute: GetRouteUseCase,
     private val getOngoingTrip: GetOngoingTripUseCase,
@@ -422,6 +447,11 @@ class RiderBookingViewModel @Inject constructor(
             RiderBookingEvent.RefreshBalance -> loadBalance()
             RiderBookingEvent.TryAgainSearch -> tryAgainSearch()
             RiderBookingEvent.CancelRide -> cancelRide()
+            RiderBookingEvent.OpenCancelSheet -> openCancelSheet()
+            is RiderBookingEvent.SelectCancelReason -> _state.update { it.copy(selectedCancelReasonId = event.id) }
+            RiderBookingEvent.SubmitCancel -> submitRiderCancel()
+            RiderBookingEvent.DismissCancelSheet -> _state.update { it.copy(showCancelSheet = false, selectedCancelReasonId = null) }
+            RiderBookingEvent.CancelDone -> goHome()
             RiderBookingEvent.ImComing -> imComing()
             RiderBookingEvent.OpenChangeDrop -> openChangeDrop()
             RiderBookingEvent.ConfirmChangeDrop -> confirmChangeDrop()
@@ -877,6 +907,38 @@ class RiderBookingViewModel @Inject constructor(
         }
     }
 
+    /** Cancel Ride after the captain is assigned → open the reasons sheet and fetch the rider reasons. */
+    private fun openCancelSheet() {
+        if (_state.value.acceptedTrip == null) return
+        _state.update { it.copy(showCancelSheet = true, selectedCancelReasonId = null, cancelReasonsLoading = it.cancelReasons.isEmpty()) }
+        if (_state.value.cancelReasons.isNotEmpty()) return
+        viewModelScope.launch {
+            when (val result = getCancelReasons(CancelReasonType.RIDER)) {
+                is ApiResult.Success -> _state.update { it.copy(cancelReasons = result.data, cancelReasonsLoading = false) }
+                is ApiResult.Error, is ApiResult.Failure -> _state.update { it.copy(cancelReasonsLoading = false) }
+            }
+        }
+    }
+
+    /**
+     * Confirm the cancellation: show "We are cancelling your ride", call `rider-cancelled`, then show
+     * "Your ride is cancelled" on success (Done returns home). On failure, reopen the sheet with the error.
+     */
+    private fun submitRiderCancel() {
+        val tripId = _state.value.acceptedTrip?.tripId ?: _state.value.bookedTrip?.tripId ?: return
+        val reason = _state.value.cancelReasons.firstOrNull { it.id == _state.value.selectedCancelReasonId } ?: return
+        val destination = _state.value.destination ?: return
+        if (_state.value.cancelSubmitting) return
+        _state.update { it.copy(showCancelSheet = false, cancelSubmitting = true, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = cancelTripByRider(tripId, reason.text, destination)) {
+                is ApiResult.Success -> _state.update { it.copy(cancelSubmitting = false, rideCancelled = true) }
+                is ApiResult.Error -> _state.update { it.copy(cancelSubmitting = false, showCancelSheet = true, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(cancelSubmitting = false, showCancelSheet = true, errorMessage = result.error.message) }
+            }
+        }
+    }
+
     /** Clears the booked trip and returns to the home map. */
     private fun goHome() {
         _state.update {
@@ -896,6 +958,10 @@ class RiderBookingViewModel @Inject constructor(
                 offeredFare = null,
                 isCreatingBidTrip = false,
                 isBidActionInFlight = false,
+                showCancelSheet = false,
+                selectedCancelReasonId = null,
+                cancelSubmitting = false,
+                rideCancelled = false,
                 errorMessage = null,
             )
         }
