@@ -18,7 +18,7 @@ data class HostedTopUpRequest(
     val country: String,
 ) {
     companion object {
-        const val HOSTED_METHOD_CLICKPAY = 1
+        const val HOSTED_METHOD_CLICKPAY = 4
     }
 }
 
