@@ -341,7 +341,7 @@ class RiderBookingViewModel @Inject constructor(
                     )
                 }
                 fetchRoute()
-                fetchTripBids(trip.tripId)
+                startBidsPolling(trip.tripId)
             }
             TripStage.Searching -> {
                 _state.update {
@@ -388,6 +388,9 @@ class RiderBookingViewModel @Inject constructor(
 
     private var searchJob: Job? = null
     private var searchTimeoutJob: Job? = null
+
+    /** Polls competing bids while on the bidding screen (REST fallback for the `v2/trip-bids-update` push). */
+    private var bidsPollJob: Job? = null
 
     fun onEvent(event: RiderBookingEvent) {
         when (event) {
@@ -715,13 +718,33 @@ class RiderBookingViewModel @Inject constructor(
         _state.update { it.copy(isCreatingBidTrip = true, offeredFare = fare, errorMessage = null) }
         viewModelScope.launch {
             when (val result = createBidTrip(pickup, destination, cab.id, state.selectedCategory?.id, fare)) {
-                is ApiResult.Success -> _state.update {
-                    it.copy(isCreatingBidTrip = false, bidTrip = result.data, bids = emptyList(), bidNotice = null, step = RiderStep.Bidding)
+                is ApiResult.Success -> {
+                    _state.update {
+                        it.copy(isCreatingBidTrip = false, bidTrip = result.data, bids = emptyList(), bidNotice = null, step = RiderStep.Bidding)
+                    }
+                    // The socket pushes bids live; also poll as a fallback so offers always surface.
+                    startBidsPolling(result.data.tripId)
                 }
                 is ApiResult.Error -> _state.update { it.copy(isCreatingBidTrip = false, errorMessage = result.message) }
                 is ApiResult.Failure -> _state.update { it.copy(isCreatingBidTrip = false, errorMessage = result.error.message) }
             }
         }
+    }
+
+    /** Polls `GET /v2/trips/{id}/bids` every few seconds while the rider is on the bidding screen. */
+    private fun startBidsPolling(tripId: String) {
+        bidsPollJob?.cancel()
+        bidsPollJob = viewModelScope.launch {
+            while (_state.value.step == RiderStep.Bidding && _state.value.bidTrip?.tripId == tripId) {
+                fetchTripBids(tripId)
+                delay(BID_POLL_MS)
+            }
+        }
+    }
+
+    private fun stopBidsPolling() {
+        bidsPollJob?.cancel()
+        bidsPollJob = null
     }
 
     /** Select a competing bid → commit the match; on success switch to the assigned (on-the-way) flow. */
@@ -780,6 +803,7 @@ class RiderBookingViewModel @Inject constructor(
 
     /** A bid was matched → fetch the assigned trip (`trips/exists` → socket) and go on-the-way. */
     private fun onBidMatched() {
+        stopBidsPolling()
         viewModelScope.launch {
             when (val result = getOngoingTrip()) {
                 is ApiResult.Success -> result.data?.acceptedTrip?.let { accepted ->
@@ -795,6 +819,7 @@ class RiderBookingViewModel @Inject constructor(
     }
 
     private fun clearBidding() {
+        stopBidsPolling()
         _state.update { it.copy(bidTrip = null, bids = emptyList(), isBidActionInFlight = false, isCreatingBidTrip = false) }
     }
 
@@ -1130,6 +1155,7 @@ class RiderBookingViewModel @Inject constructor(
         const val DEFAULT_SEARCH_TIMEOUT_MS = 45_000L
         const val MIN_SEARCH_TIMEOUT_MS = 5_000L
         const val MAX_SEARCH_TIMEOUT_MS = 180_000L
+        const val BID_POLL_MS = 3_000L
         const val NOTICE_NO_BIDS = "NO_BIDS"
         const val NOTICE_TIMEOUT = "TIMEOUT"
         const val RESTORE_MAX_FACTOR = 2.5
