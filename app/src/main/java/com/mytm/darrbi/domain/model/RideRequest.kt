@@ -7,6 +7,8 @@ package com.mytm.darrbi.domain.model
  */
 data class RideRequest(
     val tripId: String,
+    /** The rider's account id (numeric NID) — the chat peer when the captain messages the rider. */
+    val riderId: String = "",
     val riderName: String,
     val riderImageUrl: String?,
     val riderMobile: String?,

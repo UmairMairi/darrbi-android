@@ -110,6 +110,7 @@ import com.mytm.darrbi.presentation.common.rememberLocationPermissionState
 fun CaptainDashboardScreen(
     onSeeDetails: () -> Unit,
     onProfile: () -> Unit = {},
+    onChat: (com.mytm.darrbi.domain.model.RideRequest) -> Unit = {},
     viewModel: CaptainDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -414,9 +415,7 @@ fun CaptainDashboardScreen(
                     navigateStarted = state.navigateStarted,
                     isHandling = state.isHandlingRequest,
                     onCall = { active.riderMobile?.let { dialPhone(navContext, it) } },
-                    onChat = {
-                        android.widget.Toast.makeText(navContext, navContext.getString(R.string.chat_media_coming_soon), android.widget.Toast.LENGTH_SHORT).show()
-                    },
+                    onChat = { onChat(active) },
                     onNavigate = {
                         openNavigation(navContext, active.pickup.latitude, active.pickup.longitude)
                         viewModel.onEvent(CaptainDashboardEvent.StartNavigate)

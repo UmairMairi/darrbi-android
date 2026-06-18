@@ -457,6 +457,7 @@ class SocketServiceImpl @Inject constructor(
         val baseAmount = data.optDouble("estimatedBaseAmount").takeIf { !it.isNaN() }
         return RideRequest(
             tripId = data.optString("id"),
+            riderId = rider?.optString("id").orEmpty().ifBlank { data.optString("riderId") },
             riderName = rider?.optString("name").orEmpty(),
             riderImageUrl = rider?.optString("profileImage")?.takeIf { it.isNotBlank() },
             riderMobile = rider?.optString("mobile")?.takeIf { it.isNotBlank() },

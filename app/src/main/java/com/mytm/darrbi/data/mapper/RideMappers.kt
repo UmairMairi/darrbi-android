@@ -145,6 +145,7 @@ fun OngoingTripData.toOngoingTrip(): OngoingTrip = OngoingTrip(
         if (pickup != null && dest != null) {
             RideRequest(
                 tripId = id.orEmpty(),
+                riderId = riderInfo?.id.orEmpty(),
                 riderName = riderInfo?.name.orEmpty(),
                 riderImageUrl = riderInfo?.profileImage?.takeIf { it.isNotBlank() },
                 riderMobile = riderInfo?.mobile?.takeIf { it.isNotBlank() },

@@ -54,7 +54,6 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.mytm.darrbi.R
 import com.mytm.darrbi.core.designsystem.DarrbiTheme
-import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.ChatMessage
 import com.mytm.darrbi.domain.model.ChatMessageStatus
 import java.text.SimpleDateFormat
@@ -67,15 +66,17 @@ import java.util.Locale
  */
 @Composable
 fun ChatScreen(
-    trip: AcceptedTrip,
+    peerId: String,
+    peerName: String,
+    peerImageUrl: String?,
     onBack: () -> Unit,
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
     val context = LocalContext.current
 
-    LaunchedEffect(trip.driverId) {
-        viewModel.start(trip.driverId, trip.driverName, trip.driverImageUrl)
+    LaunchedEffect(peerId) {
+        viewModel.start(peerId, peerName, peerImageUrl)
     }
 
     Column(
@@ -85,8 +86,8 @@ fun ChatScreen(
             .statusBarsPadding(),
     ) {
         ChatHeader(
-            name = state.driverName.ifBlank { trip.driverName },
-            imageUrl = state.driverImageUrl ?: trip.driverImageUrl,
+            name = state.driverName.ifBlank { peerName },
+            imageUrl = state.driverImageUrl ?: peerImageUrl,
             typing = state.otherTyping,
             onBack = onBack,
         )

@@ -23,7 +23,6 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.LocalViewModelStoreOwner
 import com.mytm.darrbi.R
-import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.Ride
 import com.mytm.darrbi.presentation.chat.ChatScreen
 import com.mytm.darrbi.presentation.dashboard.CaptainDashboardScreen
@@ -55,6 +54,9 @@ private enum class Route {
     MyRides, RideDetails, ReportProblem, MyReports, Terms, Privacy,
     AppSettings, CustomerCare, Notifications, Chat,
 }
+
+/** The other party in an in-trip chat (driver for the rider; rider for the captain). */
+private data class ChatPeer(val id: String, val name: String, val imageUrl: String?)
 
 /**
  * App root: branded splash for 3s, then the onboarding flow. A successful captain application routes to
@@ -91,8 +93,9 @@ fun DarrbiRoot() {
             }
         }
     }
-    // The accepted trip whose captain the rider is chatting with (passed to the chat screen).
-    var chatTrip by remember { mutableStateOf<AcceptedTrip?>(null) }
+    // The other party (driver for the rider, rider for the captain) being chatted with.
+    var chatPeer by remember { mutableStateOf<ChatPeer?>(null) }
+    var chatReturn by remember { mutableStateOf(Route.RiderHome) }
     // Ride selected from the My Rides list, passed to the details screen.
     var selectedRide by remember { mutableStateOf<Ride?>(null) }
     var selectedRideGiven by remember { mutableStateOf(false) }
@@ -125,10 +128,19 @@ fun DarrbiRoot() {
                 Route.Dashboard -> CaptainDashboardScreen(
                     onSeeDetails = { route = Route.StatusDetail },
                     onProfile = { profileReturn = Route.Dashboard; route = Route.Profile },
+                    onChat = { request ->
+                        chatPeer = ChatPeer(request.riderId, request.riderName, request.riderImageUrl)
+                        chatReturn = Route.Dashboard
+                        route = Route.Chat
+                    },
                 )
                 Route.RiderHome -> RiderFlowScreen(
                     onProfile = { profileReturn = Route.RiderHome; route = Route.Profile },
-                    onChat = { trip -> chatTrip = trip; route = Route.Chat },
+                    onChat = { trip ->
+                        chatPeer = ChatPeer(trip.driverId, trip.driverName, trip.driverImageUrl)
+                        chatReturn = Route.RiderHome
+                        route = Route.Chat
+                    },
                 )
                 Route.StatusDetail -> {
                     BackHandler { route = Route.Dashboard }
@@ -238,12 +250,17 @@ fun DarrbiRoot() {
                     LegalScreen(titleRes = R.string.menu_privacy_policy, page = LegalPage.Privacy, onBack = { route = Route.Profile })
                 }
                 Route.Chat -> {
-                    BackHandler { route = Route.RiderHome }
-                    val trip = chatTrip
-                    if (trip == null) {
-                        route = Route.RiderHome
+                    BackHandler { route = chatReturn }
+                    val peer = chatPeer
+                    if (peer == null || peer.id.isBlank()) {
+                        route = chatReturn
                     } else {
-                        ChatScreen(trip = trip, onBack = { route = Route.RiderHome })
+                        ChatScreen(
+                            peerId = peer.id,
+                            peerName = peer.name,
+                            peerImageUrl = peer.imageUrl,
+                            onBack = { route = chatReturn },
+                        )
                     }
                 }
             }
