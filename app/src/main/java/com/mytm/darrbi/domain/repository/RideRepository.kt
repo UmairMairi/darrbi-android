@@ -74,6 +74,9 @@ interface RideRepository {
     /** CAPTAIN starts the trip after verifying the rider's [otp] (`PATCH trips/started/{tripId}`). */
     suspend fun startTrip(tripId: String, otp: Int): ApiResult<Unit>
 
+    /** CAPTAIN completes the trip at [dropOff] (`PATCH trips/completed/{tripId}`). */
+    suspend fun completeTrip(tripId: String, dropOff: PlaceLocation): ApiResult<Unit>
+
     /** CAPTAIN cancels an accepted trip (`PATCH trips/driver-cancelled/{tripId}`). */
     suspend fun cancelTripByDriver(tripId: String, destination: PlaceLocation): ApiResult<Unit>
 }

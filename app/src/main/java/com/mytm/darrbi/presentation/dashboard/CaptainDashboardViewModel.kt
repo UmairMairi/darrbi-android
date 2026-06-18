@@ -16,6 +16,7 @@ import com.mytm.darrbi.domain.repository.TripSocketEvent
 import com.mytm.darrbi.domain.repository.V2SocketEvent
 import com.mytm.darrbi.domain.usecase.AcceptTripUseCase
 import com.mytm.darrbi.domain.usecase.CancelTripByDriverUseCase
+import com.mytm.darrbi.domain.usecase.CompleteTripUseCase
 import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
 import com.mytm.darrbi.domain.usecase.GetCaptainDetailsUseCase
 import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
@@ -75,6 +76,14 @@ data class CaptainDashboardUiState(
     val otpError: Boolean = false,
     /** One-shot: the trip just started after a correct OTP → the UI shows a confirmation once. */
     val tripStarted: Boolean = false,
+    /** Trip in progress (started) → the "dropping" in-trip screen (pickup→destination route). */
+    val tripInProgress: Boolean = false,
+    /** Captain → destination distance (km) + ETA (minutes) for the dropping card. */
+    val dropDistanceKm: Double? = null,
+    val dropTimeMinutes: Int? = null,
+    val isCompleting: Boolean = false,
+    /** One-shot: the ride was completed → the UI shows a confirmation once. */
+    val rideEnded: Boolean = false,
     /** Whether the 3-dot menu (with Cancel Ride) is open. */
     val showMenu: Boolean = false,
     // --- V2 broadcast dispatch + bidding ---
@@ -121,6 +130,9 @@ sealed interface CaptainDashboardEvent {
     /** Dismiss the OTP overlay (back to the navigate screen). */
     data object DismissOtp : CaptainDashboardEvent
     data object ConsumeTripStarted : CaptainDashboardEvent
+    /** "End Ride" on the dropping screen → complete the trip. */
+    data object EndRide : CaptainDashboardEvent
+    data object ConsumeRideEnded : CaptainDashboardEvent
     /** Toggle the 3-dot menu (Cancel Ride). */
     data object ToggleMenu : CaptainDashboardEvent
     /** Cancel the accepted trip from the 3-dot menu. */
@@ -152,6 +164,7 @@ class CaptainDashboardViewModel @Inject constructor(
     private val rejectTrip: RejectTripUseCase,
     private val reachedPickup: ReachedPickupUseCase,
     private val startTripUseCase: StartTripUseCase,
+    private val completeTripUseCase: CompleteTripUseCase,
     private val cancelTripByDriver: CancelTripByDriverUseCase,
     private val getOngoingTrip: GetOngoingTripUseCase,
     private val getOpenTrips: GetOpenTripsUseCase,
@@ -257,6 +270,8 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.SubmitOtp -> submitOtp()
             CaptainDashboardEvent.DismissOtp -> _state.update { it.copy(awaitingOtp = false, otpInput = "", otpError = false) }
             CaptainDashboardEvent.ConsumeTripStarted -> _state.update { it.copy(tripStarted = false) }
+            CaptainDashboardEvent.EndRide -> endRide()
+            CaptainDashboardEvent.ConsumeRideEnded -> _state.update { it.copy(rideEnded = false) }
             CaptainDashboardEvent.ToggleMenu -> _state.update { it.copy(showMenu = !it.showMenu) }
             CaptainDashboardEvent.CancelTrip -> cancelTrip()
             CaptainDashboardEvent.ConsumeError -> _state.update { it.copy(errorMessage = null) }
@@ -483,13 +498,70 @@ class CaptainDashboardViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = startTripUseCase(trip.tripId, otp)) {
                 is ApiResult.Success -> {
-                    _state.update { it.copy(isStartingTrip = false, tripStarted = true) }
-                    clearActiveTrip()
+                    // Trip started → switch to the "dropping" in-trip screen (pickup → destination).
+                    _state.update {
+                        it.copy(
+                            isStartingTrip = false,
+                            tripStarted = true,
+                            awaitingOtp = false,
+                            otpInput = "",
+                            tripInProgress = true,
+                            navigateStarted = false,
+                        )
+                    }
+                    fetchDropRoute(trip)
                 }
                 is ApiResult.Error -> _state.update { it.copy(isStartingTrip = false, otpError = true) }
                 is ApiResult.Failure -> _state.update { it.copy(isStartingTrip = false, otpError = true) }
             }
         }
+    }
+
+    /** "End Ride" → complete the trip at the destination and return to the dashboard. */
+    private fun endRide() {
+        val trip = _state.value.activeTrip ?: return
+        if (_state.value.isCompleting) return
+        _state.update { it.copy(isCompleting = true, errorMessage = null) }
+        viewModelScope.launch {
+            when (val result = completeTripUseCase(trip.tripId, trip.destination)) {
+                is ApiResult.Success -> {
+                    _state.update { it.copy(isCompleting = false, rideEnded = true) }
+                    clearActiveTrip()
+                }
+                is ApiResult.Error -> _state.update { it.copy(isCompleting = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isCompleting = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    /** Draws the pickup → destination route for the dropping screen and the captain→destination estimate. */
+    private fun fetchDropRoute(request: RideRequest) {
+        computeLeg(request.destination)?.let { (km, mins) ->
+            _state.update { it.copy(dropDistanceKm = km, dropTimeMinutes = mins) }
+        }
+        viewModelScope.launch {
+            val points = when (val result = getRoute(request.pickup, request.destination)) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error, is ApiResult.Failure -> emptyList()
+            }
+            val path = points.ifEmpty {
+                listOf(
+                    LatLngPoint(request.pickup.latitude, request.pickup.longitude),
+                    LatLngPoint(request.destination.latitude, request.destination.longitude),
+                )
+            }
+            _state.update { if (it.activeTrip?.tripId == request.tripId) it.copy(activeRoutePoints = path) else it }
+        }
+    }
+
+    /** Distance (km) + a rough ETA (minutes) from the captain's current location to [target]. */
+    private fun computeLeg(target: PlaceLocation): Pair<Double, Int>? {
+        val me = _state.value.myLocation ?: return null
+        val out = FloatArray(1)
+        android.location.Location.distanceBetween(me.latitude, me.longitude, target.latitude, target.longitude, out)
+        val km = out[0] / 1000.0
+        val mins = Math.ceil(km / PICKUP_AVG_SPEED_KMH * 60.0).toInt().coerceAtLeast(1)
+        return km to mins
     }
 
     /** Cancel Ride (3-dot menu) → cancel server-side and return to the idle dashboard. */
@@ -514,6 +586,10 @@ class CaptainDashboardViewModel @Inject constructor(
                 otpInput = "",
                 otpError = false,
                 isStartingTrip = false,
+                tripInProgress = false,
+                isCompleting = false,
+                dropDistanceKm = null,
+                dropTimeMinutes = null,
             )
         }
     }
@@ -603,12 +679,15 @@ class CaptainDashboardViewModel @Inject constructor(
                         navigateStarted = trip.stage != TripStage.DriverAssigned,
                         // Restored at `driver_reached` → prompt for the rider's OTP to start the trip.
                         awaitingOtp = trip.stage == TripStage.DriverArrived,
+                        // Restored mid-trip → the dropping screen.
+                        tripInProgress = trip.stage == TripStage.InProgress,
                         otpInput = "",
                         otpError = false,
                         showMenu = false,
                     )
                 }
-                fetchActiveRoute(request)
+                // In-progress draws pickup→destination; otherwise the captain→pickup route.
+                if (trip.stage == TripStage.InProgress) fetchDropRoute(request) else fetchActiveRoute(request)
             }
             else -> Unit
         }

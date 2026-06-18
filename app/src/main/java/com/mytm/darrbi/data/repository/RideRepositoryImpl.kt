@@ -9,6 +9,7 @@ import com.mytm.darrbi.core.network.unwrapMainUnit
 import com.mytm.darrbi.data.mapper.toDomain
 import com.mytm.darrbi.data.mapper.toOngoingTrip
 import com.mytm.darrbi.data.remote.dto.ChangeDestinationRequest
+import com.mytm.darrbi.data.remote.dto.CompleteTripRequest
 import com.mytm.darrbi.data.remote.dto.CreateTripRequest
 import com.mytm.darrbi.data.remote.dto.DeclineTripRequest
 import com.mytm.darrbi.data.remote.dto.PromoValidateRequest
@@ -181,6 +182,18 @@ class RideRepositoryImpl @Inject constructor(
 
     override suspend fun startTrip(tripId: String, otp: Int): ApiResult<Unit> =
         safeApiCall { api.startTrip(tripId, StartTripRequest(tripOtp = otp)) }.unwrapMainUnit()
+
+    override suspend fun completeTrip(tripId: String, dropOff: PlaceLocation): ApiResult<Unit> =
+        safeApiCall {
+            api.completeTrip(
+                tripId,
+                CompleteTripRequest(
+                    address = dropOff.address.ifBlank { dropOff.name },
+                    latitude = dropOff.latitude,
+                    longitude = dropOff.longitude,
+                ),
+            )
+        }.unwrapMainUnit()
 
     override suspend fun cancelTripByDriver(tripId: String, destination: PlaceLocation): ApiResult<Unit> =
         safeApiCall { api.driverCancelTrip(tripId, declineBody(destination)) }.unwrapMainUnit()

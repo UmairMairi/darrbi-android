@@ -96,6 +96,12 @@ class StartTripUseCase @Inject constructor(private val repository: RideRepositor
     suspend operator fun invoke(tripId: String, otp: Int): ApiResult<Unit> = repository.startTrip(tripId, otp)
 }
 
+/** CAPTAIN completes the trip at the drop-off. */
+class CompleteTripUseCase @Inject constructor(private val repository: RideRepository) {
+    suspend operator fun invoke(tripId: String, dropOff: PlaceLocation): ApiResult<Unit> =
+        repository.completeTrip(tripId, dropOff)
+}
+
 /** CAPTAIN cancels an accepted trip. */
 class CancelTripByDriverUseCase @Inject constructor(private val repository: RideRepository) {
     suspend operator fun invoke(tripId: String, destination: PlaceLocation): ApiResult<Unit> =

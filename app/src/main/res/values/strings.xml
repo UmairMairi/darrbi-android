@@ -132,6 +132,12 @@
     <!-- Captain: start trip with OTP -->
     <string name="captain_enter_pin_title">Enter PIN from rider to start the ride</string>
     <string name="captain_start_ride">Start Ride</string>
+    <!-- Captain: dropping (in-trip) -->
+    <string name="captain_dropping">Dropping %1$s</string>
+    <string name="captain_end_ride">End Ride</string>
+    <string name="captain_to_dropoff">Go straight for %1$s km</string>
+    <string name="captain_head_dropoff">Head to the drop-off</string>
+    <string name="captain_ride_completed">Ride completed</string>
     <string name="captain_enter_otp_title">Enter Rider\'s OTP</string>
     <string name="captain_enter_otp_sub">Ask the rider for the code to start the trip</string>
     <string name="captain_enter_otp_sub_named">Ask %1$s for the code to start the trip</string>

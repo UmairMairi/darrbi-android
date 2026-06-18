@@ -4,6 +4,7 @@ import com.mytm.darrbi.core.network.MainEnvelope
 import com.mytm.darrbi.data.remote.dto.CabCategoryDto
 import com.mytm.darrbi.data.remote.dto.CabTypeData
 import com.mytm.darrbi.data.remote.dto.ChangeDestinationRequest
+import com.mytm.darrbi.data.remote.dto.CompleteTripRequest
 import com.mytm.darrbi.data.remote.dto.CreateTripData
 import com.mytm.darrbi.data.remote.dto.DeclineTripRequest
 import com.mytm.darrbi.data.remote.dto.CreateTripRequest
@@ -82,6 +83,10 @@ interface RideApi {
     /** CAPTAIN starts the trip after verifying the rider's OTP (`PATCH trips/started/{tripId}`). */
     @PATCH("trips/started/{tripId}")
     suspend fun startTrip(@Path("tripId") tripId: String, @Body body: StartTripRequest): MainEnvelope<JsonElement>
+
+    /** CAPTAIN completes the trip at the drop-off (`PATCH trips/completed/{tripId}`). */
+    @PATCH("trips/completed/{tripId}")
+    suspend fun completeTrip(@Path("tripId") tripId: String, @Body body: CompleteTripRequest): MainEnvelope<JsonElement>
 
     /** CAPTAIN cancels an accepted trip (before/while heading to pickup). */
     @PATCH("trips/driver-cancelled/{tripId}")

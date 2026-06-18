@@ -130,6 +130,14 @@ data class StartTripRequest(
     val tripOtp: Int,
 )
 
+/** `PATCH trips/completed/{tripId}` body — the drop-off point where the captain ended the trip. */
+@Serializable
+data class CompleteTripRequest(
+    val address: String,
+    val latitude: Double,
+    val longitude: Double,
+)
+
 /** `POST reviews/rider` body — the rider's star rating for the captain (ride-android: ReviewRequestModel). */
 @Serializable
 data class ReviewRequest(

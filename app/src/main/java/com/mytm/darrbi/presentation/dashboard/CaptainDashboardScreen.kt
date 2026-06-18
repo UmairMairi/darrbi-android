@@ -201,6 +201,14 @@ fun CaptainDashboardScreen(
             viewModel.onEvent(CaptainDashboardEvent.ConsumeTripStarted)
         }
     }
+    // Ride completed via End Ride.
+    val rideEndedMsg = stringResource(R.string.captain_ride_completed)
+    LaunchedEffect(state.rideEnded) {
+        if (state.rideEnded) {
+            android.widget.Toast.makeText(ctx, rideEndedMsg, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.onEvent(CaptainDashboardEvent.ConsumeRideEnded)
+        }
+    }
     // V2: you lost / the trip closed before you could win.
     val bidLostMsg = stringResource(R.string.captain_bid_lost)
     LaunchedEffect(state.bidLostReason) {
@@ -265,13 +273,14 @@ fun CaptainDashboardScreen(
                     AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "req_driver")
                 }
             } else if (active != null) {
-                // Navigating to the rider → captain→pickup route + pickup pin + the captain's car.
+                // Navigate (captain→pickup) or dropping (pickup→destination) route + the relevant pin + car.
                 val route = remember(state.activeRoutePoints) {
                     state.activeRoutePoints.map { LatLng(it.latitude, it.longitude) }
                 }
                 if (route.size >= 2) Polyline(points = route, color = routeColor, width = 6f)
+                val pinTarget = if (state.tripInProgress) active.destination else active.pickup
                 Marker(
-                    state = rememberMarkerState(key = "act_pickup", position = LatLng(active.pickup.latitude, active.pickup.longitude)),
+                    state = rememberMarkerState(key = if (state.tripInProgress) "act_dest" else "act_pickup", position = LatLng(pinTarget.latitude, pinTarget.longitude)),
                     icon = pinIcon, anchor = Offset(0.5f, 0.5f),
                 )
                 state.myLocation?.let {
@@ -352,6 +361,21 @@ fun CaptainDashboardScreen(
                     onAccept = { viewModel.onEvent(CaptainDashboardEvent.AcceptRequest) },
                     onDecline = { viewModel.onEvent(CaptainDashboardEvent.DeclineRequest) },
                 )
+            }
+        } else if (active != null && state.tripInProgress) {
+            // Trip started → "dropping" screen: nav banner over the map + the drop-off card.
+            Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+                NavBanner(distanceKm = state.dropDistanceKm)
+                Spacer(Modifier.height(8.dp))
+                DarrbiCard(navigationBarPadding = true) {
+                    DroppingContent(
+                        riderName = active.riderName,
+                        distanceKm = state.dropDistanceKm,
+                        etaMinutes = state.dropTimeMinutes,
+                        isCompleting = state.isCompleting,
+                        onEndRide = { viewModel.onEvent(CaptainDashboardEvent.EndRide) },
+                    )
+                }
             }
         } else if (active != null && state.awaitingOtp) {
             // At pickup → enter the rider's OTP to start the trip.
@@ -866,6 +890,76 @@ private fun PinInput(otp: String, isError: Boolean, onOtp: (String) -> Unit) {
 
 /** Rider PIN length (the reference shows 4 boxes). */
 private const val PIN_LEN = 4
+
+/** Dark navigation banner over the map during the trip (per the reference). */
+@Composable
+private fun NavBanner(distanceKm: Double?) {
+    Surface(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+        shape = RoundedCornerShape(12.dp),
+        color = DarrbiTheme.colors.buttonContainer,
+    ) {
+        Text(
+            text = distanceKm?.let { stringResource(R.string.captain_to_dropoff, formatKm(it)) }
+                ?: stringResource(R.string.captain_head_dropoff),
+            style = DarrbiTheme.typography.bodyMedium,
+            color = DarrbiTheme.colors.onButton,
+            modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
+        )
+    }
+}
+
+/** Dropping (in-trip) card: "Dropping {rider}", ETA, distance·arrival, End Ride (per the reference). */
+@Composable
+private fun DroppingContent(
+    riderName: String?,
+    distanceKm: Double?,
+    etaMinutes: Int?,
+    isCompleting: Boolean,
+    onEndRide: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = DarrbiTheme.colors.surfaceVariant,
+        ) {
+            Text(
+                text = stringResource(R.string.captain_dropping, riderName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.captain_rider_fallback)),
+                style = DarrbiTheme.typography.bodyMedium,
+                color = DarrbiTheme.colors.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        Text(
+            text = etaMinutes?.let { stringResource(R.string.captain_eta_mins, it) } ?: "—",
+            style = DarrbiTheme.typography.titleLarge,
+            color = DarrbiTheme.colors.onSurface,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(4.dp))
+        Text(
+            text = if (distanceKm != null && etaMinutes != null) stringResource(R.string.captain_km_time, formatKm(distanceKm), arrivalClock(etaMinutes)) else "",
+            style = DarrbiTheme.typography.label,
+            color = DarrbiTheme.colors.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Spacer(Modifier.height(18.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(54.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = !isCompleting, onClick = onEndRide),
+            shape = RoundedCornerShape(14.dp),
+            color = DarrbiTheme.colors.error,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.captain_end_ride), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onError)
+            }
+        }
+    }
+}
 
 /**
  * Open-request detail card (over the route map): rider, offered fare, distance·time, pickup/drop, then
