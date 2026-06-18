@@ -83,6 +83,8 @@ data class CaptainDashboardUiState(
     val dropDistanceKm: Double? = null,
     val dropTimeMinutes: Int? = null,
     val isCompleting: Boolean = false,
+    /** The rider changed the drop-off (`rider_updated_destination`) → the "Drop-off Address Changed!" overlay. */
+    val destinationChanged: PlaceLocation? = null,
     /** After completion → the "Rate Your Rider" screen. */
     val ratingRider: Boolean = false,
     /** Selected star rating (1..5) for the rider; 0 = none yet. */
@@ -134,6 +136,8 @@ sealed interface CaptainDashboardEvent {
     /** Dismiss the OTP overlay (back to the navigate screen). */
     data object DismissOtp : CaptainDashboardEvent
     data object ConsumeTripStarted : CaptainDashboardEvent
+    /** "Navigate" on the drop-off-changed overlay → dismiss it and return to the in-trip screen. */
+    data object DismissDestinationChange : CaptainDashboardEvent
     /** "End Ride" on the dropping screen → complete the trip. */
     data object EndRide : CaptainDashboardEvent
     /** Star tapped on the rate-rider screen (1..5). */
@@ -194,7 +198,11 @@ class CaptainDashboardViewModel @Inject constructor(
         // Listen for incoming ride requests on the shared socket (captain side; V1 fallback).
         viewModelScope.launch {
             socketService.tripEvents.collect { event ->
-                if (event is TripSocketEvent.TripRequest) onTripRequest(event.request)
+                when (event) {
+                    is TripSocketEvent.TripRequest -> onTripRequest(event.request)
+                    is TripSocketEvent.DestinationChanged -> onDestinationChanged(event.tripId, event.newDestination)
+                    else -> Unit // other trip events are rider-facing
+                }
             }
         }
         // V2: mirror the broadcast open-trips list into state (shown when online).
@@ -278,6 +286,7 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.SubmitOtp -> submitOtp()
             CaptainDashboardEvent.DismissOtp -> _state.update { it.copy(awaitingOtp = false, otpInput = "", otpError = false) }
             CaptainDashboardEvent.ConsumeTripStarted -> _state.update { it.copy(tripStarted = false) }
+            CaptainDashboardEvent.DismissDestinationChange -> _state.update { it.copy(destinationChanged = null) }
             CaptainDashboardEvent.EndRide -> endRide()
             is CaptainDashboardEvent.SelectRiderRating -> _state.update { it.copy(riderStars = event.stars) }
             CaptainDashboardEvent.SubmitRiderRating -> submitRiderRating()
@@ -391,6 +400,20 @@ class CaptainDashboardViewModel @Inject constructor(
             // Timed out → just dismiss (no reject call), like ride-android returning to the waiting state.
             clearRequest()
         }
+    }
+
+    /**
+     * The rider changed the drop-off mid-trip (`rider_updated_destination`). Update the active trip's
+     * destination, redraw the in-trip route/marker to the new drop-off, and show the "Drop-off Address
+     * Changed!" overlay (the captain taps Navigate to dismiss it and return to the dropping screen).
+     */
+    private fun onDestinationChanged(tripId: String, newDestination: PlaceLocation) {
+        val active = _state.value.activeTrip ?: return
+        if (tripId.isNotBlank() && tripId != active.tripId) return
+        val updated = active.copy(destination = newDestination)
+        _state.update { it.copy(activeTrip = updated, destinationChanged = newDestination) }
+        // Redraw the pickup→destination polyline/marker so the dropping screen reflects the new drop-off.
+        if (_state.value.tripInProgress) fetchDropRoute(updated)
     }
 
     /** Captain → pickup distance (km) + a rough ETA (minutes) from the captain's current location. */
@@ -613,6 +636,7 @@ class CaptainDashboardViewModel @Inject constructor(
                 isCompleting = false,
                 dropDistanceKm = null,
                 dropTimeMinutes = null,
+                destinationChanged = null,
                 ratingRider = false,
                 riderStars = 0,
                 isSubmittingReview = false,

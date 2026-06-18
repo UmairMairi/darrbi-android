@@ -6,6 +6,7 @@ import com.mytm.darrbi.domain.model.ChatMessage
 import com.mytm.darrbi.domain.model.ChatMessageStatus
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OpenTrip
+import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.RideRequest
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -45,6 +46,9 @@ sealed interface TripSocketEvent {
 
     /** CAPTAIN side: an incoming ride request to accept/decline (`action == "trip_request"`). */
     data class TripRequest(val request: RideRequest) : TripSocketEvent
+
+    /** CAPTAIN side: the rider changed the drop-off location mid-trip (`action == "rider_updated_destination"`). */
+    data class DestinationChanged(val tripId: String, val newDestination: PlaceLocation) : TripSocketEvent
 }
 
 /**

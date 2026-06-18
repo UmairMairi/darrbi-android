@@ -138,6 +138,10 @@
     <string name="captain_to_dropoff">سر للأمام %1$s كم</string>
     <string name="captain_head_dropoff">توجّه إلى نقطة النزول</string>
     <string name="captain_ride_completed">اكتملت الرحلة</string>
+    <!-- Captain: rider changed the drop-off mid-trip -->
+    <string name="captain_dropoff_changed_title">تم تغيير عنوان النزول!</string>
+    <string name="captain_dropoff_changed_sub">قام الراكب بتغيير موقع النزول، وموقع النزول الجديد هو</string>
+    <string name="captain_navigate">توجيه</string>
     <!-- Captain: rate the rider -->
     <string name="captain_rate_rider">قيّم الراكب</string>
     <string name="captain_total_earning">إجمالي الأرباح</string>

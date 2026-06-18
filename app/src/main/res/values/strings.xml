@@ -138,6 +138,10 @@
     <string name="captain_to_dropoff">Go straight for %1$s km</string>
     <string name="captain_head_dropoff">Head to the drop-off</string>
     <string name="captain_ride_completed">Ride completed</string>
+    <!-- Captain: rider changed the drop-off mid-trip -->
+    <string name="captain_dropoff_changed_title">Drop-off Address Changed!</string>
+    <string name="captain_dropoff_changed_sub">Rider changed the drop-off location your new drop-off location is</string>
+    <string name="captain_navigate">Navigate</string>
     <!-- Captain: rate the rider -->
     <string name="captain_rate_rider">Rate Your Rider</string>
     <string name="captain_total_earning">Total Earning</string>

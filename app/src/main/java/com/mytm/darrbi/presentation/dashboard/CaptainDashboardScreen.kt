@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Person
@@ -51,11 +52,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
@@ -218,6 +222,7 @@ fun CaptainDashboardScreen(
         val request = state.incomingRequest
         val active = state.activeTrip
         val bidding = state.biddingTrip
+        val newDrop = state.destinationChanged
         val mapBusy = request != null || active != null || bidding != null
         // Verified + idle (no request open) → the full-screen broadcast list (reference).
         val showList = state.stage == CaptainStage.NoRiders && !mapBusy
@@ -359,6 +364,17 @@ fun CaptainDashboardScreen(
                     isHandling = state.isHandlingRequest,
                     onAccept = { viewModel.onEvent(CaptainDashboardEvent.AcceptRequest) },
                     onDecline = { viewModel.onEvent(CaptainDashboardEvent.DeclineRequest) },
+                )
+            }
+        } else if (active != null && newDrop != null) {
+            // Rider changed the drop-off mid-trip → "Drop-off Address Changed!" overlay (over the route map).
+            BottomCard {
+                DestinationChangedContent(
+                    address = newDrop.address,
+                    onNavigate = {
+                        openNavigation(navContext, newDrop.latitude, newDrop.longitude)
+                        viewModel.onEvent(CaptainDashboardEvent.DismissDestinationChange)
+                    },
                 )
             }
         } else if (active != null && state.ratingRider) {
@@ -918,6 +934,72 @@ private fun NavBanner(distanceKm: Double?) {
             color = DarrbiTheme.colors.onButton,
             modifier = Modifier.padding(horizontal = 18.dp, vertical = 16.dp),
         )
+    }
+}
+
+/**
+ * Drop-off-changed overlay (`rider_updated_destination`): a dashed-ring drop-off pin, the title/subtitle,
+ * the rider's new address in a pill, and a Navigate button (per the reference). Navigate launches external
+ * navigation to the new drop-off and returns the captain to the in-trip (start-ride) screen.
+ */
+@Composable
+private fun DestinationChangedContent(address: String, onNavigate: () -> Unit) {
+    val ringColor = DarrbiTheme.colors.outline
+    Column(modifier = Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(140.dp)
+                .drawBehind {
+                    drawCircle(
+                        color = ringColor,
+                        radius = size.minDimension / 2f,
+                        style = Stroke(width = 2.dp.toPx(), pathEffect = PathEffect.dashPathEffect(floatArrayOf(8f, 10f))),
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Box(
+                modifier = Modifier.size(104.dp).clip(CircleShape).background(DarrbiTheme.colors.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.LocationOn,
+                    contentDescription = null,
+                    tint = DarrbiTheme.colors.primary,
+                    modifier = Modifier.size(48.dp),
+                )
+            }
+        }
+        Spacer(Modifier.height(22.dp))
+        Text(
+            text = stringResource(R.string.captain_dropoff_changed_title),
+            style = DarrbiTheme.typography.titleLarge,
+            color = DarrbiTheme.colors.onSurface,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(8.dp))
+        Text(
+            text = stringResource(R.string.captain_dropoff_changed_sub),
+            style = DarrbiTheme.typography.body,
+            color = DarrbiTheme.colors.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+        )
+        Spacer(Modifier.height(22.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(12.dp),
+            color = DarrbiTheme.colors.surfaceVariant,
+        ) {
+            Text(
+                text = address.takeIf { it.isNotBlank() } ?: stringResource(R.string.captain_location_point),
+                style = DarrbiTheme.typography.bodyMedium,
+                color = DarrbiTheme.colors.onSurface,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 16.dp),
+            )
+        }
+        Spacer(Modifier.height(22.dp))
+        DarrbiPrimaryButton(text = stringResource(R.string.captain_navigate), onClick = onNavigate)
     }
 }
 
