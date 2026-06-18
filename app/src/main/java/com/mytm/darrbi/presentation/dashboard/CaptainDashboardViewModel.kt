@@ -412,8 +412,36 @@ class CaptainDashboardViewModel @Inject constructor(
         if (tripId.isNotBlank() && tripId != active.tripId) return
         val updated = active.copy(destination = newDestination)
         _state.update { it.copy(activeTrip = updated, destinationChanged = newDestination) }
-        // Redraw the pickup→destination polyline/marker so the dropping screen reflects the new drop-off.
-        if (_state.value.tripInProgress) fetchDropRoute(updated)
+        // Redraw the in-trip map as a route from the driver's CURRENT location to the new drop-off.
+        if (_state.value.tripInProgress) fetchRouteToNewDestination(updated)
+    }
+
+    /**
+     * Draws the dropping map from the driver's current location to the (new) drop-off — used after the rider
+     * changes the destination. Refreshes the device location first so both the car marker and the route
+     * origin sit at the driver's live position, then routes that origin → the new destination.
+     */
+    private fun fetchRouteToNewDestination(request: RideRequest) {
+        viewModelScope.launch {
+            (currentLocation() as? ApiResult.Success)?.let { fresh ->
+                _state.update { it.copy(myLocation = fresh.data) }
+            }
+            val origin = _state.value.myLocation ?: request.pickup
+            computeLeg(request.destination)?.let { (km, mins) ->
+                _state.update { it.copy(dropDistanceKm = km, dropTimeMinutes = mins) }
+            }
+            val points = when (val result = getRoute(origin, request.destination)) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error, is ApiResult.Failure -> emptyList()
+            }
+            val path = points.ifEmpty {
+                listOf(
+                    LatLngPoint(origin.latitude, origin.longitude),
+                    LatLngPoint(request.destination.latitude, request.destination.longitude),
+                )
+            }
+            _state.update { if (it.activeTrip?.tripId == request.tripId) it.copy(activeRoutePoints = path) else it }
+        }
     }
 
     /** Captain → pickup distance (km) + a rough ETA (minutes) from the captain's current location. */

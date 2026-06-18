@@ -159,11 +159,12 @@ fun CaptainDashboardScreen(
         val bounds = LatLngBounds.builder().apply { pts.forEach { include(it) } }.build()
         runCatching { cameraPositionState.animate(CameraUpdateFactory.newLatLngBounds(bounds, REQUEST_BOUNDS_PADDING_PX), 700) }
     }
-    // Accepted trip → frame the captain → pickup route.
-    LaunchedEffect(state.activeTrip?.tripId, state.activeRoutePoints, state.myLocation) {
+    // Accepted trip → frame the route: driver→destination while dropping, else captain→pickup.
+    LaunchedEffect(state.activeTrip?.tripId, state.activeRoutePoints, state.myLocation, state.tripInProgress) {
         val active = state.activeTrip ?: return@LaunchedEffect
+        val anchor = if (state.tripInProgress) active.destination else active.pickup
         val pts = buildList {
-            add(LatLng(active.pickup.latitude, active.pickup.longitude))
+            add(LatLng(anchor.latitude, anchor.longitude))
             state.myLocation?.let { add(LatLng(it.latitude, it.longitude)) }
             addAll(state.activeRoutePoints.map { LatLng(it.latitude, it.longitude) })
         }
