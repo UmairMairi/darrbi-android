@@ -51,8 +51,14 @@ data class CaptainDashboardUiState(
     val ibanVerifying: Boolean = false,
     val ibanError: Boolean = false,
     val bankName: String? = null,
-    /** Device location, once the captain is set up and grants permission, used to centre the map. */
+    /** Device location, once the captain is set up and grants permission, used to centre/frame the map. */
     val myLocation: PlaceLocation? = null,
+    /**
+     * The captain's LIVE position, updated on every location tick — drives the car marker so it moves as
+     * the captain drives. Kept separate from [myLocation] (which the camera frames off) so the map doesn't
+     * re-animate on every tick. Falls back to [myLocation] until the first tick arrives.
+     */
+    val driverLocation: LatLngPoint? = null,
     /** Incoming ride request to accept/decline (`trip_request`); null when none is pending. */
     val incomingRequest: RideRequest? = null,
     /** Pickup → destination route polyline for the incoming request. */
@@ -111,6 +117,10 @@ data class CaptainDashboardUiState(
 ) {
     val canSubmitIban: Boolean
         get() = !ibanVerifying && ibanInput.startsWith("SA", ignoreCase = true) && ibanInput.length == IBAN_LENGTH
+
+    /** Where to draw the captain's car marker: the live position, else the last framed device location. */
+    val carMarker: LatLngPoint?
+        get() = driverLocation ?: myLocation?.let { LatLngPoint(it.latitude, it.longitude) }
 
     companion object {
         const val IBAN_LENGTH = 24 // Saudi IBAN: "SA" + 22 digits
@@ -242,6 +252,8 @@ class CaptainDashboardViewModel @Inject constructor(
         locationStreamJob = viewModelScope.launch {
             streamLocationUpdates().collect { point ->
                 socketService.updateCaptainLocation(point.latitude, point.longitude)
+                // Move the on-map car marker to the captain's live position (camera framing is unaffected).
+                _state.update { it.copy(driverLocation = point) }
             }
         }
     }

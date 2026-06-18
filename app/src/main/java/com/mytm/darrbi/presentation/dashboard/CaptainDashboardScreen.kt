@@ -268,7 +268,7 @@ fun CaptainDashboardScreen(
                     state = rememberMarkerState(key = "req_dest", position = LatLng(request.destination.latitude, request.destination.longitude)),
                     icon = pinIcon, anchor = Offset(0.5f, 0.5f),
                 )
-                state.myLocation?.let {
+                state.carMarker?.let {
                     AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "req_driver")
                 }
             } else if (active != null) {
@@ -287,7 +287,7 @@ fun CaptainDashboardScreen(
                         state = rememberMarkerState(key = if (state.tripInProgress) "act_dest" else "act_pickup", position = LatLng(pinTarget.latitude, pinTarget.longitude)),
                         icon = pinIcon, anchor = Offset(0.5f, 0.5f),
                     )
-                    state.myLocation?.let {
+                    state.carMarker?.let {
                         AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "act_driver")
                     }
                 }
@@ -305,7 +305,7 @@ fun CaptainDashboardScreen(
                     state = rememberMarkerState(key = "bid_dest", position = LatLng(bidding.dropoff.latitude, bidding.dropoff.longitude)),
                     icon = pinIcon, anchor = Offset(0.5f, 0.5f),
                 )
-                state.myLocation?.let {
+                state.carMarker?.let {
                     AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "bid_driver")
                 }
             }
