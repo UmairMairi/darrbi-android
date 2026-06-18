@@ -130,6 +130,8 @@
     <string name="captain_cancel_ride">Cancel Ride</string>
     <string name="captain_menu">Menu</string>
     <!-- Captain: start trip with OTP -->
+    <string name="captain_enter_pin_title">Enter PIN from rider to start the ride</string>
+    <string name="captain_start_ride">Start Ride</string>
     <string name="captain_enter_otp_title">Enter Rider\'s OTP</string>
     <string name="captain_enter_otp_sub">Ask the rider for the code to start the trip</string>
     <string name="captain_enter_otp_sub_named">Ask %1$s for the code to start the trip</string>

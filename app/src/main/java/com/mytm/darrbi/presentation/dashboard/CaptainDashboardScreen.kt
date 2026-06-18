@@ -13,6 +13,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.heightIn
@@ -20,6 +21,8 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -48,12 +51,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.OffsetMapping
 import androidx.compose.ui.text.input.TransformedText
@@ -351,12 +358,13 @@ fun CaptainDashboardScreen(
             BottomCard {
                 OtpEntryContent(
                     riderName = active.riderName,
+                    riderImageUrl = active.riderImageUrl,
+                    riderRating = active.riderRating,
                     otp = state.otpInput,
                     isStarting = state.isStartingTrip,
                     isError = state.otpError,
                     onOtp = { viewModel.onEvent(CaptainDashboardEvent.EnterOtp(it)) },
                     onSubmit = { viewModel.onEvent(CaptainDashboardEvent.SubmitOtp) },
-                    onBack = { viewModel.onEvent(CaptainDashboardEvent.DismissOtp) },
                 )
             }
         } else if (active != null) {
@@ -411,9 +419,10 @@ fun CaptainDashboardScreen(
 
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.BottomCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
-    // navigationBarPadding keeps the card content above the system nav bar (it was drawing behind it).
+    // navigationBarPadding keeps the card content above the system nav bar; imePadding lifts it above the
+    // keyboard (e.g. the PIN / IBAN inputs) so the card stays visible while typing.
     DarrbiCard(
-        modifier = Modifier.align(Alignment.BottomCenter),
+        modifier = Modifier.align(Alignment.BottomCenter).imePadding(),
         navigationBarPadding = true,
         content = content,
     )
@@ -753,53 +762,110 @@ private fun AddressRow(label: String, address: String, dotColor: Color) {
     }
 }
 
-/** OTP-entry card shown at pickup (`driver_reached`): the captain enters the rider's code to start. */
+/**
+ * Enter-PIN card shown at pickup (`driver_reached`) per the reference: a segmented 4-box PIN input, the
+ * rider row (avatar + name + rating), and a "Start Ride" button.
+ */
 @Composable
 private fun OtpEntryContent(
     riderName: String?,
+    riderImageUrl: String?,
+    riderRating: Double?,
     otp: String,
     isStarting: Boolean,
     isError: Boolean,
     onOtp: (String) -> Unit,
     onSubmit: () -> Unit,
-    onBack: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
-        Text(stringResource(R.string.captain_enter_otp_title), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
-        Spacer(Modifier.height(6.dp))
-        Text(
-            text = riderName?.takeIf { it.isNotBlank() }?.let { stringResource(R.string.captain_enter_otp_sub_named, it) }
-                ?: stringResource(R.string.captain_enter_otp_sub),
-            style = DarrbiTheme.typography.body.copy(fontSize = 13.sp),
-            color = DarrbiTheme.colors.onSurfaceVariant,
-        )
+        Text(stringResource(R.string.captain_enter_pin_title), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
+        Spacer(Modifier.height(20.dp))
+        PinInput(otp = otp, isError = isError, onOtp = onOtp)
+        if (isError) {
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.captain_otp_invalid), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.error)
+        }
         Spacer(Modifier.height(16.dp))
-        DarrbiTextField(
-            value = otp,
-            onValueChange = onOtp,
-            label = stringResource(R.string.captain_otp_hint),
-            keyboardType = KeyboardType.Number,
-            isError = isError,
-            supportingText = if (isError) stringResource(R.string.captain_otp_invalid) else null,
-        )
+        HorizontalDivider(color = DarrbiTheme.colors.outline)
         Spacer(Modifier.height(16.dp))
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = riderImageUrl,
+                contentDescription = null,
+                modifier = Modifier.size(48.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(R.drawable.user_placeholder),
+                error = painterResource(R.drawable.user_placeholder),
+                fallback = painterResource(R.drawable.user_placeholder),
+            )
+            Spacer(Modifier.width(12.dp))
+            Column {
+                Text(
+                    text = riderName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.captain_rider_fallback),
+                    style = DarrbiTheme.typography.title.copy(fontSize = 16.sp),
+                    color = DarrbiTheme.colors.onSurface,
+                    maxLines = 1,
+                )
+                riderRating?.let { rating ->
+                    Spacer(Modifier.height(2.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.width(4.dp))
+                        Text(formatRating(rating), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                    }
+                }
+            }
+        }
+        Spacer(Modifier.height(18.dp))
         DarrbiPrimaryButton(
-            text = stringResource(R.string.captain_start_trip),
+            text = stringResource(R.string.captain_start_ride),
             onClick = onSubmit,
-            enabled = !isStarting && otp.length >= OTP_MIN_LEN,
-        )
-        Spacer(Modifier.height(8.dp))
-        Text(
-            text = stringResource(R.string.cd_back),
-            style = DarrbiTheme.typography.button,
-            color = DarrbiTheme.colors.onSurfaceVariant,
-            modifier = Modifier.fillMaxWidth().clickable(onClick = onBack).padding(vertical = 8.dp),
-            textAlign = TextAlign.Center,
+            enabled = !isStarting && otp.length == PIN_LEN,
         )
     }
 }
 
-private const val OTP_MIN_LEN = 4
+/** Segmented PIN input: a hidden text field driving [PIN_LEN] boxes (active box green, per the reference). */
+@Composable
+private fun PinInput(otp: String, isError: Boolean, onOtp: (String) -> Unit) {
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
+    BasicTextField(
+        value = otp,
+        onValueChange = { v -> if (v.length <= PIN_LEN && v.all(Char::isDigit)) onOtp(v) },
+        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+        textStyle = TextStyle(color = Color.Transparent),
+        cursorBrush = SolidColor(Color.Transparent),
+        modifier = Modifier.focusRequester(focus),
+        decorationBox = {
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                repeat(PIN_LEN) { index ->
+                    val char = otp.getOrNull(index)?.toString() ?: ""
+                    val active = index == otp.length
+                    val border = when {
+                        isError -> DarrbiTheme.colors.error
+                        active -> DarrbiTheme.colors.primary
+                        else -> DarrbiTheme.colors.outline
+                    }
+                    Box(
+                        modifier = Modifier.weight(1f).height(64.dp).clip(RoundedCornerShape(14.dp))
+                            .border(if (active || isError) 2.dp else 1.dp, border, RoundedCornerShape(14.dp)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            text = if (char.isNotEmpty()) char else if (active) "|" else "",
+                            style = DarrbiTheme.typography.titleLarge.copy(fontSize = 24.sp),
+                            color = if (char.isNotEmpty()) DarrbiTheme.colors.onSurface else DarrbiTheme.colors.primary,
+                        )
+                    }
+                }
+            }
+        },
+    )
+}
+
+/** Rider PIN length (the reference shows 4 boxes). */
+private const val PIN_LEN = 4
 
 /**
  * Open-request detail card (over the route map): rider, offered fare, distance·time, pickup/drop, then

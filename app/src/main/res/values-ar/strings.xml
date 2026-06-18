@@ -130,6 +130,8 @@
     <string name="captain_cancel_ride">إلغاء الرحلة</string>
     <string name="captain_menu">القائمة</string>
     <!-- Captain: start trip with OTP -->
+    <string name="captain_enter_pin_title">أدخل رمز الراكب لبدء الرحلة</string>
+    <string name="captain_start_ride">بدء الرحلة</string>
     <string name="captain_enter_otp_title">أدخل رمز الراكب</string>
     <string name="captain_enter_otp_sub">اطلب الرمز من الراكب لبدء الرحلة</string>
     <string name="captain_enter_otp_sub_named">اطلب الرمز من %1$s لبدء الرحلة</string>
