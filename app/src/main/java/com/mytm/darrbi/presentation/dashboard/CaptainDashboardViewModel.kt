@@ -122,6 +122,8 @@ data class CaptainDashboardUiState(
     val bidErrorCode: String? = null,
     /** One-shot: you lost / the trip closed → reason code shown once. */
     val bidLostReason: String? = null,
+    /** One-shot: the rider cancelled the accepted trip → notice shown once before returning to the list. */
+    val riderCancelledNotice: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val canSubmitIban: Boolean
@@ -187,6 +189,7 @@ sealed interface CaptainDashboardEvent {
     data class CounterBid(val tripId: String, val fare: Double) : CaptainDashboardEvent
     data object ConsumeBidError : CaptainDashboardEvent
     data object ConsumeBidLost : CaptainDashboardEvent
+    data object ConsumeRiderCancelled : CaptainDashboardEvent
 }
 
 @HiltViewModel
@@ -227,6 +230,7 @@ class CaptainDashboardViewModel @Inject constructor(
                 when (event) {
                     is TripSocketEvent.TripRequest -> onTripRequest(event.request)
                     is TripSocketEvent.DestinationChanged -> onDestinationChanged(event.tripId, event.newDestination)
+                    is TripSocketEvent.RiderCancelled -> onRiderCancelled()
                     else -> Unit // other trip events are rider-facing
                 }
             }
@@ -332,6 +336,7 @@ class CaptainDashboardViewModel @Inject constructor(
             is CaptainDashboardEvent.CounterBid -> submitBid(event.tripId, BidType.Counter, event.fare)
             CaptainDashboardEvent.ConsumeBidError -> _state.update { it.copy(bidErrorCode = null) }
             CaptainDashboardEvent.ConsumeBidLost -> _state.update { it.copy(bidLostReason = null) }
+            CaptainDashboardEvent.ConsumeRiderCancelled -> _state.update { it.copy(riderCancelledNotice = false) }
         }
     }
 
@@ -473,6 +478,16 @@ class CaptainDashboardViewModel @Inject constructor(
             }
             _state.update { if (it.activeTrip?.tripId == request.tripId) it.copy(activeRoutePoints = path) else it }
         }
+    }
+
+    /**
+     * The rider cancelled the accepted trip (`rider_cancelled`). Drop the active trip and any open cancel
+     * sheet — clearActiveTrip returns the captain to the broadcast trips list — and flag a one-shot notice.
+     */
+    private fun onRiderCancelled() {
+        if (_state.value.activeTrip == null) return
+        clearActiveTrip()
+        _state.update { it.copy(riderCancelledNotice = true) }
     }
 
     /** Captain → pickup distance (km) + a rough ETA (minutes) from the captain's current location. */

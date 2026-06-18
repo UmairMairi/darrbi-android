@@ -442,6 +442,10 @@ class SocketServiceImpl @Inject constructor(
                 Log.d(TAG, "$TRIP_DETAIL → DriverCancelled")
                 _tripEvents.tryEmit(TripSocketEvent.DriverCancelled)
             }
+            ACTION_RIDER_CANCELLED -> {
+                Log.d(TAG, "$TRIP_DETAIL → RiderCancelled")
+                _tripEvents.tryEmit(TripSocketEvent.RiderCancelled)
+            }
             ACTION_DES_CHANGED -> {
                 val data = json.optJSONObject("data")
                 // Prefer the updated destination (lat != 0), else fall back to the original (mirrors ride-android).
@@ -710,6 +714,7 @@ class SocketServiceImpl @Inject constructor(
         const val ACTION_TRIP_REQUEST = "trip_request"
         const val ACTION_DRIVER_CANCELLED = "driver_cancelled"
         const val ACTION_DRIVER_CANCELLED_BEFORE_ARRIVED = "driver_cancelled_before_arrived"
+        const val ACTION_RIDER_CANCELLED = "rider_cancelled"
         const val ACTION_DES_CHANGED = "rider_updated_destination"
         const val PAYMENT_METHOD_CASH = 2
         const val UPDATE_CAPTAIN_LOCATION = "update-captain-location"

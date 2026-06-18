@@ -44,6 +44,9 @@ sealed interface TripSocketEvent {
     /** The captain cancelled the trip (`action == "driver_cancelled"`) — rider returns to ride selection. */
     data object DriverCancelled : TripSocketEvent
 
+    /** CAPTAIN side: the rider cancelled the accepted trip (`action == "rider_cancelled"`) — return to the trips list. */
+    data object RiderCancelled : TripSocketEvent
+
     /** CAPTAIN side: an incoming ride request to accept/decline (`action == "trip_request"`). */
     data class TripRequest(val request: RideRequest) : TripSocketEvent
 

@@ -297,7 +297,8 @@ class RiderBookingViewModel @Inject constructor(
                     is TripSocketEvent.TripCompleted -> onTripCompleted(event.trip)
                     TripSocketEvent.DriverCancelled -> onDriverCancelled()
                     is TripSocketEvent.TripRequest,
-                    is TripSocketEvent.DestinationChanged -> Unit // captain-side events; ignored on the rider
+                    is TripSocketEvent.DestinationChanged,
+                    TripSocketEvent.RiderCancelled -> Unit // captain-side events; ignored on the rider
                 }
             }
         }

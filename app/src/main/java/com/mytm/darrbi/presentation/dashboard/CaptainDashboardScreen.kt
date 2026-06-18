@@ -216,6 +216,14 @@ fun CaptainDashboardScreen(
             viewModel.onEvent(CaptainDashboardEvent.ConsumeBidLost)
         }
     }
+    // Rider cancelled the accepted trip → toast and return to the trips list.
+    val riderCancelledMsg = stringResource(R.string.captain_rider_cancelled)
+    LaunchedEffect(state.riderCancelledNotice) {
+        if (state.riderCancelledNotice) {
+            android.widget.Toast.makeText(ctx, riderCancelledMsg, android.widget.Toast.LENGTH_SHORT).show()
+            viewModel.onEvent(CaptainDashboardEvent.ConsumeRiderCancelled)
+        }
+    }
 
     // System-back closes an open request detail (back to the list) instead of leaving the dashboard.
     BackHandler(enabled = state.biddingTrip != null) { viewModel.onEvent(CaptainDashboardEvent.DismissBidSheet) }
