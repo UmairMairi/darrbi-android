@@ -111,6 +111,7 @@ import com.google.maps.android.compose.Marker
 import com.google.maps.android.compose.Polyline
 import com.google.maps.android.compose.rememberCameraPositionState
 import com.google.maps.android.compose.rememberMarkerState
+import com.google.maps.android.compose.rememberUpdatedMarkerState
 import com.mytm.darrbi.R
 import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.LatLngPoint
@@ -559,18 +560,23 @@ private fun RiderMap(
 @Composable
 @com.google.maps.android.compose.GoogleMapComposable
 internal fun AnimatedCarMarker(target: LatLng, icon: BitmapDescriptor?, key: String) {
-    val markerState = rememberMarkerState(key = key, position = target)
-    var bearing by remember { mutableFloatStateOf(0f) }
+    // The position the marker is currently drawn at — animated toward each new [target]. We feed this into
+    // rememberUpdatedMarkerState (the maps-compose 6.x pattern) instead of mutating MarkerState.position
+    // directly, which no longer moves the marker reliably in 6.x.
+    var current by remember(key) { mutableStateOf(target) }
+    var bearing by remember(key) { mutableFloatStateOf(0f) }
     LaunchedEffect(target) {
-        val start = markerState.position
+        val start = current
         if (start.latitude != target.latitude || start.longitude != target.longitude) {
             val computed = bearingBetween(start, target)
             if (!computed.isNaN()) bearing = computed
             Animatable(0f).animateTo(1f, tween(durationMillis = DRIVER_MARKER_ANIM_MS, easing = LinearEasing)) {
-                markerState.position = lerpLatLng(start, target, value)
+                current = lerpLatLng(start, target, value)
             }
+            current = target
         }
     }
+    val markerState = rememberUpdatedMarkerState(position = current)
     Marker(state = markerState, icon = icon, anchor = Offset(0.5f, 0.5f), flat = true, rotation = bearing)
 }
 
