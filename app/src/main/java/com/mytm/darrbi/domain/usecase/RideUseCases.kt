@@ -75,6 +75,12 @@ class RateDriverUseCase @Inject constructor(private val repository: RideReposito
         repository.rateDriver(tripId, stars, riderName, driverName)
 }
 
+/** Submits the captain's star rating for the rider after a completed trip. */
+class RateRiderUseCase @Inject constructor(private val repository: RideRepository) {
+    suspend operator fun invoke(tripId: String, stars: Int, captainName: String, riderName: String): ApiResult<Unit> =
+        repository.rateRider(tripId, stars, captainName, riderName)
+}
+
 /** CAPTAIN accepts an incoming ride request. */
 class AcceptTripUseCase @Inject constructor(private val repository: RideRepository) {
     suspend operator fun invoke(tripId: String): ApiResult<Unit> = repository.acceptTrip(tripId)

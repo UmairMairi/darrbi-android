@@ -138,6 +138,11 @@
     <string name="captain_to_dropoff">سر للأمام %1$s كم</string>
     <string name="captain_head_dropoff">توجّه إلى نقطة النزول</string>
     <string name="captain_ride_completed">اكتملت الرحلة</string>
+    <!-- Captain: rate the rider -->
+    <string name="captain_rate_rider">قيّم الراكب</string>
+    <string name="captain_total_earning">إجمالي الأرباح</string>
+    <string name="captain_loyalty_points">إجمالي نقاط الولاء المكتسبة</string>
+    <string name="captain_submit_rating">إرسال التقييم</string>
     <string name="captain_enter_otp_title">أدخل رمز الراكب</string>
     <string name="captain_enter_otp_sub">اطلب الرمز من الراكب لبدء الرحلة</string>
     <string name="captain_enter_otp_sub_named">اطلب الرمز من %1$s لبدء الرحلة</string>

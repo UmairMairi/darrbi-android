@@ -23,6 +23,7 @@ import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
 import com.mytm.darrbi.domain.usecase.GetOpenTripsUseCase
 import com.mytm.darrbi.domain.usecase.GetRouteUseCase
 import com.mytm.darrbi.domain.usecase.PlaceBidUseCase
+import com.mytm.darrbi.domain.usecase.RateRiderUseCase
 import com.mytm.darrbi.domain.usecase.ReachedPickupUseCase
 import com.mytm.darrbi.domain.usecase.RejectTripUseCase
 import com.mytm.darrbi.domain.usecase.StartTripUseCase
@@ -82,8 +83,11 @@ data class CaptainDashboardUiState(
     val dropDistanceKm: Double? = null,
     val dropTimeMinutes: Int? = null,
     val isCompleting: Boolean = false,
-    /** One-shot: the ride was completed → the UI shows a confirmation once. */
-    val rideEnded: Boolean = false,
+    /** After completion → the "Rate Your Rider" screen. */
+    val ratingRider: Boolean = false,
+    /** Selected star rating (1..5) for the rider; 0 = none yet. */
+    val riderStars: Int = 0,
+    val isSubmittingReview: Boolean = false,
     /** Whether the 3-dot menu (with Cancel Ride) is open. */
     val showMenu: Boolean = false,
     // --- V2 broadcast dispatch + bidding ---
@@ -132,7 +136,10 @@ sealed interface CaptainDashboardEvent {
     data object ConsumeTripStarted : CaptainDashboardEvent
     /** "End Ride" on the dropping screen → complete the trip. */
     data object EndRide : CaptainDashboardEvent
-    data object ConsumeRideEnded : CaptainDashboardEvent
+    /** Star tapped on the rate-rider screen (1..5). */
+    data class SelectRiderRating(val stars: Int) : CaptainDashboardEvent
+    /** Submit the rider rating. */
+    data object SubmitRiderRating : CaptainDashboardEvent
     /** Toggle the 3-dot menu (Cancel Ride). */
     data object ToggleMenu : CaptainDashboardEvent
     /** Cancel the accepted trip from the 3-dot menu. */
@@ -165,6 +172,7 @@ class CaptainDashboardViewModel @Inject constructor(
     private val reachedPickup: ReachedPickupUseCase,
     private val startTripUseCase: StartTripUseCase,
     private val completeTripUseCase: CompleteTripUseCase,
+    private val rateRiderUseCase: RateRiderUseCase,
     private val cancelTripByDriver: CancelTripByDriverUseCase,
     private val getOngoingTrip: GetOngoingTripUseCase,
     private val getOpenTrips: GetOpenTripsUseCase,
@@ -271,7 +279,8 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.DismissOtp -> _state.update { it.copy(awaitingOtp = false, otpInput = "", otpError = false) }
             CaptainDashboardEvent.ConsumeTripStarted -> _state.update { it.copy(tripStarted = false) }
             CaptainDashboardEvent.EndRide -> endRide()
-            CaptainDashboardEvent.ConsumeRideEnded -> _state.update { it.copy(rideEnded = false) }
+            is CaptainDashboardEvent.SelectRiderRating -> _state.update { it.copy(riderStars = event.stars) }
+            CaptainDashboardEvent.SubmitRiderRating -> submitRiderRating()
             CaptainDashboardEvent.ToggleMenu -> _state.update { it.copy(showMenu = !it.showMenu) }
             CaptainDashboardEvent.CancelTrip -> cancelTrip()
             CaptainDashboardEvent.ConsumeError -> _state.update { it.copy(errorMessage = null) }
@@ -524,12 +533,26 @@ class CaptainDashboardViewModel @Inject constructor(
         _state.update { it.copy(isCompleting = true, errorMessage = null) }
         viewModelScope.launch {
             when (val result = completeTripUseCase(trip.tripId, trip.destination)) {
-                is ApiResult.Success -> {
-                    _state.update { it.copy(isCompleting = false, rideEnded = true) }
-                    clearActiveTrip()
-                }
+                // Completed → show the "Rate Your Rider" screen (keep the trip for its summary).
+                is ApiResult.Success -> _state.update { it.copy(isCompleting = false, tripInProgress = false, ratingRider = true, riderStars = 0) }
                 is ApiResult.Error -> _state.update { it.copy(isCompleting = false, errorMessage = result.message) }
                 is ApiResult.Failure -> _state.update { it.copy(isCompleting = false, errorMessage = result.error.message) }
+            }
+        }
+    }
+
+    /** Submit the captain's star rating for the rider; on success return to the dashboard. */
+    private fun submitRiderRating() {
+        val trip = _state.value.activeTrip ?: return
+        val stars = _state.value.riderStars
+        if (stars < 1 || _state.value.isSubmittingReview) return
+        _state.update { it.copy(isSubmittingReview = true, errorMessage = null) }
+        viewModelScope.launch {
+            val captainName = _state.value.captain?.driverName ?: CAPTAIN_REVIEW_NAME
+            when (val result = rateRiderUseCase(trip.tripId, stars, captainName, trip.riderName)) {
+                is ApiResult.Success -> clearActiveTrip()
+                is ApiResult.Error -> _state.update { it.copy(isSubmittingReview = false, errorMessage = result.message) }
+                is ApiResult.Failure -> _state.update { it.copy(isSubmittingReview = false, errorMessage = result.error.message) }
             }
         }
     }
@@ -590,6 +613,9 @@ class CaptainDashboardViewModel @Inject constructor(
                 isCompleting = false,
                 dropDistanceKm = null,
                 dropTimeMinutes = null,
+                ratingRider = false,
+                riderStars = 0,
+                isSubmittingReview = false,
             )
         }
     }
@@ -689,6 +715,11 @@ class CaptainDashboardViewModel @Inject constructor(
                 // In-progress draws pickup→destination; otherwise the captain→pickup route.
                 if (trip.stage == TripStage.InProgress) fetchDropRoute(request) else fetchActiveRoute(request)
             }
+            // Completed but unrated → restore the rate-rider screen.
+            TripStage.Completed -> {
+                _state.update { it.copy(activeTrip = request, ratingRider = true, riderStars = 0, showMenu = false) }
+                fetchDropRoute(request)
+            }
             else -> Unit
         }
     }
@@ -700,5 +731,6 @@ class CaptainDashboardViewModel @Inject constructor(
         const val REASON_CLOSED = "CLOSED"
         const val REASON_BID_FAILED = "BID_FAILED"
         const val OTP_MAX_LEN = 6
+        const val CAPTAIN_REVIEW_NAME = "Captain"
     }
 }

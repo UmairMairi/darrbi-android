@@ -62,6 +62,9 @@ interface RideRepository {
     /** Submits the rider's star rating ([stars] = 1..5) for the captain of [tripId] (`POST reviews/rider`). */
     suspend fun rateDriver(tripId: String, stars: Int, riderName: String, driverName: String): ApiResult<Unit>
 
+    /** Submits the captain's star rating ([stars] = 1..5) for the rider of [tripId] (`POST reviews/driver`). */
+    suspend fun rateRider(tripId: String, stars: Int, captainName: String, riderName: String): ApiResult<Unit>
+
     /** CAPTAIN accepts an incoming ride request (`PATCH trips/driver-accepted/{tripId}`). */
     suspend fun acceptTrip(tripId: String): ApiResult<Unit>
 

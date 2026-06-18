@@ -171,6 +171,18 @@ class RideRepositoryImpl @Inject constructor(
             )
         }.unwrapMainUnit()
 
+    override suspend fun rateRider(tripId: String, stars: Int, captainName: String, riderName: String): ApiResult<Unit> =
+        safeApiCall {
+            api.rateRider(
+                ReviewRequest(
+                    title = DRIVER_REVIEW_TITLE,
+                    description = "$captainName Review to $riderName",
+                    rating = stars.toFloat(),
+                    tripId = tripId,
+                ),
+            )
+        }.unwrapMainUnit()
+
     override suspend fun acceptTrip(tripId: String): ApiResult<Unit> =
         safeApiCall { api.driverAcceptTrip(tripId) }.unwrapMainUnit()
 
@@ -214,6 +226,7 @@ class RideRepositoryImpl @Inject constructor(
         // ride-android sends the city name in Arabic with the change-destination request.
         const val CITY_NAME_AR = "الرياض"
         const val REVIEW_TITLE = "Rider Review"
+        const val DRIVER_REVIEW_TITLE = "Driver Review"
         const val DECLINE_REASON_NONE = "none"
     }
 }

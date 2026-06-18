@@ -201,14 +201,6 @@ fun CaptainDashboardScreen(
             viewModel.onEvent(CaptainDashboardEvent.ConsumeTripStarted)
         }
     }
-    // Ride completed via End Ride.
-    val rideEndedMsg = stringResource(R.string.captain_ride_completed)
-    LaunchedEffect(state.rideEnded) {
-        if (state.rideEnded) {
-            android.widget.Toast.makeText(ctx, rideEndedMsg, android.widget.Toast.LENGTH_SHORT).show()
-            viewModel.onEvent(CaptainDashboardEvent.ConsumeRideEnded)
-        }
-    }
     // V2: you lost / the trip closed before you could win.
     val bidLostMsg = stringResource(R.string.captain_bid_lost)
     LaunchedEffect(state.bidLostReason) {
@@ -278,13 +270,19 @@ fun CaptainDashboardScreen(
                     state.activeRoutePoints.map { LatLng(it.latitude, it.longitude) }
                 }
                 if (route.size >= 2) Polyline(points = route, color = routeColor, width = 6f)
-                val pinTarget = if (state.tripInProgress) active.destination else active.pickup
-                Marker(
-                    state = rememberMarkerState(key = if (state.tripInProgress) "act_dest" else "act_pickup", position = LatLng(pinTarget.latitude, pinTarget.longitude)),
-                    icon = pinIcon, anchor = Offset(0.5f, 0.5f),
-                )
-                state.myLocation?.let {
-                    AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "act_driver")
+                if (state.ratingRider) {
+                    // Completed → show both ends of the trip (no live car).
+                    Marker(state = rememberMarkerState(key = "rate_pickup", position = LatLng(active.pickup.latitude, active.pickup.longitude)), icon = pinIcon, anchor = Offset(0.5f, 0.5f))
+                    Marker(state = rememberMarkerState(key = "rate_dest", position = LatLng(active.destination.latitude, active.destination.longitude)), icon = pinIcon, anchor = Offset(0.5f, 0.5f))
+                } else {
+                    val pinTarget = if (state.tripInProgress) active.destination else active.pickup
+                    Marker(
+                        state = rememberMarkerState(key = if (state.tripInProgress) "act_dest" else "act_pickup", position = LatLng(pinTarget.latitude, pinTarget.longitude)),
+                        icon = pinIcon, anchor = Offset(0.5f, 0.5f),
+                    )
+                    state.myLocation?.let {
+                        AnimatedCarMarker(target = LatLng(it.latitude, it.longitude), icon = carIcon, key = "act_driver")
+                    }
                 }
             } else if (bidding != null) {
                 // Open-trip detail → pickup→destination route + pickup/destination pins + the captain's car.
@@ -360,6 +358,21 @@ fun CaptainDashboardScreen(
                     isHandling = state.isHandlingRequest,
                     onAccept = { viewModel.onEvent(CaptainDashboardEvent.AcceptRequest) },
                     onDecline = { viewModel.onEvent(CaptainDashboardEvent.DeclineRequest) },
+                )
+            }
+        } else if (active != null && state.ratingRider) {
+            // Completed → rate the rider.
+            BottomCard {
+                RateRiderContent(
+                    riderName = active.riderName,
+                    riderImageUrl = active.riderImageUrl,
+                    stars = state.riderStars,
+                    earning = active.estimateEarning,
+                    paymentMethod = active.paymentMethod,
+                    loyaltyKm = state.dropDistanceKm ?: active.destDistanceKm,
+                    isSubmitting = state.isSubmittingReview,
+                    onRate = { viewModel.onEvent(CaptainDashboardEvent.SelectRiderRating(it)) },
+                    onSubmit = { viewModel.onEvent(CaptainDashboardEvent.SubmitRiderRating) },
                 )
             }
         } else if (active != null && state.tripInProgress) {
@@ -956,6 +969,95 @@ private fun DroppingContent(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.captain_end_ride), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onError)
+            }
+        }
+    }
+}
+
+/** Rate-your-rider card after completion (per the reference): stars, earning/payment, loyalty, submit. */
+@Composable
+private fun RateRiderContent(
+    riderName: String?,
+    riderImageUrl: String?,
+    stars: Int,
+    earning: Double,
+    paymentMethod: Int,
+    loyaltyKm: Double,
+    isSubmitting: Boolean,
+    onRate: (Int) -> Unit,
+    onSubmit: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            AsyncImage(
+                model = riderImageUrl,
+                contentDescription = null,
+                modifier = Modifier.size(56.dp).clip(CircleShape),
+                contentScale = ContentScale.Crop,
+                placeholder = painterResource(R.drawable.user_placeholder),
+                error = painterResource(R.drawable.user_placeholder),
+                fallback = painterResource(R.drawable.user_placeholder),
+            )
+            Spacer(Modifier.width(14.dp))
+            Column {
+                Text(stringResource(R.string.captain_rate_rider), style = DarrbiTheme.typography.body, color = DarrbiTheme.colors.onSurfaceVariant)
+                Text(
+                    text = riderName?.takeIf { it.isNotBlank() } ?: stringResource(R.string.captain_rider_fallback),
+                    style = DarrbiTheme.typography.title.copy(fontSize = 18.sp),
+                    color = DarrbiTheme.colors.onSurface,
+                    maxLines = 1,
+                )
+            }
+        }
+        Spacer(Modifier.height(16.dp))
+        StarRatingRow(stars = stars, onRate = onRate)
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = DarrbiTheme.colors.outline)
+        Spacer(Modifier.height(16.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            RequestStat(
+                modifier = Modifier.weight(1f),
+                label = stringResource(R.string.captain_total_earning),
+                value = stringResource(R.string.captain_sar, formatAmount(earning)),
+            )
+            RequestStat(
+                modifier = Modifier.weight(1f),
+                label = stringResource(R.string.captain_payment_method),
+                value = stringResource(if (paymentMethod == PAYMENT_METHOD_CARD) R.string.captain_payment_card else R.string.captain_payment_cash),
+            )
+        }
+        Spacer(Modifier.height(16.dp))
+        HorizontalDivider(color = DarrbiTheme.colors.outline)
+        Spacer(Modifier.height(16.dp))
+        RequestStat(
+            label = stringResource(R.string.captain_loyalty_points),
+            value = stringResource(R.string.captain_km_only, formatKm(loyaltyKm)),
+        )
+        Spacer(Modifier.height(18.dp))
+        DarrbiPrimaryButton(
+            text = stringResource(R.string.captain_submit_rating),
+            onClick = onSubmit,
+            enabled = !isSubmitting && stars >= 1,
+        )
+    }
+}
+
+/** Five tappable star circles (filled = orange, unrated = grey). */
+@Composable
+private fun StarRatingRow(stars: Int, onRate: (Int) -> Unit) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        (1..5).forEach { i ->
+            val filled = i <= stars
+            Box(
+                modifier = Modifier.size(48.dp).clip(CircleShape).background(DarrbiTheme.colors.surfaceVariant).clickable { onRate(i) },
+                contentAlignment = Alignment.Center,
+            ) {
+                Icon(
+                    Icons.Filled.Star,
+                    contentDescription = null,
+                    tint = if (filled) DarrbiTheme.colors.warning else DarrbiTheme.colors.onSurfaceVariant,
+                    modifier = Modifier.size(24.dp),
+                )
             }
         }
     }

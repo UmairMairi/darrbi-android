@@ -68,6 +68,10 @@ interface RideApi {
     @POST("reviews/rider")
     suspend fun rateDriver(@Body body: ReviewRequest): MainEnvelope<JsonElement>
 
+    /** Submits the captain's star rating for the rider after a completed trip (`POST reviews/driver`). */
+    @POST("reviews/driver")
+    suspend fun rateRider(@Body body: ReviewRequest): MainEnvelope<JsonElement>
+
     /** CAPTAIN accepts an incoming ride request. */
     @PATCH("trips/driver-accepted/{tripId}")
     suspend fun driverAcceptTrip(@Path("tripId") tripId: String): MainEnvelope<JsonElement>

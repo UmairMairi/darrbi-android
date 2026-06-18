@@ -138,6 +138,11 @@
     <string name="captain_to_dropoff">Go straight for %1$s km</string>
     <string name="captain_head_dropoff">Head to the drop-off</string>
     <string name="captain_ride_completed">Ride completed</string>
+    <!-- Captain: rate the rider -->
+    <string name="captain_rate_rider">Rate Your Rider</string>
+    <string name="captain_total_earning">Total Earning</string>
+    <string name="captain_loyalty_points">Total Loyalty Points Earned</string>
+    <string name="captain_submit_rating">Submit Rating</string>
     <string name="captain_enter_otp_title">Enter Rider\'s OTP</string>
     <string name="captain_enter_otp_sub">Ask the rider for the code to start the trip</string>
     <string name="captain_enter_otp_sub_named">Ask %1$s for the code to start the trip</string>
