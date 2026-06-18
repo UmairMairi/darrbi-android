@@ -70,6 +70,8 @@ fun ChatScreen(
     peerName: String,
     peerImageUrl: String?,
     onBack: () -> Unit,
+    /** True when the local user is the RIDER (peer is the captain) → show rider-facing quick replies. */
+    localUserIsRider: Boolean = true,
     viewModel: ChatViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -109,7 +111,7 @@ fun ChatScreen(
             }
         }
 
-        QuickReplies(onSelect = viewModel::sendQuickReply)
+        QuickReplies(localUserIsRider = localUserIsRider, onSelect = viewModel::sendQuickReply)
 
         ChatInputBar(
             value = state.draft,
@@ -238,8 +240,11 @@ private fun StatusTick(status: ChatMessageStatus) {
 }
 
 @Composable
-private fun QuickReplies(onSelect: (String) -> Unit) {
-    val replies = stringArrayResource(R.array.chat_quick_replies)
+private fun QuickReplies(localUserIsRider: Boolean, onSelect: (String) -> Unit) {
+    // Rider talks to the captain (and vice-versa), so each side gets its own quick replies.
+    val replies = stringArrayResource(
+        if (localUserIsRider) R.array.chat_quick_replies_rider else R.array.chat_quick_replies_captain,
+    )
     LazyRow(
         modifier = Modifier
             .fillMaxWidth()

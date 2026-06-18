@@ -56,7 +56,7 @@ private enum class Route {
 }
 
 /** The other party in an in-trip chat (driver for the rider; rider for the captain). */
-private data class ChatPeer(val id: String, val name: String, val imageUrl: String?)
+private data class ChatPeer(val id: String, val name: String, val imageUrl: String?, val localUserIsRider: Boolean)
 
 /**
  * App root: branded splash for 3s, then the onboarding flow. A successful captain application routes to
@@ -129,7 +129,8 @@ fun DarrbiRoot() {
                     onSeeDetails = { route = Route.StatusDetail },
                     onProfile = { profileReturn = Route.Dashboard; route = Route.Profile },
                     onChat = { request ->
-                        chatPeer = ChatPeer(request.riderId, request.riderName, request.riderImageUrl)
+                        // Captain chatting the rider → local user is the captain.
+                        chatPeer = ChatPeer(request.riderId, request.riderName, request.riderImageUrl, localUserIsRider = false)
                         chatReturn = Route.Dashboard
                         route = Route.Chat
                     },
@@ -137,7 +138,8 @@ fun DarrbiRoot() {
                 Route.RiderHome -> RiderFlowScreen(
                     onProfile = { profileReturn = Route.RiderHome; route = Route.Profile },
                     onChat = { trip ->
-                        chatPeer = ChatPeer(trip.driverId, trip.driverName, trip.driverImageUrl)
+                        // Rider chatting the captain → local user is the rider.
+                        chatPeer = ChatPeer(trip.driverId, trip.driverName, trip.driverImageUrl, localUserIsRider = true)
                         chatReturn = Route.RiderHome
                         route = Route.Chat
                     },
@@ -260,6 +262,7 @@ fun DarrbiRoot() {
                             peerName = peer.name,
                             peerImageUrl = peer.imageUrl,
                             onBack = { route = chatReturn },
+                            localUserIsRider = peer.localUserIsRider,
                         )
                     }
                 }

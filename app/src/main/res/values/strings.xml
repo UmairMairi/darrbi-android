@@ -425,10 +425,20 @@
     <string name="chat_send_image">Send image</string>
     <string name="chat_record_voice">Record voice message</string>
     <string name="chat_media_coming_soon">Media sharing is coming soon</string>
-    <string-array name="chat_quick_replies">
-        <item>I am at pickup location</item>
-        <item>Give me 2 mins</item>
+    <!-- Quick replies the RIDER sends to the captain -->
+    <string-array name="chat_quick_replies_rider">
+        <item>I\'m at the pickup point</item>
+        <item>Please wait, I\'m coming</item>
+        <item>Where are you?</item>
+        <item>Please call me</item>
+        <item>Okay, thanks</item>
+    </string-array>
+    <!-- Quick replies the CAPTAIN sends to the rider -->
+    <string-array name="chat_quick_replies_captain">
         <item>I\'m on my way</item>
+        <item>I\'ve arrived at the pickup</item>
+        <item>Please come out</item>
+        <item>I\'m waiting for you</item>
         <item>Okay</item>
     </string-array>
     <!-- Location permission -->

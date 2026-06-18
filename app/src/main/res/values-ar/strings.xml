@@ -423,10 +423,20 @@
     <string name="chat_send_image">إرسال صورة</string>
     <string name="chat_record_voice">تسجيل رسالة صوتية</string>
     <string name="chat_media_coming_soon">مشاركة الوسائط قادمة قريبًا</string>
-    <string-array name="chat_quick_replies">
+    <!-- Quick replies the RIDER sends to the captain -->
+    <string-array name="chat_quick_replies_rider">
         <item>أنا في موقع الانطلاق</item>
-        <item>أمهلني دقيقتين</item>
+        <item>انتظر من فضلك، أنا قادم</item>
+        <item>أين أنت؟</item>
+        <item>اتصل بي من فضلك</item>
+        <item>حسنًا، شكرًا</item>
+    </string-array>
+    <!-- Quick replies the CAPTAIN sends to the rider -->
+    <string-array name="chat_quick_replies_captain">
         <item>أنا في الطريق</item>
+        <item>لقد وصلت إلى موقع الانطلاق</item>
+        <item>اخرج من فضلك</item>
+        <item>أنا في انتظارك</item>
         <item>حسنًا</item>
     </string-array>
     <!-- Location permission -->
