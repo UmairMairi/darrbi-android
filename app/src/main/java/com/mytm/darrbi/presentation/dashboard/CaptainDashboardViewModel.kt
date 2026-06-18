@@ -110,8 +110,10 @@ data class CaptainDashboardUiState(
     // --- V2 broadcast dispatch + bidding ---
     /** Online (accepting/showing broadcast trips) vs offline (banner). Verified → online by default. */
     val isOnline: Boolean = true,
-    /** Live broadcast list of open (awaiting-bids) trips, from the socket. */
+    /** Live broadcast list of open (awaiting-bids) trips, from the socket (minus [dismissedTripIds]). */
     val openTrips: List<OpenTrip> = emptyList(),
+    /** Trips the captain swiped away — filtered out of the list even when the socket re-sends them. */
+    val dismissedTripIds: Set<String> = emptySet(),
     /** The open trip whose detail view is showing (map + bid actions); null when closed. */
     val biddingTrip: OpenTrip? = null,
     /** Pickup → destination route polyline for the open-trip detail map. */
@@ -182,6 +184,8 @@ sealed interface CaptainDashboardEvent {
     data class SetOnline(val online: Boolean) : CaptainDashboardEvent
     /** Open the bid sheet for an open trip. */
     data class OpenBidSheet(val tripId: String) : CaptainDashboardEvent
+    /** Swiped a request away → remove it from the list (and keep it out of future socket updates). */
+    data class DismissOpenTrip(val tripId: String) : CaptainDashboardEvent
     data object DismissBidSheet : CaptainDashboardEvent
     /** Bid by accepting the rider's offered fare as-is. */
     data class AcceptFare(val tripId: String) : CaptainDashboardEvent
@@ -239,7 +243,9 @@ class CaptainDashboardViewModel @Inject constructor(
         viewModelScope.launch {
             socketService.openTrips.collect { trips ->
                 _state.update { st ->
-                    val sorted = trips.sortedByDescending { it.createdAtMillis ?: 0L }
+                    val sorted = trips
+                        .filterNot { it.tripId in st.dismissedTripIds }
+                        .sortedByDescending { it.createdAtMillis ?: 0L }
                     st.copy(
                         openTrips = sorted,
                         // Keep the open bid sheet's trip in sync (or close it if the trip vanished).
@@ -331,6 +337,12 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.ConsumeAccepted -> _state.update { it.copy(tripAccepted = false) }
             is CaptainDashboardEvent.SetOnline -> setOnline(event.online)
             is CaptainDashboardEvent.OpenBidSheet -> openBidDetail(event.tripId)
+            is CaptainDashboardEvent.DismissOpenTrip -> _state.update {
+                it.copy(
+                    dismissedTripIds = it.dismissedTripIds + event.tripId,
+                    openTrips = it.openTrips.filterNot { t -> t.tripId == event.tripId },
+                )
+            }
             CaptainDashboardEvent.DismissBidSheet -> _state.update { it.copy(biddingTrip = null, bidErrorCode = null, biddingRoutePoints = emptyList()) }
             is CaptainDashboardEvent.AcceptFare -> submitBid(event.tripId, BidType.AcceptFare, null)
             is CaptainDashboardEvent.CounterBid -> submitBid(event.tripId, BidType.Counter, event.fare)
@@ -356,8 +368,9 @@ class CaptainDashboardViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = getOpenTrips(cabId, loc.latitude, loc.longitude)) {
                 is ApiResult.Success -> _state.update {
-                    // Merge: keep any socket-delivered trips, prefer the fresh snapshot.
+                    // Merge: keep any socket-delivered trips, prefer the fresh snapshot, drop swiped-away ones.
                     val merged = (result.data + it.openTrips).distinctBy { t -> t.tripId }
+                        .filterNot { t -> t.tripId in it.dismissedTripIds }
                         .sortedByDescending { t -> t.createdAtMillis ?: 0L }
                     it.copy(openTrips = merged)
                 }

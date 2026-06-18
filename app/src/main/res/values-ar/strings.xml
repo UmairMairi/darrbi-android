@@ -183,6 +183,7 @@
     <string name="captain_location_point">موقع على الخريطة</string>
     <string name="captain_bid_lost">لم تحصل على هذه الرحلة</string>
     <string name="captain_rider_cancelled">قام الراكب بإلغاء الرحلة</string>
+    <string name="captain_remove_request">إزالة الطلب</string>
     <string name="captain_place_bid">قدّم عرضك</string>
     <string name="captain_offer_your_fare">اعرض أجرتك</string>
     <string name="captain_bid_range">النطاق: %1$s – %2$s ر.س</string>

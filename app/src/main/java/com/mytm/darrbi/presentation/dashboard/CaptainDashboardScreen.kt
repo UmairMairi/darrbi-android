@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
@@ -41,11 +42,15 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.Surface
+import androidx.compose.material3.SwipeToDismissBox
+import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.rememberModalBottomSheetState
+import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -653,7 +658,13 @@ private fun DriverOpenTripsView(
             ) {
                 Spacer(Modifier.height(2.dp))
                 state.openTrips.forEach { trip ->
-                    OpenTripCard(trip = trip, onClick = { onEvent(CaptainDashboardEvent.OpenBidSheet(trip.tripId)) })
+                    key(trip.tripId) {
+                        SwipeableOpenTripCard(
+                            trip = trip,
+                            onClick = { onEvent(CaptainDashboardEvent.OpenBidSheet(trip.tripId)) },
+                            onDismiss = { onEvent(CaptainDashboardEvent.DismissOpenTrip(trip.tripId)) },
+                        )
+                    }
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -745,6 +756,42 @@ private fun LookingForRides(modifier: Modifier = Modifier) {
             color = DarrbiTheme.colors.onSurfaceVariant,
             textAlign = TextAlign.Center,
         )
+    }
+}
+
+/** An [OpenTripCard] the captain can swipe (either direction) to remove the request from the list. */
+@Composable
+private fun SwipeableOpenTripCard(trip: OpenTrip, onClick: () -> Unit, onDismiss: () -> Unit) {
+    val dismissState = rememberSwipeToDismissBoxState(
+        confirmValueChange = { value ->
+            if (value != SwipeToDismissBoxValue.Settled) {
+                onDismiss()
+                true
+            } else {
+                false
+            }
+        },
+    )
+    SwipeToDismissBox(
+        state = dismissState,
+        backgroundContent = {
+            Surface(
+                modifier = Modifier.fillMaxSize(),
+                shape = RoundedCornerShape(16.dp),
+                color = DarrbiTheme.colors.error,
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Icon(Icons.Filled.Delete, stringResource(R.string.captain_remove_request), tint = DarrbiTheme.colors.onError, modifier = Modifier.size(24.dp))
+                    Icon(Icons.Filled.Delete, null, tint = DarrbiTheme.colors.onError, modifier = Modifier.size(24.dp))
+                }
+            }
+        },
+    ) {
+        OpenTripCard(trip = trip, onClick = onClick)
     }
 }
 

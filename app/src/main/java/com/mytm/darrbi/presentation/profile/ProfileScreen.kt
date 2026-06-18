@@ -392,9 +392,9 @@ private fun ModeToggle(isCaptain: Boolean, onRider: () -> Unit, onCaptain: () ->
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .height(56.dp)
+            .height(45.dp)
             // Background carries the rounded shape WITHOUT clipping, so the active pill's shadow shows.
-            .background(DarrbiTheme.colors.modeTrack, RoundedCornerShape(28.dp))
+            .background(DarrbiTheme.colors.modeTrack, RoundedCornerShape(10.dp))
             .padding(5.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -408,7 +408,7 @@ private fun ModeSegment(label: String, active: Boolean, modifier: Modifier, onCl
     if (active) {
         Surface(
             modifier = modifier.clickable(onClick = onClick),
-            shape = RoundedCornerShape(24.dp),
+            shape = RoundedCornerShape(8.dp),
             color = DarrbiTheme.colors.modeAccent,
             shadowElevation = 4.dp,
         ) {
