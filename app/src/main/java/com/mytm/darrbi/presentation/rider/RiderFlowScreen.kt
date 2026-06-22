@@ -165,12 +165,17 @@ fun RiderFlowScreen(
             viewModel.onEvent(RiderBookingEvent.ConsumeInfo)
         }
     }
-    // V2 bidding notices (no bids yet / window timed out).
+    // V2 bidding notices (no bids yet / window timed out / payment hold failed at selection).
     val noBidsMsg = stringResource(R.string.rider_bid_no_bids)
     val bidTimeoutMsg = stringResource(R.string.rider_bid_timeout)
+    val paymentHoldMsg = stringResource(R.string.rider_bid_payment_hold)
     LaunchedEffect(state.bidNotice) {
         state.bidNotice?.let {
-            val msg = if (it == "TIMEOUT") bidTimeoutMsg else noBidsMsg
+            val msg = when (it) {
+                "TIMEOUT" -> bidTimeoutMsg
+                "PAYMENT_HOLD" -> paymentHoldMsg
+                else -> noBidsMsg
+            }
             android.widget.Toast.makeText(errorContext, msg, android.widget.Toast.LENGTH_LONG).show()
             viewModel.onEvent(RiderBookingEvent.ConsumeBidNotice)
         }

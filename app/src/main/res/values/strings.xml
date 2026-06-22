@@ -196,6 +196,7 @@
     <string name="captain_bid_err_ineligible">Go online and finish verification to bid</string>
     <string name="captain_bid_err_range_out">This pickup is out of your range</string>
     <string name="captain_bid_err_closed">This request is no longer available</string>
+    <string name="captain_bid_err_cab_mismatch">This request needs a different car type</string>
     <string name="captain_bid_err_generic">Couldn\'t place your bid</string>
     <string name="captain_bid_err_range">Enter an amount between SAR %1$s and %2$s</string>
     <string name="profile_switch_to_rider">Switch to Rider</string>
@@ -415,6 +416,7 @@
     <string name="rider_eta_min">%1$d min</string>
     <string name="rider_bid_no_bids">No offers yet — try raising your fare</string>
     <string name="rider_bid_timeout">No captain accepted in time</string>
+    <string name="rider_bid_payment_hold">Couldn\'t hold the fare. Top up your wallet and select the offer again.</string>
     <!-- Rider: in-trip help -->
     <string name="rider_help_call_center">Call Center</string>
     <string name="rider_help_share_ride">Share Ride Details</string>

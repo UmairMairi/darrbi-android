@@ -195,6 +195,7 @@
     <string name="captain_bid_err_ineligible">اتصل وأكمل التحقق لتقديم عرض</string>
     <string name="captain_bid_err_range_out">نقطة الانطلاق خارج نطاقك</string>
     <string name="captain_bid_err_closed">لم يعد هذا الطلب متاحاً</string>
+    <string name="captain_bid_err_cab_mismatch">هذا الطلب يحتاج إلى نوع سيارة مختلف</string>
     <string name="captain_bid_err_generic">تعذّر تقديم عرضك</string>
     <string name="captain_bid_err_range">أدخل مبلغاً بين %1$s و %2$s ر.س</string>
     <string name="profile_switch_to_rider">التبديل إلى الراكب</string>
@@ -413,6 +414,7 @@
     <string name="rider_eta_min">%1$d دقيقة</string>
     <string name="rider_bid_no_bids">لا عروض بعد — حاول رفع أجرتك</string>
     <string name="rider_bid_timeout">لم يقبل أي كابتن في الوقت المحدد</string>
+    <string name="rider_bid_payment_hold">تعذّر حجز الأجرة. اشحن محفظتك ثم اختر العرض مرة أخرى.</string>
     <!-- Rider: in-trip help -->
     <string name="rider_help_call_center">مركز الاتصال</string>
     <string name="rider_help_share_ride">مشاركة تفاصيل الرحلة</string>

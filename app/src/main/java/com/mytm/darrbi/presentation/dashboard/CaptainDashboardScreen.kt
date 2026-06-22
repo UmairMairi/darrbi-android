@@ -1348,6 +1348,7 @@ private fun bidErrorText(code: String): String = when (code) {
     "BID_ABOVE_CEILING" -> stringResource(R.string.captain_bid_err_above)
     "DRIVER_INELIGIBLE" -> stringResource(R.string.captain_bid_err_ineligible)
     "DRIVER_OUT_OF_RANGE" -> stringResource(R.string.captain_bid_err_range_out)
+    "CAB_TYPE_MISMATCH" -> stringResource(R.string.captain_bid_err_cab_mismatch)
     "TRIP_NOT_OPEN" -> stringResource(R.string.captain_bid_err_closed)
     else -> stringResource(R.string.captain_bid_err_generic)
 }

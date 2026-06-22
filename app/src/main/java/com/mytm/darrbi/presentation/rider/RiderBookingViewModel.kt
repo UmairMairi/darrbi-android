@@ -790,7 +790,15 @@ class RiderBookingViewModel @Inject constructor(
         viewModelScope.launch {
             when (val result = selectBidUseCase(tripId, bidId)) {
                 is ApiResult.Success -> { _state.update { it.copy(isBidActionInFlight = false) }; onBidMatched() }
-                is ApiResult.Error -> _state.update { it.copy(isBidActionInFlight = false, errorMessage = result.message) }
+                // PAYMENT_HOLD_FAILED is recoverable: the trip stays AWAITING_BIDS and the bid stays PENDING,
+                // so keep the rider on the bids screen and nudge them to top up and re-select the same bid.
+                is ApiResult.Error -> _state.update {
+                    if (result.message == CODE_PAYMENT_HOLD_FAILED) {
+                        it.copy(isBidActionInFlight = false, bidNotice = NOTICE_PAYMENT_HOLD)
+                    } else {
+                        it.copy(isBidActionInFlight = false, errorMessage = result.message)
+                    }
+                }
                 is ApiResult.Failure -> _state.update { it.copy(isBidActionInFlight = false, errorMessage = result.error.message) }
             }
         }
@@ -1229,6 +1237,9 @@ class RiderBookingViewModel @Inject constructor(
         const val BID_POLL_MS = 3_000L
         const val NOTICE_NO_BIDS = "NO_BIDS"
         const val NOTICE_TIMEOUT = "TIMEOUT"
+        const val NOTICE_PAYMENT_HOLD = "PAYMENT_HOLD"
+        /** V2 select-bid error code that's recoverable by topping up and retrying the same bid. */
+        const val CODE_PAYMENT_HOLD_FAILED = "PAYMENT_HOLD_FAILED"
         const val RESTORE_MAX_FACTOR = 2.5
     }
 }

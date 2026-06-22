@@ -1,7 +1,6 @@
 package com.mytm.darrbi.data.remote.service
 
 import com.mytm.darrbi.core.network.MainEnvelope
-import com.mytm.darrbi.core.network.V2Envelope
 import com.mytm.darrbi.data.remote.dto.BidDto
 import com.mytm.darrbi.data.remote.dto.CancelOpenTripRequest
 import com.mytm.darrbi.data.remote.dto.CreateBidTripData
@@ -37,33 +36,33 @@ interface V2RideApi {
         @Query("cabId") cabId: String,
         @Query("lat") lat: String,
         @Query("long") lng: String,
-    ): V2Envelope<OpenTripsData>
+    ): MainEnvelope<OpenTripsData>
 
     /** Driver places (or updates) a bid — ACCEPT the fare (bidType 1) or COUNTER (bidType 2 + bidFare). */
     @POST("v2/trips/{tripId}/bids")
-    suspend fun placeBid(@Path("tripId") tripId: String, @Body body: PlaceBidRequest): V2Envelope<BidDto>
+    suspend fun placeBid(@Path("tripId") tripId: String, @Body body: PlaceBidRequest): MainEnvelope<BidDto>
 
     /** Driver withdraws their active bid. */
     @DELETE("v2/trips/{tripId}/bids/{bidId}")
-    suspend fun withdrawBid(@Path("tripId") tripId: String, @Path("bidId") bidId: String): V2Envelope<V2Ignored>
+    suspend fun withdrawBid(@Path("tripId") tripId: String, @Path("bidId") bidId: String): MainEnvelope<V2Ignored>
 
     /** Rider: the current competing bids for a trip (sorted cheapest-first). */
     @GET("v2/trips/{tripId}/bids")
-    suspend fun getBids(@Path("tripId") tripId: String): V2Envelope<TripBidsData>
+    suspend fun getBids(@Path("tripId") tripId: String): MainEnvelope<TripBidsData>
 
     /** Rider selects (accepts) a bid → commits the match; trip becomes ACCEPTED_BY_DRIVER (2). */
     @PATCH("v2/trips/{tripId}/bids/{bidId}/accept")
-    suspend fun acceptBid(@Path("tripId") tripId: String, @Path("bidId") bidId: String): V2Envelope<SelectBidData>
+    suspend fun acceptBid(@Path("tripId") tripId: String, @Path("bidId") bidId: String): MainEnvelope<SelectBidData>
 
     /** Rider rejects a single bid (keeps collecting others). */
     @PATCH("v2/trips/{tripId}/bids/{bidId}/reject")
-    suspend fun rejectBid(@Path("tripId") tripId: String, @Path("bidId") bidId: String): V2Envelope<V2Ignored>
+    suspend fun rejectBid(@Path("tripId") tripId: String, @Path("bidId") bidId: String): MainEnvelope<V2Ignored>
 
     /** Rider raises the offered fare to attract more/faster bids. */
     @PATCH("v2/trips/{tripId}/raise-offer")
-    suspend fun raiseOffer(@Path("tripId") tripId: String, @Body body: RaiseOfferRequest): V2Envelope<V2Ignored>
+    suspend fun raiseOffer(@Path("tripId") tripId: String, @Body body: RaiseOfferRequest): MainEnvelope<V2Ignored>
 
     /** Rider cancels the open request before a match. */
     @PATCH("v2/trips/{tripId}/cancel")
-    suspend fun cancelTrip(@Path("tripId") tripId: String, @Body body: CancelOpenTripRequest): V2Envelope<V2Ignored>
+    suspend fun cancelTrip(@Path("tripId") tripId: String, @Body body: CancelOpenTripRequest): MainEnvelope<V2Ignored>
 }

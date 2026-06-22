@@ -20,10 +20,14 @@ suspend fun <T> safeApiCall(block: suspend () -> T): ApiResult<T> =
     } catch (e: SocketTimeoutException) {
         ApiResult.Failure(AppError.Timeout(e.message))
     } catch (e: HttpException) {
+        // House error body on a real HTTP 4xx/5xx: { statusCode, message, data:{ code, …details } }.
+        // Surface the machine `code` (so callers can map e.g. BID_BELOW_FLOOR / PAYMENT_HOLD_FAILED),
+        // falling back to the human message then the bare reason phrase.
+        val (errCode, errMessage) = parseHouseError(runCatching { e.response()?.errorBody()?.string() }.getOrNull())
         when (val code = e.code()) {
-            401 -> ApiResult.Failure(AppError.Unauthorized(e.message()))
-            in 500..599 -> ApiResult.Failure(AppError.Server(code, e.message()))
-            else -> ApiResult.Error(code, e.message())
+            401 -> ApiResult.Failure(AppError.Unauthorized(errMessage ?: e.message()))
+            in 500..599 -> ApiResult.Failure(AppError.Server(code, errMessage ?: e.message()))
+            else -> ApiResult.Error(code, errCode ?: errMessage ?: e.message())
         }
     } catch (e: IOException) {
         ApiResult.Failure(AppError.Network(e.message))
@@ -32,3 +36,14 @@ suspend fun <T> safeApiCall(block: suspend () -> T): ApiResult<T> =
     } catch (e: Exception) {
         ApiResult.Failure(AppError.Unknown(e.message))
     }
+
+/** Extracts (machine `code` from `data.code`, human `message`) from a house error body, or (null, null). */
+private fun parseHouseError(body: String?): Pair<String?, String?> {
+    if (body.isNullOrBlank()) return null to null
+    return runCatching {
+        val json = org.json.JSONObject(body)
+        val message = json.optString("message").takeIf { it.isNotBlank() }
+        val code = json.optJSONObject("data")?.optString("code")?.takeIf { it.isNotBlank() }
+        code to message
+    }.getOrDefault(null to null)
+}
