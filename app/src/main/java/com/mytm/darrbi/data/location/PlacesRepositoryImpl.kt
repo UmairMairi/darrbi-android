@@ -31,13 +31,13 @@ class PlacesRepositoryImpl @Inject constructor(
     override suspend fun autocomplete(query: String): ApiResult<List<PlaceSuggestion>> {
         if (query.isBlank()) return ApiResult.Success(emptyList())
         return runCatching {
-            // Mirror ride-android's WhereToGo/Pickup autocomplete: restrict predictions to one country.
+            // Restrict predictions to the supported markets (Pakistan + Saudi Arabia).
             val request = FindAutocompletePredictionsRequest.builder()
-                .setCountries(AUTOCOMPLETE_COUNTRY)
+                .setCountries(AUTOCOMPLETE_COUNTRIES)
                 .setSessionToken(sessionToken)
                 .setQuery(query)
                 .build()
-            Log.d(TAG, "autocomplete request: query=\"$query\" country=$AUTOCOMPLETE_COUNTRY")
+            Log.d(TAG, "autocomplete request: query=\"$query\" countries=$AUTOCOMPLETE_COUNTRIES")
             val response = placesClient.findAutocompletePredictions(request).await()
             val predictions = response.autocompletePredictions
             Log.d(TAG, "autocomplete response: ${predictions.size} prediction(s)")
@@ -81,8 +81,8 @@ class PlacesRepositoryImpl @Inject constructor(
 
     private companion object {
         const val TAG = "PlacesAutocomplete"
-        // Country to bias autocomplete to (matches ride-android's WhereToGo/Pickup test region).
-        // Switch to "SA" for the Saudi production market.
-        const val AUTOCOMPLETE_COUNTRY = "PK"
+        // Markets autocomplete is restricted to: Pakistan (test) + Saudi Arabia (production).
+        // setCountries accepts up to 5 ISO 3166-1 country codes.
+        val AUTOCOMPLETE_COUNTRIES = listOf("PK", "SA")
     }
 }

@@ -4,6 +4,7 @@ import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.ChatMessage
 import com.mytm.darrbi.domain.model.ChatMessageStatus
+import com.mytm.darrbi.domain.model.CourierMatch
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
@@ -83,11 +84,29 @@ sealed interface V2SocketEvent {
     /** RIDER: the live competing-bids list for a trip changed (cheapest-first; full replacement). */
     data class BidsUpdate(val tripId: String, val bids: List<Bid>, val riderOfferedFare: Double, val currency: String) : V2SocketEvent
 
-    /** RIDER: the match was committed (`v2/bid-accepted` / `driver-selected`). */
-    data class BidAccepted(val tripId: String, val bidId: String, val driverId: String, val agreedFare: Double, val currency: String) : V2SocketEvent
+    /**
+     * RIDER: the match was committed (`v2/bid-accepted` / `driver-selected`). For a courier trip [courier]
+     * carries the sender/receiver contacts + the `deliveryOtp` the rider relays to the receiver (guide §8.3).
+     */
+    data class BidAccepted(
+        val tripId: String,
+        val bidId: String,
+        val driverId: String,
+        val agreedFare: Double,
+        val currency: String,
+        val courier: CourierMatch? = null,
+    ) : V2SocketEvent
 
-    /** DRIVER: you won the trip (`v2/bid-won`) → switch to the assigned/navigate flow. */
-    data class BidWon(val tripId: String, val bidId: String, val agreedFare: Double) : V2SocketEvent
+    /**
+     * DRIVER: you won the trip (`v2/bid-won`) → switch to the assigned/navigate flow. For a courier trip
+     * [courier] carries the sender/receiver contacts + the `deliveryOtp` needed to complete (guide §8.2).
+     */
+    data class BidWon(
+        val tripId: String,
+        val bidId: String,
+        val agreedFare: Double,
+        val courier: CourierMatch? = null,
+    ) : V2SocketEvent
 
     /** DRIVER: you lost (`v2/bid-lost`) — `reason` = ANOTHER_DRIVER_SELECTED | LOST_DRIVER_RACE | DRIVER_INELIGIBLE. */
     data class BidLost(val tripId: String, val bidId: String, val reason: String?) : V2SocketEvent

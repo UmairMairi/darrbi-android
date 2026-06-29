@@ -4,6 +4,8 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.core.common.EnvConfig
+import com.mytm.darrbi.core.common.buildStaticMapUrl
+import com.mytm.darrbi.domain.model.TripImageType
 import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.Bid
@@ -12,6 +14,8 @@ import com.mytm.darrbi.domain.model.BookedTrip
 import com.mytm.darrbi.domain.model.CabOption
 import com.mytm.darrbi.domain.model.CancelReason
 import com.mytm.darrbi.domain.model.CancelReasonType
+import com.mytm.darrbi.domain.model.CourierDetails
+import com.mytm.darrbi.domain.model.CourierMatch
 import com.mytm.darrbi.domain.model.DropChangeQuote
 import com.mytm.darrbi.domain.model.FareRange
 import com.mytm.darrbi.domain.model.LatLngPoint
@@ -39,6 +43,7 @@ import com.mytm.darrbi.domain.usecase.EstimateDropChangeUseCase
 import com.mytm.darrbi.domain.usecase.RaiseOfferUseCase
 import com.mytm.darrbi.domain.usecase.RejectBidUseCase
 import com.mytm.darrbi.domain.usecase.SelectBidUseCase
+import com.mytm.darrbi.domain.usecase.SubmitTripMapImageUseCase
 import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
 import com.mytm.darrbi.domain.usecase.GetBalanceUseCase
 import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
@@ -61,8 +66,12 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import javax.inject.Inject
 
-/** Steps of the rider's booking flow: location selection → ride selection → searching for a captain. */
-enum class RiderStep { Home, DestinationSearch, PickupSearch, MapPicker, ConfirmPickup, SelectRide, ProposeFare, Bidding, Searching, DriverOnWay, DriverArrived, TripStarted, ChangeDropSearch, ChangeDropConfirm, TripCompleted }
+/**
+ * Steps of the rider's booking flow: location selection → ride selection → searching for a captain.
+ * [CourierDetails] is inserted (only for a COURIER/CARGO category) after the pickup is confirmed and before
+ * ride selection, so the parcel weight is known when greying out under-capacity cabs.
+ */
+enum class RiderStep { Home, DestinationSearch, PickupSearch, MapPicker, ConfirmPickup, CourierDetails, SelectRide, ProposeFare, Bidding, Searching, DriverOnWay, DriverArrived, TripStarted, ChangeDropSearch, ChangeDropConfirm, TripCompleted }
 
 data class RiderBookingUiState(
     val step: RiderStep = RiderStep.Home,
@@ -121,6 +130,8 @@ data class RiderBookingUiState(
     val arrivedAtMillis: Long? = null,
     /** Tentative new drop-off being chosen during the change-drop flow (committed only on confirm). */
     val changeDropDestination: PlaceLocation? = null,
+    /** Route (pickup → [changeDropDestination]) from the route API, drawn on the change-drop confirm map. */
+    val changeDropRoutePoints: List<LatLngPoint> = emptyList(),
     /** Re-quoted fare for [changeDropDestination] (new fare + arrival), shown on the change-drop confirm. */
     val changeDropQuote: DropChangeQuote? = null,
     val isChangingDrop: Boolean = false,
@@ -146,9 +157,16 @@ data class RiderBookingUiState(
     val isBidActionInFlight: Boolean = false,
     /** One-shot notice on the bidding screen (no-bids / window timed out). */
     val bidNotice: String? = null,
+    // --- Courier (parcel delivery) ---
+    /** The rider's parcel + sender/receiver input for a courier trip (guide §4); null for a normal ride. */
+    val courierDetails: CourierDetails? = null,
+    /** The courier match block (sender/receiver + deliveryOtp) from `v2/bid-accepted` after a match (guide §8.3). */
+    val courierMatch: CourierMatch? = null,
     val errorMessage: String? = null,
 ) {
     val selectedCab: CabOption? get() = cabs.firstOrNull { it.id == selectedCabId }
+    /** True when the booking flow is for a COURIER (or CARGO) category — collects parcel info. */
+    val isCourier: Boolean get() = selectedCategory?.isCourier == true
     /** Fare after any applied promo discount (never below zero). */
     val payableFare: Double get() = ((selectedCab?.fare ?: 0.0) - (promo?.discount ?: 0.0)).coerceAtLeast(0.0)
     /** A zero (or not-yet-loaded) wallet balance below the fare means the rider must top up first. */
@@ -174,6 +192,8 @@ sealed interface RiderBookingEvent {
     data class ConfirmMapLocation(val latitude: Double, val longitude: Double) : RiderBookingEvent
     data object EditPickup : RiderBookingEvent
     data object ProceedToRideSelection : RiderBookingEvent
+    /** Courier: parcel + sender/receiver details submitted → continue to (capacity-gated) ride selection. */
+    data class SubmitCourierDetails(val details: CourierDetails) : RiderBookingEvent
     data class SelectCab(val cabId: String) : RiderBookingEvent
     data class ApplyPromo(val code: String) : RiderBookingEvent
     data object RemovePromo : RiderBookingEvent
@@ -251,6 +271,7 @@ class RiderBookingViewModel @Inject constructor(
     private val rejectBidUseCase: RejectBidUseCase,
     private val raiseOfferUseCase: RaiseOfferUseCase,
     private val cancelOpenTrip: CancelOpenTripUseCase,
+    private val submitTripMapImage: SubmitTripMapImageUseCase,
     private val session: SessionRepository,
     private val env: EnvConfig,
     private val socketService: SocketService,
@@ -320,7 +341,11 @@ class RiderBookingViewModel @Inject constructor(
                 val tripId = _state.value.bidTrip?.tripId
                 when (event) {
                     is V2SocketEvent.BidsUpdate -> if (event.tripId == tripId) _state.update { it.copy(bids = event.bids) }
-                    is V2SocketEvent.BidAccepted -> if (event.tripId == tripId) onBidMatched()
+                    is V2SocketEvent.BidAccepted -> if (event.tripId == tripId) {
+                        // Courier: capture the sender/receiver + deliveryOtp to show the rider (guide §8.3).
+                        event.courier?.let { match -> _state.update { it.copy(courierMatch = match) } }
+                        onBidMatched()
+                    }
                     is V2SocketEvent.NoBids -> if (event.tripId == tripId) _state.update { it.copy(bidNotice = NOTICE_NO_BIDS) }
                     is V2SocketEvent.BiddingTimeout -> if (event.tripId == tripId) _state.update { it.copy(bidNotice = NOTICE_TIMEOUT) }
                     else -> Unit // driver-facing events
@@ -435,6 +460,7 @@ class RiderBookingViewModel @Inject constructor(
             RiderBookingEvent.EditPickup ->
                 _state.update { it.copy(step = RiderStep.PickupSearch, query = "", suggestions = emptyList()) }
             RiderBookingEvent.ProceedToRideSelection -> proceedToRideSelection()
+            is RiderBookingEvent.SubmitCourierDetails -> submitCourierDetails(event.details)
             is RiderBookingEvent.SelectCab -> selectCab(event.cabId)
             is RiderBookingEvent.ApplyPromo -> applyPromo(event.code)
             RiderBookingEvent.RemovePromo -> _state.update { it.copy(promo = null) }
@@ -605,6 +631,7 @@ class RiderBookingViewModel @Inject constructor(
                 it.copy(
                     isResolving = false,
                     changeDropDestination = place,
+                    changeDropRoutePoints = emptyList(),
                     changeDropQuote = null,
                     step = RiderStep.ChangeDropConfirm,
                     query = "",
@@ -612,6 +639,7 @@ class RiderBookingViewModel @Inject constructor(
                 )
             }
             fetchChangeDropQuote()
+            fetchChangeDropRoute()
             return
         }
         _state.update { state ->
@@ -656,20 +684,57 @@ class RiderBookingViewModel @Inject constructor(
         }
     }
 
-    /** Move to ride selection and load the cab list + wallet balance. */
+    /** Fetches the pickup → tentative new-drop route for the change-drop preview (falls back to a straight line). */
+    private fun fetchChangeDropRoute() {
+        val pickup = _state.value.pickup ?: return
+        val newDest = _state.value.changeDropDestination ?: return
+        viewModelScope.launch {
+            val points = when (val result = getRoute(pickup, newDest)) {
+                is ApiResult.Success -> result.data
+                is ApiResult.Error, is ApiResult.Failure -> emptyList()
+            }
+            val path = points.ifEmpty {
+                listOf(
+                    LatLngPoint(pickup.latitude, pickup.longitude),
+                    LatLngPoint(newDest.latitude, newDest.longitude),
+                )
+            }
+            // Apply only if still previewing this same drop (the user may have changed/cancelled meanwhile).
+            _state.update { if (it.changeDropDestination == newDest) it.copy(changeDropRoutePoints = path) else it }
+        }
+    }
+
+    /**
+     * Move to ride selection and load the cab list + wallet balance. For a COURIER category, the parcel
+     * details must be collected first (so cabs can be greyed out by weight) — divert to the courier-details
+     * step until they're provided.
+     */
     private fun proceedToRideSelection() {
         val pickup = _state.value.pickup ?: return
         val destination = _state.value.destination ?: return
+        // Courier: collect parcel + sender/receiver before listing cabs (guide §0/§3.2).
+        if (_state.value.isCourier && _state.value.courierDetails == null) {
+            _state.update { it.copy(step = RiderStep.CourierDetails, errorMessage = null) }
+            return
+        }
         val categoryId = _state.value.selectedCategory?.id
         _state.update { it.copy(step = RiderStep.SelectRide, isLoadingCabs = true, errorMessage = null) }
         viewModelScope.launch {
             when (val result = getCabTypes(pickup, destination, categoryId)) {
-                is ApiResult.Success -> _state.update {
-                    it.copy(
+                is ApiResult.Success -> _state.update { st ->
+                    val cabs = result.data
+                    // Courier: pre-select the cheapest cab that can carry the parcel (guide §3.2); else the first.
+                    val courier = st.courierDetails
+                    val preferred = if (st.isCourier && courier != null) {
+                        cabs.firstOrNull { it.canCarry(courier.parcelWeightKg, courier.lengthCm, courier.widthCm, courier.heightCm) }?.id
+                    } else {
+                        null
+                    }
+                    st.copy(
                         isLoadingCabs = false,
-                        cabs = result.data,
-                        // Pre-select the first cab (ride-android shows the top one highlighted).
-                        selectedCabId = it.selectedCabId ?: result.data.firstOrNull()?.id,
+                        cabs = cabs,
+                        // Pre-select the first carryable cab (courier) / the first cab (ride-android highlights the top one).
+                        selectedCabId = preferred ?: st.selectedCabId ?: cabs.firstOrNull()?.id,
                     )
                 }
                 is ApiResult.Error -> _state.update { it.copy(isLoadingCabs = false, errorMessage = result.message) }
@@ -677,6 +742,12 @@ class RiderBookingViewModel @Inject constructor(
             }
         }
         loadBalance()
+    }
+
+    /** Courier: store the parcel/sender/receiver input, then continue to (capacity-gated) ride selection. */
+    private fun submitCourierDetails(details: CourierDetails) {
+        _state.update { it.copy(courierDetails = details, selectedCabId = null) }
+        proceedToRideSelection()
     }
 
     private fun loadBalance() {
@@ -735,9 +806,14 @@ class RiderBookingViewModel @Inject constructor(
 
     /** "Confirm Ride" → V2: go to the propose-fare step, seeded with the selected cab's recommended fare. */
     private fun openProposeFare() {
-        val cab = _state.value.selectedCab ?: return
-        if (_state.value.pickup == null || _state.value.destination == null) return
-        _state.update { it.copy(step = RiderStep.ProposeFare, offeredFare = it.offeredFare ?: cab.fare, errorMessage = null) }
+        val state = _state.value
+        val cab = state.selectedCab ?: return
+        if (state.pickup == null || state.destination == null) return
+        // Courier: seed the offer with the weight × type-adjusted recommended (guide §5) so it lands in band;
+        // a normal ride keeps any previously-entered offer, else the bare cab fare.
+        val courier = state.courierDetails?.takeIf { state.isCourier }
+        val seeded = courier?.let { cab.fare * it.fareFactor } ?: state.offeredFare ?: cab.fare
+        _state.update { it.copy(step = RiderStep.ProposeFare, offeredFare = seeded, errorMessage = null) }
     }
 
     /** Submit the proposed fare → create a BID trip (status 15) and move to the live-bids screen. */
@@ -752,7 +828,7 @@ class RiderBookingViewModel @Inject constructor(
         socketService.connect()
         _state.update { it.copy(isCreatingBidTrip = true, offeredFare = fare, errorMessage = null) }
         viewModelScope.launch {
-            when (val result = createBidTrip(pickup, destination, cab.id, state.selectedCategory?.id, fare)) {
+            when (val result = createBidTrip(pickup, destination, cab.id, state.selectedCategory?.id, fare, state.courierDetails)) {
                 is ApiResult.Success -> {
                     _state.update {
                         it.copy(isCreatingBidTrip = false, bidTrip = result.data, bids = emptyList(), bidNotice = null, step = RiderStep.Bidding)
@@ -965,6 +1041,8 @@ class RiderBookingViewModel @Inject constructor(
                 bidTrip = null,
                 bids = emptyList(),
                 offeredFare = null,
+                courierDetails = null,
+                courierMatch = null,
                 isCreatingBidTrip = false,
                 isBidActionInFlight = false,
                 showCancelSheet = false,
@@ -993,6 +1071,25 @@ class RiderBookingViewModel @Inject constructor(
             )
         }
         fetchDriverRoute()
+        submitTripMap(TripImageType.CREATED)
+    }
+
+    /**
+     * Render + upload a static map of the current trip (pickup → destination route + captain position),
+     * tagged with the trip-status [type]. Fired on every trip step (accepted → completed). Best-effort:
+     * any failure is swallowed so it never disrupts the ride UI.
+     */
+    private fun submitTripMap(type: Int) {
+        val s = _state.value
+        val tripId = s.acceptedTrip?.tripId ?: return
+        val url = buildStaticMapUrl(
+            apiKey = env.mapsApiKey,
+            pickup = s.pickup,
+            dropoff = s.destination,
+            routePoints = s.routePoints,
+            carLocation = s.driverLocation,
+        ) ?: return
+        viewModelScope.launch { submitTripMapImage(tripId, url, type) }
     }
 
     /** Fetches the pickup → captain route polyline (falls back to a straight line). */
@@ -1035,6 +1132,7 @@ class RiderBookingViewModel @Inject constructor(
         }
         // The map now previews the trip itself: pickup → destination.
         fetchRoute()
+        submitTripMap(TripImageType.CREATED)
     }
 
     /** Trip started (`trip_started`) → in-trip view; the map shows the pickup → destination route. */
@@ -1044,6 +1142,7 @@ class RiderBookingViewModel @Inject constructor(
             it.copy(step = RiderStep.TripStarted, noCaptainFound = false, acceptedTrip = trip)
         }
         fetchRoute()
+        submitTripMap(TripImageType.STARTED)
     }
 
     /** Trip finished (`trip_completed`) → the rate-your-captain screen (payment, balance, loyalty, invoice). */
@@ -1054,6 +1153,7 @@ class RiderBookingViewModel @Inject constructor(
         }
         loadBalance()
         fetchRoute()
+        submitTripMap(TripImageType.COMPLETED)
     }
 
     /**
@@ -1122,6 +1222,7 @@ class RiderBookingViewModel @Inject constructor(
                 query = "",
                 suggestions = emptyList(),
                 changeDropDestination = null,
+                changeDropRoutePoints = emptyList(),
                 changeDropQuote = null,
             )
         }
@@ -1159,6 +1260,7 @@ class RiderBookingViewModel @Inject constructor(
                             step = RiderStep.TripStarted,
                             destination = newDest,
                             changeDropDestination = null,
+                            changeDropRoutePoints = emptyList(),
                             changeDropQuote = null,
                             dropChangeSucceeded = true,
                         )
@@ -1210,7 +1312,10 @@ class RiderBookingViewModel @Inject constructor(
                 RiderStep.PickupSearch -> RiderStep.DestinationSearch
                 RiderStep.MapPicker -> state.mapPickerOrigin
                 RiderStep.ConfirmPickup -> RiderStep.PickupSearch
-                RiderStep.SelectRide -> RiderStep.ConfirmPickup
+                // Courier details → back to confirm-pickup.
+                RiderStep.CourierDetails -> RiderStep.ConfirmPickup
+                // Select-ride → courier details (courier) else confirm-pickup.
+                RiderStep.SelectRide -> if (state.isCourier) RiderStep.CourierDetails else RiderStep.ConfirmPickup
                 // Propose-fare → back to cab selection; bidding has no back-dismiss (use Cancel).
                 RiderStep.ProposeFare -> RiderStep.SelectRide
                 RiderStep.Bidding -> RiderStep.Bidding

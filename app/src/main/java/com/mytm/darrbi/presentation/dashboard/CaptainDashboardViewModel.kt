@@ -3,10 +3,17 @@ package com.mytm.darrbi.presentation.dashboard
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mytm.darrbi.core.common.ApiResult
+import com.mytm.darrbi.core.common.EnvConfig
+import com.mytm.darrbi.core.common.buildStaticMapUrl
+import com.mytm.darrbi.domain.model.TripImageType
 import com.mytm.darrbi.domain.model.BidType
+import com.mytm.darrbi.domain.model.C2cCity
+import com.mytm.darrbi.domain.model.C2cOpenScheduledTrip
+import com.mytm.darrbi.domain.model.C2cQuote
 import com.mytm.darrbi.domain.model.CancelReason
 import com.mytm.darrbi.domain.model.CancelReasonType
 import com.mytm.darrbi.domain.model.CaptainDetails
+import com.mytm.darrbi.domain.model.CourierMatch
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OngoingTrip
 import com.mytm.darrbi.domain.model.OpenTrip
@@ -20,9 +27,12 @@ import com.mytm.darrbi.domain.usecase.AcceptTripUseCase
 import com.mytm.darrbi.domain.usecase.CancelTripByDriverUseCase
 import com.mytm.darrbi.domain.usecase.CompleteTripUseCase
 import com.mytm.darrbi.domain.usecase.CurrentLocationUseCase
+import com.mytm.darrbi.domain.usecase.GetC2cCitiesUseCase
+import com.mytm.darrbi.domain.usecase.GetC2cQuoteUseCase
 import com.mytm.darrbi.domain.usecase.GetCancelReasonsUseCase
 import com.mytm.darrbi.domain.usecase.GetCaptainDetailsUseCase
 import com.mytm.darrbi.domain.usecase.GetOngoingTripUseCase
+import com.mytm.darrbi.domain.usecase.GetOpenScheduledTripsUseCase
 import com.mytm.darrbi.domain.usecase.GetOpenTripsUseCase
 import com.mytm.darrbi.domain.usecase.GetRouteUseCase
 import com.mytm.darrbi.domain.usecase.PlaceBidUseCase
@@ -30,6 +40,7 @@ import com.mytm.darrbi.domain.usecase.RateRiderUseCase
 import com.mytm.darrbi.domain.usecase.ReachedPickupUseCase
 import com.mytm.darrbi.domain.usecase.RejectTripUseCase
 import com.mytm.darrbi.domain.usecase.StartTripUseCase
+import com.mytm.darrbi.domain.usecase.SubmitTripMapImageUseCase
 import com.mytm.darrbi.domain.usecase.StreamLocationUpdatesUseCase
 import com.mytm.darrbi.domain.usecase.ValidateIbanUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -126,6 +137,25 @@ data class CaptainDashboardUiState(
     val bidLostReason: String? = null,
     /** One-shot: the rider cancelled the accepted trip → notice shown once before returning to the list. */
     val riderCancelledNotice: Boolean = false,
+    // --- City-to-City scheduled open requests (driver discovery + bid; guide §7) ---
+    /** Cities for resolving origin/destination names on the scheduled request cards. */
+    val c2cCities: List<C2cCity> = emptyList(),
+    /** Open intercity requests the driver can bid on (`/v2/schedule/open-in-route`), shown on the dashboard. */
+    val scheduledRequests: List<C2cOpenScheduledTrip> = emptyList(),
+    /** The open scheduled request whose bid sheet is showing; null when closed. */
+    val c2cBidTrip: C2cOpenScheduledTrip? = null,
+    /** The fare band for [c2cBidTrip] (for countering); null while loading or unavailable. */
+    val c2cBidQuote: C2cQuote? = null,
+    val isLoadingC2cQuote: Boolean = false,
+    /** One-shot toast for a scheduled bid (placed / error code). */
+    val scheduledMessage: String? = null,
+    // --- Courier (parcel delivery) ---
+    /** The won courier trip's match block (sender/receiver + deliveryOtp) from `v2/bid-won` (guide §8.2). */
+    val courierMatch: CourierMatch? = null,
+    /** At drop-off on a courier trip → show the delivery-OTP entry (the receiver's code) before completing. */
+    val awaitingDeliveryOtp: Boolean = false,
+    val deliveryOtpInput: String = "",
+    val deliveryOtpError: Boolean = false,
     val errorMessage: String? = null,
 ) {
     val canSubmitIban: Boolean
@@ -161,8 +191,14 @@ sealed interface CaptainDashboardEvent {
     data object ConsumeTripStarted : CaptainDashboardEvent
     /** "Navigate" on the drop-off-changed overlay → dismiss it and return to the in-trip screen. */
     data object DismissDestinationChange : CaptainDashboardEvent
-    /** "End Ride" on the dropping screen → complete the trip. */
+    /** "End Ride" on the dropping screen → complete the trip (courier trips first ask for the delivery OTP). */
     data object EndRide : CaptainDashboardEvent
+    /** Courier: delivery-OTP field edited (the receiver's code). */
+    data class EnterDeliveryOtp(val value: String) : CaptainDashboardEvent
+    /** Courier: submit the delivery OTP to complete the trip at drop-off. */
+    data object SubmitDeliveryOtp : CaptainDashboardEvent
+    /** Courier: dismiss the delivery-OTP entry (back to the dropping screen). */
+    data object DismissDeliveryOtp : CaptainDashboardEvent
     /** Star tapped on the rate-rider screen (1..5). */
     data class SelectRiderRating(val stars: Int) : CaptainDashboardEvent
     /** Submit the rider rating. */
@@ -194,6 +230,15 @@ sealed interface CaptainDashboardEvent {
     data object ConsumeBidError : CaptainDashboardEvent
     data object ConsumeBidLost : CaptainDashboardEvent
     data object ConsumeRiderCancelled : CaptainDashboardEvent
+    // --- City-to-City scheduled open requests ---
+    /** Open the bid sheet for an open intercity request. */
+    data class OpenScheduledBid(val tripId: String) : CaptainDashboardEvent
+    data object DismissScheduledBid : CaptainDashboardEvent
+    /** Bid by accepting the rider's offered fare as-is on the open scheduled request. */
+    data object AcceptScheduledFare : CaptainDashboardEvent
+    /** Counter on the open scheduled request (within the quote band). */
+    data class CounterScheduledBid(val fare: Double) : CaptainDashboardEvent
+    data object ConsumeScheduledMessage : CaptainDashboardEvent
 }
 
 @HiltViewModel
@@ -214,6 +259,11 @@ class CaptainDashboardViewModel @Inject constructor(
     private val getOngoingTrip: GetOngoingTripUseCase,
     private val getOpenTrips: GetOpenTripsUseCase,
     private val placeBid: PlaceBidUseCase,
+    private val getOpenScheduledTrips: GetOpenScheduledTripsUseCase,
+    private val getC2cCities: GetC2cCitiesUseCase,
+    private val getC2cQuote: GetC2cQuoteUseCase,
+    private val submitTripMapImage: SubmitTripMapImageUseCase,
+    private val env: EnvConfig,
     private val socketService: SocketService,
 ) : ViewModel() {
 
@@ -228,6 +278,8 @@ class CaptainDashboardViewModel @Inject constructor(
 
     init {
         refresh()
+        loadC2cCities()
+        loadScheduledRequests()
         // Listen for incoming ride requests on the shared socket (captain side; V1 fallback).
         viewModelScope.launch {
             socketService.tripEvents.collect { event ->
@@ -258,7 +310,7 @@ class CaptainDashboardViewModel @Inject constructor(
         viewModelScope.launch {
             socketService.v2Events.collect { event ->
                 when (event) {
-                    is V2SocketEvent.BidWon -> onBidWon()
+                    is V2SocketEvent.BidWon -> onBidWon(event.courier)
                     is V2SocketEvent.BidLost -> _state.update { it.copy(bidLostReason = event.reason ?: REASON_LOST) }
                     is V2SocketEvent.TripClosed -> _state.update { it.copy(bidLostReason = event.reason ?: REASON_CLOSED) }
                     else -> Unit // rider-facing events
@@ -278,8 +330,25 @@ class CaptainDashboardViewModel @Inject constructor(
         locationStreamJob = viewModelScope.launch {
             streamLocationUpdates().collect { point ->
                 socketService.updateCaptainLocation(point.latitude, point.longitude)
-                // Move the on-map car marker to the captain's live position (camera framing is unaffected).
-                _state.update { it.copy(driverLocation = point) }
+                // Move the on-map car marker to the captain's live position (camera framing is unaffected), and
+                // keep the active leg's distance + ETA live off the streamed location: captain→destination while
+                // dropping (powers the dropping-screen stats), else captain→pickup (drives the Navigate/Reached
+                // CTA). Recomputing here means the stats appear even when an ongoing trip is restored before the
+                // first device-location fetch.
+                _state.update { st ->
+                    val trip = st.activeTrip
+                    when {
+                        trip == null -> st.copy(driverLocation = point)
+                        st.tripInProgress -> {
+                            val (km, mins) = legFrom(point, trip.destination)
+                            st.copy(driverLocation = point, dropDistanceKm = km, dropTimeMinutes = mins)
+                        }
+                        else -> {
+                            val (km, mins) = legFrom(point, trip.pickup)
+                            st.copy(driverLocation = point, requestPickupDistanceKm = km, requestPickupTimeMinutes = mins)
+                        }
+                    }
+                }
             }
         }
     }
@@ -326,6 +395,9 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.ConsumeTripStarted -> _state.update { it.copy(tripStarted = false) }
             CaptainDashboardEvent.DismissDestinationChange -> _state.update { it.copy(destinationChanged = null) }
             CaptainDashboardEvent.EndRide -> endRide()
+            is CaptainDashboardEvent.EnterDeliveryOtp -> _state.update { it.copy(deliveryOtpInput = event.value.filter { c -> c.isDigit() }.take(OTP_MAX_LEN), deliveryOtpError = false) }
+            CaptainDashboardEvent.SubmitDeliveryOtp -> submitDeliveryOtp()
+            CaptainDashboardEvent.DismissDeliveryOtp -> _state.update { it.copy(awaitingDeliveryOtp = false, deliveryOtpInput = "", deliveryOtpError = false) }
             is CaptainDashboardEvent.SelectRiderRating -> _state.update { it.copy(riderStars = event.stars) }
             CaptainDashboardEvent.SubmitRiderRating -> submitRiderRating()
             CaptainDashboardEvent.ToggleMenu -> _state.update { it.copy(showMenu = !it.showMenu) }
@@ -349,6 +421,62 @@ class CaptainDashboardViewModel @Inject constructor(
             CaptainDashboardEvent.ConsumeBidError -> _state.update { it.copy(bidErrorCode = null) }
             CaptainDashboardEvent.ConsumeBidLost -> _state.update { it.copy(bidLostReason = null) }
             CaptainDashboardEvent.ConsumeRiderCancelled -> _state.update { it.copy(riderCancelledNotice = false) }
+            is CaptainDashboardEvent.OpenScheduledBid -> openScheduledBid(event.tripId)
+            CaptainDashboardEvent.DismissScheduledBid -> _state.update { it.copy(c2cBidTrip = null, c2cBidQuote = null) }
+            CaptainDashboardEvent.AcceptScheduledFare -> submitScheduledBid(BidType.AcceptFare, null)
+            is CaptainDashboardEvent.CounterScheduledBid -> submitScheduledBid(BidType.Counter, event.fare)
+            CaptainDashboardEvent.ConsumeScheduledMessage -> _state.update { it.copy(scheduledMessage = null) }
+        }
+    }
+
+    // --- City-to-City scheduled open requests (driver discovery + bid) ---
+
+    private fun loadC2cCities() {
+        viewModelScope.launch {
+            when (val result = getC2cCities()) {
+                is ApiResult.Success -> _state.update { it.copy(c2cCities = result.data) }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
+    /** Pull the open intercity requests on offer (REST; refreshed on going online and after a bid). */
+    private fun loadScheduledRequests() {
+        viewModelScope.launch {
+            when (val result = getOpenScheduledTrips()) {
+                is ApiResult.Success -> _state.update { it.copy(scheduledRequests = result.data) }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
+        }
+    }
+
+    /** Open the C2C bid sheet and fetch the fare band so the driver can counter within [min, max]. */
+    private fun openScheduledBid(tripId: String) {
+        val trip = _state.value.scheduledRequests.firstOrNull { it.tripId == tripId } ?: return
+        _state.update { it.copy(c2cBidTrip = trip, c2cBidQuote = null, isLoadingC2cQuote = true) }
+        viewModelScope.launch {
+            when (val result = getC2cQuote(trip.originCityId, trip.destinationCityId, trip.cabId, trip.seatsRequested)) {
+                is ApiResult.Success -> _state.update { if (it.c2cBidTrip?.tripId == trip.tripId) it.copy(isLoadingC2cQuote = false, c2cBidQuote = result.data) else it }
+                is ApiResult.Error, is ApiResult.Failure -> _state.update { it.copy(isLoadingC2cQuote = false) }
+            }
+        }
+    }
+
+    /** Place a bid on the open scheduled request (reuses the V2 engine; long C2C TTL applies server-side). */
+    private fun submitScheduledBid(bidType: BidType, fare: Double?) {
+        val trip = _state.value.c2cBidTrip ?: return
+        if (_state.value.isPlacingBid) return
+        _state.update { it.copy(isPlacingBid = true, scheduledMessage = null) }
+        viewModelScope.launch {
+            val result = placeBid(tripId = trip.tripId, bidType = bidType, bidFare = fare, cabId = trip.cabId)
+            when (result) {
+                is ApiResult.Success -> {
+                    _state.update { it.copy(isPlacingBid = false, c2cBidTrip = null, c2cBidQuote = null, scheduledMessage = C2C_BID_PLACED) }
+                    loadScheduledRequests()
+                }
+                is ApiResult.Error -> _state.update { it.copy(isPlacingBid = false, scheduledMessage = result.message ?: C2C_BID_FAILED) }
+                is ApiResult.Failure -> _state.update { it.copy(isPlacingBid = false, scheduledMessage = result.error.message ?: C2C_BID_FAILED) }
+            }
         }
     }
 
@@ -358,6 +486,7 @@ class CaptainDashboardViewModel @Inject constructor(
         if (online) {
             socketService.connect()
             fetchOpenTrips()
+            loadScheduledRequests()
         }
     }
 
@@ -418,8 +547,9 @@ class CaptainDashboardViewModel @Inject constructor(
     }
 
     /** Won the trip → fetch the assigned trip (`trips/exists` → `trips/socket/{id}`) and navigate to rider. */
-    private fun onBidWon() {
-        _state.update { it.copy(biddingTrip = null) }
+    private fun onBidWon(courier: CourierMatch? = null) {
+        // Courier: keep the match block (sender/receiver + deliveryOtp) for the navigate/complete screens (guide §8.2).
+        _state.update { it.copy(biddingTrip = null, courierMatch = courier ?: it.courierMatch) }
         viewModelScope.launch {
             when (val result = getOngoingTrip()) {
                 is ApiResult.Success -> result.data?.let { restoreOngoing(it) }
@@ -550,11 +680,29 @@ class CaptainDashboardViewModel @Inject constructor(
                         )
                     }
                     fetchActiveRoute(request)
+                    submitTripMap(TripImageType.CREATED)
                 }
                 is ApiResult.Error -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.message) }
                 is ApiResult.Failure -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.error.message) }
             }
         }
+    }
+
+    /**
+     * Render + upload a static map of the active trip (pickup → destination + the captain's position),
+     * tagged with the trip-status [type]. Fired on every trip step (accepted → completed). Best-effort:
+     * failures are swallowed.
+     */
+    private fun submitTripMap(type: Int) {
+        val s = _state.value
+        val trip = s.activeTrip ?: return
+        val url = buildStaticMapUrl(
+            apiKey = env.mapsApiKey,
+            pickup = trip.pickup,
+            dropoff = trip.destination,
+            carLocation = s.carMarker,
+        ) ?: return
+        viewModelScope.launch { submitTripMapImage(trip.tripId, url, type) }
     }
 
     private fun declineRequest() {
@@ -598,7 +746,10 @@ class CaptainDashboardViewModel @Inject constructor(
         _state.update { it.copy(isHandlingRequest = true, errorMessage = null) }
         viewModelScope.launch {
             when (val result = reachedPickup(trip.tripId)) {
-                is ApiResult.Success -> _state.update { it.copy(isHandlingRequest = false, awaitingOtp = true, otpInput = "", otpError = false) }
+                is ApiResult.Success -> {
+                    _state.update { it.copy(isHandlingRequest = false, awaitingOtp = true, otpInput = "", otpError = false) }
+                    submitTripMap(TripImageType.CREATED)
+                }
                 is ApiResult.Error -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.message) }
                 is ApiResult.Failure -> _state.update { it.copy(isHandlingRequest = false, errorMessage = result.error.message) }
             }
@@ -629,6 +780,7 @@ class CaptainDashboardViewModel @Inject constructor(
                         )
                     }
                     fetchDropRoute(trip)
+                    submitTripMap(TripImageType.STARTED)
                 }
                 is ApiResult.Error -> _state.update { it.copy(isStartingTrip = false, otpError = true) }
                 is ApiResult.Failure -> _state.update { it.copy(isStartingTrip = false, otpError = true) }
@@ -636,17 +788,50 @@ class CaptainDashboardViewModel @Inject constructor(
         }
     }
 
-    /** "End Ride" → complete the trip at the destination and return to the dashboard. */
+    /**
+     * "End Ride" → complete the trip at the destination. A courier trip is gated on the receiver's
+     * delivery OTP (guide §9.2), so it opens the delivery-OTP entry instead of completing immediately.
+     */
     private fun endRide() {
         val trip = _state.value.activeTrip ?: return
         if (_state.value.isCompleting) return
+        if (_state.value.courierMatch != null) {
+            _state.update { it.copy(awaitingDeliveryOtp = true, deliveryOtpInput = "", deliveryOtpError = false) }
+            return
+        }
+        completeActiveTrip(trip, deliveryOtp = null)
+    }
+
+    /** Courier: submit the receiver's delivery OTP to complete the trip (`INVALID_DELIVERY_OTP` → re-enter). */
+    private fun submitDeliveryOtp() {
+        val trip = _state.value.activeTrip ?: return
+        val otp = _state.value.deliveryOtpInput.toIntOrNull()
+        if (otp == null) { _state.update { it.copy(deliveryOtpError = true) }; return }
+        if (_state.value.isCompleting) return
+        completeActiveTrip(trip, deliveryOtp = otp)
+    }
+
+    /** Shared completion: PATCH /trips/completed (with [deliveryOtp] for courier) → rate-your-rider on success. */
+    private fun completeActiveTrip(trip: RideRequest, deliveryOtp: Int?) {
         _state.update { it.copy(isCompleting = true, errorMessage = null) }
         viewModelScope.launch {
-            when (val result = completeTripUseCase(trip.tripId, trip.destination)) {
+            when (val result = completeTripUseCase(trip.tripId, trip.destination, deliveryOtp)) {
                 // Completed → show the "Rate Your Rider" screen (keep the trip for its summary).
-                is ApiResult.Success -> _state.update { it.copy(isCompleting = false, tripInProgress = false, ratingRider = true, riderStars = 0) }
-                is ApiResult.Error -> _state.update { it.copy(isCompleting = false, errorMessage = result.message) }
-                is ApiResult.Failure -> _state.update { it.copy(isCompleting = false, errorMessage = result.error.message) }
+                is ApiResult.Success -> {
+                    submitTripMap(TripImageType.COMPLETED)
+                    _state.update {
+                        it.copy(isCompleting = false, awaitingDeliveryOtp = false, deliveryOtpInput = "", tripInProgress = false, ratingRider = true, riderStars = 0)
+                    }
+                }
+                // A courier delivery-OTP rejection keeps the captain on the OTP entry to retry.
+                is ApiResult.Error -> _state.update {
+                    if (deliveryOtp != null) it.copy(isCompleting = false, deliveryOtpError = true)
+                    else it.copy(isCompleting = false, errorMessage = result.message)
+                }
+                is ApiResult.Failure -> _state.update {
+                    if (deliveryOtp != null) it.copy(isCompleting = false, deliveryOtpError = true)
+                    else it.copy(isCompleting = false, errorMessage = result.error.message)
+                }
             }
         }
     }
@@ -687,11 +872,21 @@ class CaptainDashboardViewModel @Inject constructor(
         }
     }
 
-    /** Distance (km) + a rough ETA (minutes) from the captain's current location to [target]. */
+    /**
+     * Distance (km) + a rough ETA (minutes) from the captain's current location to [target]. Prefers the
+     * live streamed [driverLocation], falling back to the framed [myLocation]; null only when neither is known.
+     */
     private fun computeLeg(target: PlaceLocation): Pair<Double, Int>? {
-        val me = _state.value.myLocation ?: return null
+        val from = _state.value.driverLocation
+            ?: _state.value.myLocation?.let { LatLngPoint(it.latitude, it.longitude) }
+            ?: return null
+        return legFrom(from, target)
+    }
+
+    /** Distance (km) + a rough ETA (minutes) from [from] to [target]. */
+    private fun legFrom(from: LatLngPoint, target: PlaceLocation): Pair<Double, Int> {
         val out = FloatArray(1)
-        android.location.Location.distanceBetween(me.latitude, me.longitude, target.latitude, target.longitude, out)
+        android.location.Location.distanceBetween(from.latitude, from.longitude, target.latitude, target.longitude, out)
         val km = out[0] / 1000.0
         val mins = Math.ceil(km / PICKUP_AVG_SPEED_KMH * 60.0).toInt().coerceAtLeast(1)
         return km to mins
@@ -750,6 +945,10 @@ class CaptainDashboardViewModel @Inject constructor(
                 showCancelSheet = false,
                 selectedCancelReasonId = null,
                 isCancelling = false,
+                courierMatch = null,
+                awaitingDeliveryOtp = false,
+                deliveryOtpInput = "",
+                deliveryOtpError = false,
             )
         }
     }

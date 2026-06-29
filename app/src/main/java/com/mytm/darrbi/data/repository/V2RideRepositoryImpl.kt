@@ -8,6 +8,7 @@ import com.mytm.darrbi.core.network.unwrapMain
 import com.mytm.darrbi.core.network.unwrapMainUnit
 import com.mytm.darrbi.data.mapper.toDomain
 import com.mytm.darrbi.data.remote.dto.CancelOpenTripRequest
+import com.mytm.darrbi.data.remote.dto.CourierBody
 import com.mytm.darrbi.data.remote.dto.CreateBidTripRequest
 import com.mytm.darrbi.data.remote.dto.PlaceBidRequest
 import com.mytm.darrbi.data.remote.dto.RaiseOfferRequest
@@ -16,6 +17,7 @@ import com.mytm.darrbi.data.remote.service.V2RideApi
 import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.BidTrip
 import com.mytm.darrbi.domain.model.BidType
+import com.mytm.darrbi.domain.model.CourierDetails
 import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.SelectedBid
@@ -32,6 +34,7 @@ class V2RideRepositoryImpl @Inject constructor(
         cabId: String,
         categoryId: String?,
         offeredFare: Double,
+        courier: CourierDetails?,
     ): ApiResult<BidTrip> =
         safeApiCall {
             api.createTrip(
@@ -42,9 +45,11 @@ class V2RideRepositoryImpl @Inject constructor(
                     tripType = 1,
                     riderOfferedFare = offeredFare,
                     addresses = listOf(
+                        // For a courier trip pickup = sender and destination = receiver (guide §6).
                         TripAddressBody(pickup.address.ifBlank { pickup.name }, ADDRESS_PICKUP, pickup.latitude, pickup.longitude),
                         TripAddressBody(destination.address.ifBlank { destination.name }, ADDRESS_DESTINATION, destination.latitude, destination.longitude),
                     ),
+                    courier = courier?.toBody(),
                 ),
             )
         }.unwrapMain().map { it.toDomain(offeredFare) }
@@ -105,3 +110,18 @@ class V2RideRepositoryImpl @Inject constructor(
         const val PAYMENT_METHOD_WALLET = 2
     }
 }
+
+/** Maps the rider's courier input to the create-trip `courier{}` wire block (guide §6.1). */
+private fun CourierDetails.toBody(): CourierBody = CourierBody(
+    senderPhone = senderPhone,
+    senderName = senderName?.takeIf { it.isNotBlank() },
+    receiverPhone = receiverPhone,
+    receiverName = receiverName?.takeIf { it.isNotBlank() },
+    parcelType = parcelType.wire,
+    parcelWeightKg = parcelWeightKg,
+    weightBucket = weightBucket?.wire,
+    lengthCm = lengthCm,
+    widthCm = widthCm,
+    heightCm = heightCm,
+    parcelNote = note?.takeIf { it.isNotBlank() },
+)

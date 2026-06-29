@@ -331,6 +331,7 @@
     <string name="rider_set_location_from_map">تحديد الموقع من الخريطة</string>
     <string name="rider_confirm_location">تأكيد الموقع</string>
     <string name="cd_recenter">موقعي</string>
+    <string name="cd_open_navigation">فتح الملاحة في خرائط جوجل</string>
     <!-- Rider home dashboard -->
     <string name="rider_greeting_morning">صباح الخير، %1$s</string>
     <string name="rider_greeting_afternoon">نهارك سعيد، %1$s</string>
@@ -499,4 +500,315 @@
         <item>ج</item>
         <item>س</item>
     </string-array>
+
+    <!-- Courier (parcel delivery) -->
+    <string name="courier_details_title">تفاصيل الطرد</string>
+    <string name="courier_details_subtitle">نقطة الانطلاق هي المُرسِل، والوجهة هي المُستلِم.</string>
+    <string name="courier_sender">المُرسِل</string>
+    <string name="courier_sender_phone">هاتف المُرسِل</string>
+    <string name="courier_sender_name_optional">اسم المُرسِل (اختياري)</string>
+    <string name="courier_receiver">المُستلِم</string>
+    <string name="courier_receiver_phone">هاتف المُستلِم</string>
+    <string name="courier_receiver_name_optional">اسم المُستلِم (اختياري)</string>
+    <string name="courier_parcel_type">نوع الطرد</string>
+    <string name="courier_weight_kg">الوزن (كجم)</string>
+    <string name="courier_note_optional">ملاحظة (اختياري)</string>
+    <string name="courier_continue">متابعة</string>
+    <string name="courier_cab_capacity">حتى %1$s كجم</string>
+    <string name="courier_cab_too_small">أصغر من أن يحمل هذا الطرد</string>
+    <string name="courier_summary_type_weight">%1$s · %2$s كجم</string>
+    <string name="courier_delivery_otp_share">شارك رمز التسليم هذا مع المُستلِم</string>
+    <string name="courier_delivery_otp_share_named">شارك رمز التسليم هذا مع %1$s</string>
+    <string name="courier_delivery_otp_title">أدخل رمز التسليم</string>
+    <string name="courier_delivery_otp_subtitle">اطلب رمز التسليم من المُستلِم لإكمال الرحلة.</string>
+    <string name="courier_delivery_otp_invalid">رمز تسليم غير صحيح، حاول مرة أخرى</string>
+    <string name="parcel_type_documents">مستندات</string>
+    <string name="parcel_type_food">طعام</string>
+    <string name="parcel_type_electronics">إلكترونيات</string>
+    <string name="parcel_type_fragile">قابل للكسر</string>
+    <string name="parcel_type_clothing">ملابس</string>
+    <string name="parcel_type_medicine">أدوية</string>
+    <string name="parcel_type_groceries">بقالة</string>
+    <string name="parcel_type_furniture">أثاث</string>
+    <string name="parcel_type_other">أخرى</string>
+    <string name="courier_err_phone">أدخل رقم جوال سعودي صحيح (5XXXXXXXX)</string>
+    <string name="courier_err_name">أدخل اسماً صحيحاً</string>
+    <string name="courier_err_details_required">يرجى إكمال بيانات المُرسِل والمُستلِم والطرد</string>
+    <string name="courier_err_invalid_weight">أدخل وزنًا صحيحًا للطرد</string>
+    <string name="courier_err_exceeds_weight">هذا الطرد ثقيل جدًا على المركبة المختارة</string>
+    <string name="courier_err_exceeds_dimensions">هذا الطرد كبير جدًا على المركبة المختارة</string>
+    <string name="courier_err_not_supported">بيانات التوصيل غير مدعومة لهذه المركبة</string>
+    <string name="courier_err_offer_out_of_band">السعر المقترح خارج النطاق المسموح</string>
+
+    <!-- الرحلات المجدولة بين المدن -->
+    <string name="schedule_title">جدولة رحلتك</string>
+    <string name="schedule_confirm_schedule">تأكيد الجدولة</string>
+    <string name="schedule_time_label">الوقت</string>
+    <string name="schedule_am">ص</string>
+    <string name="schedule_pm">م</string>
+    <string name="schedule_today">اليوم</string>
+    <string name="schedule_tomorrow">غدًا</string>
+    <string name="schedule_when_full">%1$s في %2$s</string>
+    <string name="schedule_origin_city_title">مدينة الانطلاق</string>
+    <string name="schedule_destination_city_title">مدينة الوصول</string>
+    <string name="schedule_select_city_hint">ابحث عن مدينة</string>
+    <string name="schedule_no_city_match">لا توجد مدن مطابقة</string>
+    <string name="schedule_pickup_title">موقع الانطلاق</string>
+    <string name="schedule_pickup_hint">من أين؟</string>
+    <string name="schedule_dropoff_title">موقع الوصول</string>
+    <string name="schedule_dropoff_hint">إلى أين؟</string>
+    <string name="schedule_find_offers_title">البحث عن عروض</string>
+    <string name="schedule_find_offers">البحث عن عروض</string>
+    <string name="schedule_scheduled_for">مجدولة لـ %1$s</string>
+    <string name="schedule_point_city">%1$s، %2$s</string>
+    <string name="schedule_seats_label">المقاعد</string>
+    <string name="schedule_recommended_fare">السعر المقترح</string>
+    <string name="schedule_fare_band">الأدنى %1$s · الأعلى %2$s</string>
+    <string name="schedule_route_distance">%1$s كم</string>
+    <string name="schedule_pay_via_wallet">محفظة دربي</string>
+    <string name="schedule_pay_label">الدفع عبر دربي</string>
+    <!-- التأكيد -->
+    <string name="schedule_confirmed_title">تم جدولة الرحلة</string>
+    <string name="schedule_confirmed_notify">سنُذكّرك قبل موعد رحلتك.</string>
+    <string name="schedule_upcoming">القادمة</string>
+    <!-- قائمة الرحلات القادمة -->
+    <string name="schedule_upcoming_title">الرحلات القادمة</string>
+    <string name="schedule_badge_scheduled">مجدولة</string>
+    <string name="schedule_badge_finding">جارٍ البحث عن عروض</string>
+    <string name="schedule_badge_confirmed">مؤكدة</string>
+    <string name="schedule_create_new">إنشاء رحلة جديدة</string>
+    <string name="schedule_no_upcoming">لا توجد رحلات قادمة</string>
+    <string name="schedule_no_upcoming_subtitle">ستظهر هنا رحلاتك المجدولة بين المدن.</string>
+    <!-- الانتظار / المطابقة -->
+    <string name="schedule_waiting_title">هذه الرحلة مجدولة وستكون في %1$s</string>
+    <string name="schedule_cancellation_fee">رسوم إلغاء الرحلة هي %1$s</string>
+    <string name="schedule_cancel_ride">إلغاء الرحلة</string>
+    <!-- نتائج الإلغاء -->
+    <string name="schedule_cancelled_free">تم إلغاء رحلتك</string>
+    <string name="schedule_cancelled_fee">تم إلغاء رحلتك مع تطبيق رسوم</string>
+    <!-- أحرف الأيام تبدأ بالأحد -->
+    <string-array name="schedule_weekday_initials">
+        <item>ح</item>
+        <item>ن</item>
+        <item>ث</item>
+        <item>ر</item>
+        <item>خ</item>
+        <item>ج</item>
+        <item>س</item>
+    </string-array>
+    <!-- رسائل أخطاء الرحلات المجدولة -->
+    <string name="c2c_err_disabled">الرحلات المجدولة غير متاحة حاليًا</string>
+    <string name="c2c_err_same_od">يجب أن تختلف مدينتا الانطلاق والوصول</string>
+    <string name="c2c_err_invalid_city">يرجى اختيار مدينة صحيحة</string>
+    <string name="c2c_err_departure_too_soon">اختر موعدًا بعد ساعة على الأقل من الآن</string>
+    <string name="c2c_err_departure_too_far">اختر موعدًا خلال الثلاثين يومًا القادمة</string>
+    <string name="c2c_err_invalid_seats">اختر بين مقعد و6 مقاعد</string>
+    <string name="c2c_err_not_priced">هذا المسار غير متاح بعد</string>
+    <string name="c2c_err_offer_out_of_band">السعر المقترح خارج النطاق المسموح</string>
+    <string name="c2c_err_bidding_closed">انتهى وقت تقديم العروض لهذه الرحلة</string>
+    <string name="c2c_err_not_cancellable">لا يمكن إلغاء هذه الرحلة الآن</string>
+    <string name="c2c_err_create_failed">تعذّر جدولة رحلتك، يرجى المحاولة مرة أخرى</string>
+
+    <!-- ===================== الكابتن: رحلات بين المدن المجدولة ===================== -->
+    <string name="captain_scheduled_title">الرحلات المجدولة</string>
+    <string name="captain_scheduled_refresh">تحديث</string>
+    <string name="captain_scheduled_available">الطلبات المتاحة</string>
+    <string name="captain_scheduled_mine">رحلاتي المجدولة</string>
+    <string name="captain_scheduled_empty_available">لا توجد طلبات بين المدن مفتوحة حالياً</string>
+    <string name="captain_scheduled_empty_mine">لا توجد رحلات مجدولة بعد</string>
+    <string name="captain_scheduled_seats">%1$d مقاعد</string>
+    <string name="captain_scheduled_offered_label">عرض الراكب</string>
+    <string name="captain_scheduled_bid">قدّم عرضاً</string>
+    <string name="captain_scheduled_place_bid">تقديم عرض</string>
+    <string name="captain_scheduled_accept_fare">قبول %1$s</string>
+    <string name="captain_scheduled_counter_label">سعرك</string>
+    <string name="captain_scheduled_counter_bid">تقديم عرض مضاد</string>
+    <string name="captain_scheduled_fare_band">الحد الأدنى %1$s · الحد الأقصى %2$s</string>
+    <string name="captain_scheduled_bid_placed">تم تقديم العرض</string>
+    <string name="captain_sched_open">مفتوح</string>
+    <string name="captain_sched_matched">تم الاختيار</string>
+    <string name="captain_sched_reminded">تذكير</string>
+    <string name="captain_sched_activated">نشط</string>
+    <string name="captain_bid_err_cab">سيارتك ليست من نوع رحلات بين المدن</string>
+    <string name="captain_bid_err_band">سعرك خارج النطاق المسموح</string>
+
+    <!-- ============================ تأجير السيارات (RAC) ============================ -->
+    <string name="rental_title">تأجير السيارات</string>
+    <string name="rental_my_bookings">حجوزاتي</string>
+    <string name="rental_search">بحث</string>
+    <string name="rental_continue">متابعة</string>
+    <string name="rental_apply">تطبيق</string>
+
+    <!-- الصفحة الرئيسية للبحث -->
+    <string name="rental_location_hint">مدينة الاستلام</string>
+    <string name="rental_return_station">اختياري: محطة إرجاع مختلفة</string>
+    <string name="rental_date_time">التاريخ والوقت</string>
+    <string name="rental_select_date_time">اختر التاريخ والوقت</string>
+    <string name="rental_best_start">أفضل بداية لرحلتك</string>
+    <string name="rental_fast_pickup_title">استلام سريع</string>
+    <string name="rental_fast_pickup_sub">تجاوز الكاونتر وانطلق.</string>
+    <string name="rental_easy_return_title">إرجاع سهل</string>
+    <string name="rental_easy_return_sub">دليل مغادرة سريع.</string>
+    <string name="rental_how_it_works">كيف تعمل</string>
+    <string name="rental_hiw_1">أكمل حجزك عبر الإنترنت.</string>
+    <string name="rental_hiw_2">استلم التعليمات عبر البريد الإلكتروني.</string>
+    <string name="rental_hiw_3">أرسل نسخة من هويتك والمستندات المطلوبة.</string>
+    <string name="rental_hiw_4">نؤكد حجزك ونرسل موقع السيارة.</string>
+    <string name="rental_hiw_5">استلم سيارتك وانطلق.</string>
+
+    <!-- التاريخ والوقت -->
+    <string name="rental_pickup_at">الاستلام</string>
+    <string name="rental_return_at">الإرجاع</string>
+    <string name="rental_pickup_date_time">تاريخ ووقت الاستلام</string>
+    <string name="rental_return_date_time">تاريخ ووقت الإرجاع</string>
+
+    <!-- النتائج -->
+    <string name="rental_total_count">الإجمالي %1$d</string>
+    <string name="rental_results_note">يرجى ملاحظة أن السيارة الفعلية قد تختلف عن الصورة المعروضة.</string>
+    <string name="rental_filter">تصفية</string>
+    <string name="rental_sort">ترتيب</string>
+    <string name="rental_per_day_format">%1$s/يوم</string>
+    <string name="rental_total_format">%1$s الإجمالي</string>
+    <string name="rental_unlimited_km">كيلومترات غير محدودة</string>
+    <string name="rental_limited_km">%1$d كم/يوم مشمولة</string>
+    <string name="rental_seats_value">%1$d مقاعد</string>
+    <string name="rental_model_year">موديل %1$d</string>
+    <string name="rental_no_vehicles">لا توجد سيارات متاحة لهذه التواريخ</string>
+    <string name="rental_rating_format">%1$s (%2$d)</string>
+
+    <!-- نافذة التصفية -->
+    <string name="rental_filter_title">تصفية</string>
+    <string name="rental_filter_car_type">نوع السيارة</string>
+    <string name="rental_filter_seats">عدد المقاعد</string>
+    <string name="rental_filter_transmission">ناقل الحركة</string>
+    <string name="rental_filter_all">الكل</string>
+    <string name="rental_filter_search_count">بحث (%1$d)</string>
+    <string name="rental_transmission_automatic">أوتوماتيك</string>
+    <string name="rental_transmission_manual">عادي</string>
+
+    <!-- نافذة الترتيب -->
+    <string name="rental_sort_title">ترتيب</string>
+    <string name="rental_sort_recommended">موصى به</string>
+    <string name="rental_sort_price_low">السعر (من الأقل للأعلى)</string>
+    <string name="rental_sort_price_high">السعر (من الأعلى للأقل)</string>
+    <string name="rental_sort_rating">الأعلى تقييماً</string>
+
+    <!-- تفاصيل السيارة -->
+    <string name="rental_specs_title">المواصفات</string>
+    <string name="rental_features_title">المميزات</string>
+    <string name="rental_reviews_title">التقييمات</string>
+    <string name="rental_pricing_title">أسعار التأجير</string>
+    <string name="rental_people_value">%1$d أشخاص</string>
+    <string name="rental_doors_value">%1$d أبواب</string>
+    <string name="rental_small_bag_value">%1$d حقيبة صغيرة</string>
+    <string name="rental_large_bag_value">%1$d حقيبة كبيرة</string>
+    <string name="rental_min_age">الحد الأدنى لعمر أصغر سائق</string>
+    <string name="rental_total_label">الإجمالي</string>
+    <string name="rental_period_per_hour">للساعة</string>
+    <string name="rental_period_h2to3">2–3 ساعات</string>
+    <string name="rental_period_h4to5">4–5 ساعات</string>
+    <string name="rental_period_h6to12">6–12 ساعة</string>
+    <string name="rental_period_per_day">لليوم</string>
+    <string name="rental_period_per_week">للأسبوع</string>
+    <string name="rental_period_per_month">للشهر</string>
+    <string name="rental_cdw_title">تأمين ضد الأضرار (CDW)</string>
+    <string name="rental_cdw_deposit">التأمين %1$s</string>
+    <string name="rental_cdw_excess">التحمل %1$s</string>
+    <string name="rental_cdw_per_day">+%1$s / يوم</string>
+    <string name="rental_cdw_included">مشمول</string>
+    <string name="rental_cdw_zero_excess">بدون تحمل</string>
+    <string name="rental_cdw_tier_none">بدون تأمين</string>
+    <string name="rental_cdw_tier_basic">أساسي</string>
+    <string name="rental_cdw_tier_standard">قياسي</string>
+    <string name="rental_cdw_tier_premium">شامل</string>
+    <string name="rental_branches_title">مواقع الاستلام</string>
+    <string name="rental_company_by">بواسطة %1$s</string>
+
+    <!-- الحجز / التسعير -->
+    <string name="rental_reservation_title">الحجز</string>
+    <string name="rental_reservation_info">معلومات الحجز</string>
+    <string name="rental_field_nid">رقم الهوية/الإقامة</string>
+    <string name="rental_field_license">رقم رخصة القيادة</string>
+    <string name="rental_field_name">الاسم</string>
+    <string name="rental_field_dob">تاريخ الميلاد</string>
+    <string name="rental_dob_hint">سنة/شهر/يوم</string>
+    <string name="rental_dob_note">يرجى ذكر تاريخ الميلاد كما في الهوية/الإقامة</string>
+    <string name="rental_field_phone">رقم الجوال</string>
+    <string name="rental_field_email">البريد الإلكتروني</string>
+    <string name="rental_field_email_optional">البريد الإلكتروني (اختياري)</string>
+    <string name="rental_rental_period">مدة التأجير</string>
+    <string name="rental_coupon_label">رمز الخصم</string>
+    <string name="rental_coupon_applied">تم تطبيق الكوبون</string>
+    <string name="rental_discount_amount">مبلغ الخصم</string>
+    <string name="rental_deposit_label">مبلغ التأمين</string>
+    <string name="rental_deposit_note">يُحجز على بطاقتك ويُسترجع عند الإرجاع السليم.</string>
+    <string name="rental_reserve_now">احجز الآن</string>
+    <string name="rental_phone_cc">+966</string>
+    <string name="rental_err_nid">أدخل رقم هوية/إقامة صحيحاً من 10 أرقام (يبدأ بـ 1 أو 2)</string>
+    <string name="rental_err_phone">أدخل رقم جوال سعودي صحيح (5XXXXXXXX)</string>
+    <string name="rental_err_email">أدخل بريداً إلكترونياً صحيحاً</string>
+    <string name="rental_terms_agree">لقد قرأت وأوافق على الشروط والأحكام</string>
+    <string name="rental_free_cancellation">إلغاء مجاني قبل أكثر من 48 ساعة من الاستلام</string>
+    <string name="rental_quote_unavailable">هذه السيارة غير متاحة للتواريخ المختارة</string>
+    <string name="rental_pay_summary">تدفع الآن</string>
+
+    <!-- نفاذ -->
+    <string name="rental_nafath_title">تحقّق من هويتك</string>
+    <string name="rental_nafath_desc">تحقّق عبر نفاذ باستخدام رقم هويتك الوطنية للمتابعة.</string>
+    <string name="rental_nafath_verify">التحقق عبر نفاذ</string>
+    <string name="rental_nafath_verified">تم التحقق من الهوية</string>
+    <string name="rental_nafath_failed">فشل التحقق، يرجى المحاولة مرة أخرى</string>
+
+    <!-- التأكيد -->
+    <string name="rental_success_title">تم الحجز بنجاح</string>
+    <string name="rental_success_desc">ستصلك رسالة على البريد الإلكتروني المُدخل قريباً.</string>
+    <string name="rental_booking_id">رقم الحجز: %1$s</string>
+
+    <!-- قائمة الحجوزات -->
+    <string name="rental_bookings_title">حجوزاتي</string>
+    <string name="rental_bookings_empty">لا توجد لديك حجوزات بعد</string>
+    <string name="rental_book_a_car">احجز سيارة</string>
+    <string name="rental_booking_ref">المرجع %1$s</string>
+    <string name="rental_status_pending">قادم</string>
+    <string name="rental_status_active">نشط</string>
+    <string name="rental_status_completed">مكتمل</string>
+    <string name="rental_status_late">متأخر</string>
+    <string name="rental_status_cancelled">ملغي</string>
+    <string name="rental_status_disputed">نزاع</string>
+    <string name="rental_status_unknown">حجز</string>
+
+    <!-- تفاصيل الحجز / التتبع -->
+    <string name="rental_detail_title">الحجز</string>
+    <string name="rental_track_title">سيارتك المستأجرة</string>
+    <string name="rental_trip_distance">%1$s كم</string>
+    <string name="rental_trip_fuel">الوقود %1$d%%</string>
+    <string name="rental_tajeer_contract">عقد تأجير %1$s</string>
+    <string name="rental_penalties_title">الغرامات</string>
+    <string name="rental_penalty_late">إرجاع متأخر</string>
+    <string name="rental_penalty_fuel">وقود منخفض</string>
+    <string name="rental_penalty_zone">خارج النطاق</string>
+    <string name="rental_refund_format">استرداد %1$s</string>
+    <string name="rental_cancel_booking">إلغاء الحجز</string>
+    <string name="rental_extend">تمديد التأجير</string>
+    <string name="rental_extend_title">مدّد فترة تأجيرك</string>
+    <string name="rental_extend_hours">ساعات إضافية</string>
+    <string name="rental_extend_request">طلب تمديد</string>
+    <string name="rental_extension_pending">تم طلب التمديد (%1$d ساعة) — بانتظار موافقة الشريك</string>
+    <string name="rental_rate_title">قيّم تجربتك</string>
+    <string name="rental_rate_hint">شاركنا تجربتك (اختياري)</string>
+    <string name="rental_payment_refs">الدفع %1$s</string>
+
+    <!-- رسائل -->
+    <string name="rental_cancelled">تم إلغاء الحجز</string>
+    <string name="rental_extension_requested">تم طلب التمديد</string>
+    <string name="rental_rated">شكراً لتقييمك</string>
+    <string name="rental_err_not_available">السيارة غير متاحة للتواريخ المختارة</string>
+    <string name="rental_err_payment_failed">فشل الدفع — يرجى تجربة بطاقة أخرى</string>
+    <string name="rental_err_guest">يرجى إكمال ملفك الشخصي قبل الحجز</string>
+    <string name="rental_err_invalid_dates">تحقّق من تاريخي الاستلام والإرجاع</string>
+    <string name="rental_err_generic">حدث خطأ ما، يرجى المحاولة مرة أخرى</string>
+
+    <!-- أوصاف للوصول -->
+    <string name="rental_cd_vehicle_photo">صورة السيارة</string>
+    <string name="rental_cd_close">إغلاق</string>
 </resources>

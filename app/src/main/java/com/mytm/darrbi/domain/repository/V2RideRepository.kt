@@ -4,6 +4,7 @@ import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.BidTrip
 import com.mytm.darrbi.domain.model.BidType
+import com.mytm.darrbi.domain.model.CourierDetails
 import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.SelectedBid
@@ -15,13 +16,17 @@ import com.mytm.darrbi.domain.model.SelectedBid
  */
 interface V2RideRepository {
 
-    /** RIDER: create a BID trip with [offeredFare]; returns the open trip id + authoritative fare range. */
+    /**
+     * RIDER: create a BID trip with [offeredFare]; returns the open trip id + authoritative fare range.
+     * [courier] is required for a courier (parcel) cab and omitted for a normal ride.
+     */
     suspend fun createBidTrip(
         pickup: PlaceLocation,
         destination: PlaceLocation,
         cabId: String,
         categoryId: String?,
         offeredFare: Double,
+        courier: CourierDetails? = null,
     ): ApiResult<BidTrip>
 
     /** DRIVER: open (awaiting-bids) trips in range for [cabId] around [lat]/[lng]. */

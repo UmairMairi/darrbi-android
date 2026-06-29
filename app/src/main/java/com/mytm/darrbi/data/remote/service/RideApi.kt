@@ -17,11 +17,15 @@ import com.mytm.darrbi.data.remote.dto.ReviewRequest
 import com.mytm.darrbi.data.remote.dto.StartTripRequest
 import com.mytm.darrbi.data.remote.dto.TripExistsData
 import kotlinx.serialization.json.JsonElement
+import okhttp3.MultipartBody
+import okhttp3.RequestBody
 import retrofit2.http.Body
 import retrofit2.http.GET
+import retrofit2.http.Multipart
 import retrofit2.http.PATCH
 import retrofit2.http.POST
 import retrofit2.http.PUT
+import retrofit2.http.Part
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -112,4 +116,18 @@ interface RideApi {
     /** Live trip snapshot for [tripId] (same shape as the `trip-detail` socket push). */
     @GET("trips/socket/{tripId}")
     suspend fun getOngoingTripDetail(@Path("tripId") tripId: String): MainEnvelope<OngoingTripData>
+
+    /**
+     * Uploads the rendered trip static-map image (multipart) — mirrors ride-android's
+     * `PATCH /trips/upload-photo/{trip_id}`. Submitted by the rider + captain on each trip step;
+     * [type] is the trip-status code ([com.mytm.darrbi.domain.model.TripImageType]).
+     */
+    @Multipart
+    @PATCH("trips/upload-photo/{tripId}")
+    suspend fun uploadTripStaticMapImage(
+        @Path("tripId") tripId: String,
+        @Part riderPhoto: MultipartBody.Part,
+        @Part driverPhoto: MultipartBody.Part,
+        @Part("type") type: RequestBody,
+    ): MainEnvelope<JsonElement>
 }

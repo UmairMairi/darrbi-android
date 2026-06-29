@@ -26,19 +26,22 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentHeight
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.automirrored.filled.Send
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.MyLocation
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Place
 import androidx.compose.material.icons.filled.PushPin
@@ -80,6 +83,9 @@ import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.CabOption
+import com.mytm.darrbi.domain.model.CourierDetails
+import com.mytm.darrbi.domain.model.ParcelType
+import com.mytm.darrbi.domain.model.ParcelWeightBucket
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
@@ -96,6 +102,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.Dp
 import androidx.core.content.ContextCompat
 import com.google.android.gms.maps.CameraUpdateFactory
 import com.google.android.gms.maps.model.BitmapDescriptor
@@ -120,6 +127,7 @@ import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.repository.NearbyDriver
 import com.mytm.darrbi.core.designsystem.DarrbiTheme
 import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
+import com.mytm.darrbi.core.designsystem.components.DarrbiTextField
 import com.mytm.darrbi.presentation.components.CancelReasonsSheet
 import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.domain.model.PlaceSuggestion
@@ -137,15 +145,22 @@ import androidx.core.graphics.scale
 fun RiderFlowScreen(
     onProfile: () -> Unit = {},
     onChat: (com.mytm.darrbi.domain.model.AcceptedTrip) -> Unit = {},
+    /** Tapping the SCHEDULE category tile opens the separate scheduled City-to-City flow. */
+    onOpenSchedule: () -> Unit = {},
+    /** Tapping the RENT-A-CAR category tile opens the separate self-drive car-rental flow. */
+    onOpenRental: () -> Unit = {},
     viewModel: RiderBookingViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
 
-    // Surface transient errors (e.g. a failed cancel) and consume them so they show once.
+    // Surface transient errors (e.g. a failed cancel) and consume them so they show once. Known courier/bid
+    // create error codes (e.g. PARCEL_EXCEEDS_CAB_WEIGHT) are translated to a friendly message.
     val errorContext = LocalContext.current
+    val courierErrorText = courierCreateErrorStrings()
     LaunchedEffect(state.errorMessage) {
         state.errorMessage?.let {
-            android.widget.Toast.makeText(errorContext, it, android.widget.Toast.LENGTH_SHORT).show()
+            val msg = courierErrorText[it] ?: it
+            android.widget.Toast.makeText(errorContext, msg, android.widget.Toast.LENGTH_LONG).show()
             viewModel.onEvent(RiderBookingEvent.ConsumeError)
         }
     }
@@ -236,7 +251,7 @@ fun RiderFlowScreen(
     }
     val mapRoutePoints: List<LatLngPoint> = when {
         onWay -> state.driverRoutePoints
-        state.step == RiderStep.ChangeDropConfirm -> emptyList() // straight-line preview to the new drop
+        state.step == RiderStep.ChangeDropConfirm -> state.changeDropRoutePoints // road route to the new drop
         showRoute -> state.routePoints
         else -> emptyList()
     }
@@ -296,6 +311,8 @@ fun RiderFlowScreen(
                 state = state,
                 onEvent = viewModel::onEvent,
                 onProfile = onProfile,
+                onOpenSchedule = onOpenSchedule,
+                onOpenRental = onOpenRental,
                 modifier = Modifier.fillMaxSize(),
             )
             RiderStep.DestinationSearch -> SearchOverlay(
@@ -324,6 +341,11 @@ fun RiderFlowScreen(
                 address = state.pickup?.address.orEmpty(),
                 onEdit = { viewModel.onEvent(RiderBookingEvent.EditPickup) },
                 onConfirm = { viewModel.onEvent(RiderBookingEvent.ProceedToRideSelection) },
+                onHeight = { routeSheetHeightPx = it },
+            )
+            RiderStep.CourierDetails -> CourierDetailsOverlay(
+                state = state,
+                onSubmit = { details -> viewModel.onEvent(RiderBookingEvent.SubmitCourierDetails(details)) },
                 onHeight = { routeSheetHeightPx = it },
             )
             RiderStep.SelectRide -> SelectRideOverlay(
@@ -448,6 +470,18 @@ fun RiderFlowScreen(
                 )
             }
         }
+        // Courier: once matched, show the delivery OTP banner (top) so the rider relays it to the receiver.
+        val deliveryOtp = state.courierMatch?.deliveryOtp
+        val activeRideStep = state.step == RiderStep.DriverOnWay ||
+            state.step == RiderStep.DriverArrived ||
+            state.step == RiderStep.TripStarted
+        if (deliveryOtp != null && activeRideStep) {
+            DeliveryOtpBanner(
+                otp = deliveryOtp,
+                receiverName = state.courierMatch?.receiver?.name,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        }
         // Profile avatar, top-end — persistent over the map steps (Home has its own header avatar; the
         // full-screen map picker hides it). The RIDER/CAPTAIN switch now lives in the profile screen.
         if (state.step != RiderStep.MapPicker && state.step != RiderStep.Home) {
@@ -464,6 +498,32 @@ fun RiderFlowScreen(
                 contentAlignment = Alignment.Center,
             ) {
                 Icon(Icons.Filled.Person, stringResource(R.string.cd_profile), tint = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.size(26.dp))
+            }
+        }
+        // "Open in Google Maps" navigation shortcut — shown on the right, just above the bottom overlay,
+        // for the whole active ride (driver on the way → arrived → trip started). Tapping it launches
+        // turn-by-turn navigation to the trip destination in Google Maps.
+        if (activeRideStep && !state.showCancelSheet && !state.showHelp && !state.rideCancelled) {
+            state.destination?.let { dest ->
+                Surface(
+                    onClick = { openNavigation(errorContext, dest.latitude, dest.longitude) },
+                    shape = CircleShape,
+                    color = DarrbiTheme.colors.surface,
+                    shadowElevation = 4.dp,
+                    modifier = Modifier
+                        .align(Alignment.BottomEnd)
+                        .padding(end = 16.dp, bottom = with(density) { routeSheetHeightPx.toDp() } + 16.dp)
+                        .size(48.dp),
+                ) {
+                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        Icon(
+                            Icons.Filled.Navigation,
+                            contentDescription = stringResource(R.string.cd_open_navigation),
+                            tint = DarrbiTheme.colors.primary,
+                            modifier = Modifier.size(24.dp),
+                        )
+                    }
+                }
             }
         }
         if (state.isResolving || state.isCancelling) {
@@ -486,7 +546,7 @@ private const val CUSTOMER_CARE_NUMBER = "+966500000000"
 private const val POLICE_NUMBER = "999"
 
 @Composable
-private fun RiderMap(
+internal fun RiderMap(
     cameraPositionState: CameraPositionState,
     showMyLocation: Boolean,
     pickup: PlaceLocation? = null,
@@ -690,6 +750,8 @@ private fun RiderHomeDashboard(
     state: RiderBookingUiState,
     onEvent: (RiderBookingEvent) -> Unit,
     onProfile: () -> Unit,
+    onOpenSchedule: () -> Unit,
+    onOpenRental: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(
@@ -715,7 +777,14 @@ private fun RiderHomeDashboard(
             categories = state.categories,
             isLoading = state.isLoadingCategories,
             nearbyCount = state.nearbyDrivers.size,
-            onCategory = { onEvent(RiderBookingEvent.OpenCategory(it)) },
+            // SCHEDULE → City-to-City flow; RENT-A-CAR → self-drive rental flow; everything else stays inline.
+            onCategory = {
+                when {
+                    it.isSchedule -> onOpenSchedule()
+                    it.isRental -> onOpenRental()
+                    else -> onEvent(RiderBookingEvent.OpenCategory(it))
+                }
+            },
             onRetry = { onEvent(RiderBookingEvent.RetryCategories) },
         )
         Spacer(Modifier.height(20.dp))
@@ -879,15 +948,15 @@ private fun CategoryTile(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CategoryImage(category.imageUrl, Modifier.size(60.dp))
+                CategoryImage(category.imageUrl, Modifier.size(80.dp))
                 Spacer(Modifier.width(16.dp))
                 CategoryText(title, subtitle)
             }
         } else {
-            Column(modifier = Modifier.fillMaxSize().padding(14.dp)) {
+            Column(modifier = Modifier.fillMaxSize().padding(5.dp)) {
                 Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    CategoryImage(category.imageUrl, Modifier.size(72.dp))
-                    Spacer(Modifier.width(10.dp))
+                    CategoryImage(category.imageUrl, Modifier.size(80.dp))
+                    Spacer(Modifier.width(5.dp))
                     CategoryText(title, subtitle)
                 }
                 if (isTaxi && nearbyCount > 0) NearbyCaptainsBadge(nearbyCount)
@@ -922,7 +991,7 @@ private fun CategoryImage(imageUrl: String?, modifier: Modifier) {
         placeholder = painterResource(R.drawable.placeholder_select_car),
         error = painterResource(R.drawable.placeholder_select_car),
         fallback = painterResource(R.drawable.placeholder_select_car),
-        contentScale = ContentScale.Fit,
+        contentScale = ContentScale.FillWidth,
         modifier = modifier,
     )
 }
@@ -1299,7 +1368,7 @@ private fun androidx.compose.foundation.layout.BoxScope.MapPickerOverlay(
 }
 
 @Composable
-private fun SearchField(value: String, hint: String, onValueChange: (String) -> Unit) {
+internal fun SearchField(value: String, hint: String, onValueChange: (String) -> Unit) {
     val focusRequester = remember { androidx.compose.ui.focus.FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focusRequester.requestFocus() } }
     Surface(shape = RoundedCornerShape(14.dp), color = DarrbiTheme.colors.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
@@ -1325,7 +1394,7 @@ private fun SearchField(value: String, hint: String, onValueChange: (String) -> 
 }
 
 @Composable
-private fun CurrentLocationRow(onClick: () -> Unit) {
+internal fun CurrentLocationRow(onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(16.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1337,7 +1406,7 @@ private fun CurrentLocationRow(onClick: () -> Unit) {
 }
 
 @Composable
-private fun SuggestionRow(suggestion: PlaceSuggestion, onClick: () -> Unit) {
+internal fun SuggestionRow(suggestion: PlaceSuggestion, onClick: () -> Unit) {
     Row(
         modifier = Modifier.fillMaxWidth().clickable(onClick = onClick).padding(vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -1426,11 +1495,19 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
                         CircularProgressIndicator(color = DarrbiTheme.colors.primary)
                     }
                     else -> state.cabs.forEachIndexed { index, cab ->
+                        // Courier: grey out (disable) any cab that can't carry the parcel weight/dims (guide §3.2).
+                        val courier = state.courierDetails
+                        val carryable = if (state.isCourier && courier != null) {
+                            cab.canCarry(courier.parcelWeightKg, courier.lengthCm, courier.widthCm, courier.heightCm)
+                        } else {
+                            true
+                        }
                         CabRow(
                             cab = cab,
                             selected = cab.id == state.selectedCabId,
                             promo = state.promo,
-                            onClick = { onEvent(RiderBookingEvent.SelectCab(cab.id)) },
+                            enabled = carryable,
+                            onClick = { if (carryable) onEvent(RiderBookingEvent.SelectCab(cab.id)) },
                         )
                         if (index < state.cabs.lastIndex) HorizontalDivider(color = DarrbiTheme.colors.outline)
                     }
@@ -1486,7 +1563,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
 }
 
 @Composable
-private fun RouteHeader(pickup: String, destination: String) {
+internal fun RouteHeader(pickup: String, destination: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Box(Modifier.size(14.dp).clip(CircleShape).border(3.dp, DarrbiTheme.colors.primary, CircleShape))
@@ -1505,14 +1582,17 @@ private fun RouteHeader(pickup: String, destination: String) {
 }
 
 @Composable
-private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onClick: () -> Unit) {
+private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onClick: () -> Unit, enabled: Boolean = true) {
+    // Disabled (over-capacity) courier cabs are dimmed and non-selectable (guide §3.2).
+    val contentAlpha = if (enabled) 1f else 0.4f
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
             .background(if (selected) DarrbiTheme.colors.surfaceVariant else Color.Transparent)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 12.dp, vertical = 8.dp),
+            .clickable(enabled = enabled, onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 8.dp)
+            .alpha(contentAlpha),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         AsyncImage(
@@ -1536,7 +1616,14 @@ private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onCl
                 }
             }
             Spacer(Modifier.height(3.dp))
-            Text(etaLine(cab), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant, maxLines = 1)
+            // For a courier cab show its weight capacity; else the ETA line.
+            val capacityLine = cab.maxWeightKg?.let { stringResource(R.string.courier_cab_capacity, formatFare(it)) }
+            Text(
+                text = if (!enabled) stringResource(R.string.courier_cab_too_small) else capacityLine ?: etaLine(cab),
+                style = DarrbiTheme.typography.label,
+                color = if (!enabled) DarrbiTheme.colors.error else DarrbiTheme.colors.onSurfaceVariant,
+                maxLines = 1,
+            )
         }
         Spacer(Modifier.width(8.dp))
         val currency = stringResource(R.string.profile_currency_sar)
@@ -1678,9 +1765,229 @@ private fun androidx.compose.foundation.layout.BoxScope.SearchingOverlay(
 }
 
 /** Rounds to ≤2 decimals and drops trailing zeros (ride-android's roundWith). */
-private fun formatFare(value: Double): String {
+internal fun formatFare(value: Double): String {
     val rounded = Math.round(value * 100) / 100.0
     return if (rounded % 1.0 == 0.0) rounded.toLong().toString() else rounded.toString()
+}
+
+// ---------------------------------------------------------------------------------------------
+// Courier (parcel delivery): the parcel-details form, the delivery-OTP banner, and label helpers.
+// ---------------------------------------------------------------------------------------------
+
+/** Localized label for a parcel type (guide §2.2). */
+@Composable
+internal fun parcelTypeLabel(type: ParcelType): String = stringResource(
+    when (type) {
+        ParcelType.Documents -> R.string.parcel_type_documents
+        ParcelType.Food -> R.string.parcel_type_food
+        ParcelType.Electronics -> R.string.parcel_type_electronics
+        ParcelType.Fragile -> R.string.parcel_type_fragile
+        ParcelType.Clothing -> R.string.parcel_type_clothing
+        ParcelType.Medicine -> R.string.parcel_type_medicine
+        ParcelType.Groceries -> R.string.parcel_type_groceries
+        ParcelType.Furniture -> R.string.parcel_type_furniture
+        ParcelType.Other -> R.string.parcel_type_other
+    },
+)
+
+/** Maps each courier create-trip error code (guide §11.1) to a friendly message. */
+@Composable
+private fun courierCreateErrorStrings(): Map<String, String> = mapOf(
+    "COURIER_DETAILS_REQUIRED" to stringResource(R.string.courier_err_details_required),
+    "INVALID_PARCEL_WEIGHT" to stringResource(R.string.courier_err_invalid_weight),
+    "PARCEL_EXCEEDS_CAB_WEIGHT" to stringResource(R.string.courier_err_exceeds_weight),
+    "PARCEL_EXCEEDS_CAB_DIMENSIONS" to stringResource(R.string.courier_err_exceeds_dimensions),
+    "COURIER_NOT_SUPPORTED_FOR_CAB" to stringResource(R.string.courier_err_not_supported),
+    "OFFER_OUT_OF_BAND" to stringResource(R.string.courier_err_offer_out_of_band),
+)
+
+/** A valid Saudi mobile is 9 local digits starting with 5 (after the +966 code), matching onboarding. */
+private const val COURIER_PHONE_LENGTH = 9
+
+/** Max characters accepted in an (optional) sender/receiver name. */
+private const val COURIER_NAME_MAX = 40
+
+/** Names: letters of any script (incl. Arabic), spaces and `. ' -`; 2–40 chars. No digits/symbols. */
+private val COURIER_NAME_REGEX = Regex("^[\\p{L} .'\\-]{2,40}$")
+
+/** Normalise a typed contact number to the 9-digit Saudi local form (drops a +966 code / leading zeros). */
+private fun normalizeSaudiLocal(raw: String): String =
+    raw.filter(Char::isDigit).removePrefix("966").trimStart('0').take(COURIER_PHONE_LENGTH)
+
+/** The fixed "+966" affordance shown before the courier phone fields. */
+@Composable
+private fun CourierPhonePrefix() {
+    Text(
+        stringResource(R.string.rental_phone_cc),
+        style = DarrbiTheme.typography.body,
+        color = DarrbiTheme.colors.onSurfaceVariant,
+        modifier = Modifier.padding(start = 14.dp, end = 4.dp),
+    )
+}
+
+/**
+ * Courier parcel-details sheet (guide §4): sender + receiver contacts and the parcel type/weight/note.
+ * Pickup = sender, dropoff = receiver. The weight gates which cabs are available on the next screen.
+ */
+@Composable
+private fun androidx.compose.foundation.layout.BoxScope.CourierDetailsOverlay(
+    state: RiderBookingUiState,
+    onSubmit: (CourierDetails) -> Unit,
+    onHeight: (Int) -> Unit,
+) {
+    val existing = state.courierDetails
+    var senderPhone by remember { mutableStateOf(existing?.senderPhone.orEmpty()) }
+    var senderName by remember { mutableStateOf(existing?.senderName.orEmpty()) }
+    var receiverPhone by remember { mutableStateOf(existing?.receiverPhone.orEmpty()) }
+    var receiverName by remember { mutableStateOf(existing?.receiverName.orEmpty()) }
+    var weight by remember { mutableStateOf(existing?.parcelWeightKg?.let { formatFare(it) }.orEmpty()) }
+    var note by remember { mutableStateOf(existing?.note.orEmpty()) }
+    var parcelType by remember { mutableStateOf(existing?.parcelType ?: ParcelType.Documents) }
+
+    val weightKg = weight.toDoubleOrNull()
+    val senderPhoneValid = senderPhone.length == COURIER_PHONE_LENGTH && senderPhone.startsWith("5")
+    val receiverPhoneValid = receiverPhone.length == COURIER_PHONE_LENGTH && receiverPhone.startsWith("5")
+    val senderNameValid = senderName.isBlank() || COURIER_NAME_REGEX.matches(senderName.trim())
+    val receiverNameValid = receiverName.isBlank() || COURIER_NAME_REGEX.matches(receiverName.trim())
+    val valid = senderPhoneValid && receiverPhoneValid && senderNameValid && receiverNameValid && (weightKg ?: 0.0) > 0.0
+
+    Surface(
+        modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().wrapContentHeight().onSizeChanged { onHeight(it.height) },
+        shape = RoundedCornerShape(topStart = 24.dp, topEnd = 24.dp),
+        color = DarrbiTheme.colors.surface,
+        shadowElevation = 8.dp,
+    ) {
+        Column(
+            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
+                .heightIn(max = 560.dp).verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+        ) {
+            Text(stringResource(R.string.courier_details_title), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
+            Spacer(Modifier.height(2.dp))
+            Text(stringResource(R.string.courier_details_subtitle), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+            Spacer(Modifier.height(14.dp))
+
+            Text(stringResource(R.string.courier_sender), style = DarrbiTheme.typography.title.copy(fontSize = 14.sp), color = DarrbiTheme.colors.onSurface)
+            Spacer(Modifier.height(8.dp))
+            DarrbiTextField(
+                value = senderPhone,
+                onValueChange = { senderPhone = normalizeSaudiLocal(it) },
+                label = stringResource(R.string.courier_sender_phone),
+                keyboardType = KeyboardType.Phone,
+                isError = senderPhone.isNotEmpty() && !senderPhoneValid,
+                supportingText = if (senderPhone.isNotEmpty() && !senderPhoneValid) stringResource(R.string.courier_err_phone) else null,
+                leadingContent = { CourierPhonePrefix() },
+            )
+            Spacer(Modifier.height(8.dp))
+            DarrbiTextField(
+                value = senderName,
+                onValueChange = { if (it.length <= COURIER_NAME_MAX) senderName = it },
+                label = stringResource(R.string.courier_sender_name_optional),
+                isError = senderName.isNotBlank() && !senderNameValid,
+                supportingText = if (senderName.isNotBlank() && !senderNameValid) stringResource(R.string.courier_err_name) else null,
+            )
+            Spacer(Modifier.height(14.dp))
+
+            Text(stringResource(R.string.courier_receiver), style = DarrbiTheme.typography.title.copy(fontSize = 14.sp), color = DarrbiTheme.colors.onSurface)
+            Spacer(Modifier.height(8.dp))
+            DarrbiTextField(
+                value = receiverPhone,
+                onValueChange = { receiverPhone = normalizeSaudiLocal(it) },
+                label = stringResource(R.string.courier_receiver_phone),
+                keyboardType = KeyboardType.Phone,
+                isError = receiverPhone.isNotEmpty() && !receiverPhoneValid,
+                supportingText = if (receiverPhone.isNotEmpty() && !receiverPhoneValid) stringResource(R.string.courier_err_phone) else null,
+                leadingContent = { CourierPhonePrefix() },
+            )
+            Spacer(Modifier.height(8.dp))
+            DarrbiTextField(
+                value = receiverName,
+                onValueChange = { if (it.length <= COURIER_NAME_MAX) receiverName = it },
+                label = stringResource(R.string.courier_receiver_name_optional),
+                isError = receiverName.isNotBlank() && !receiverNameValid,
+                supportingText = if (receiverName.isNotBlank() && !receiverNameValid) stringResource(R.string.courier_err_name) else null,
+            )
+            Spacer(Modifier.height(14.dp))
+
+            Text(stringResource(R.string.courier_parcel_type), style = DarrbiTheme.typography.title.copy(fontSize = 14.sp), color = DarrbiTheme.colors.onSurface)
+            Spacer(Modifier.height(8.dp))
+            Row(modifier = Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                ParcelType.entries.forEach { type ->
+                    ParcelTypeChip(label = parcelTypeLabel(type), selected = type == parcelType, onClick = { parcelType = type })
+                }
+            }
+            Spacer(Modifier.height(14.dp))
+
+            DarrbiTextField(value = weight, onValueChange = { weight = it.filter { c -> c.isDigit() || c == '.' } }, label = stringResource(R.string.courier_weight_kg), keyboardType = KeyboardType.Decimal)
+            Spacer(Modifier.height(8.dp))
+            DarrbiTextField(value = note, onValueChange = { note = it }, label = stringResource(R.string.courier_note_optional), singleLine = false)
+            Spacer(Modifier.height(16.dp))
+
+            DarrbiPrimaryButton(
+                text = stringResource(R.string.courier_continue),
+                onClick = {
+                    onSubmit(
+                        CourierDetails(
+                            senderPhone = senderPhone.trim(),
+                            senderName = senderName.trim().takeIf { it.isNotBlank() },
+                            receiverPhone = receiverPhone.trim(),
+                            receiverName = receiverName.trim().takeIf { it.isNotBlank() },
+                            parcelType = parcelType,
+                            parcelWeightKg = weightKg ?: 0.0,
+                            note = note.trim().takeIf { it.isNotBlank() },
+                        ),
+                    )
+                },
+                enabled = valid,
+            )
+        }
+    }
+}
+
+@Composable
+private fun ParcelTypeChip(label: String, selected: Boolean, onClick: () -> Unit) {
+    Surface(
+        modifier = Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = onClick),
+        shape = RoundedCornerShape(20.dp),
+        color = if (selected) DarrbiTheme.colors.primary else DarrbiTheme.colors.surfaceVariant,
+    ) {
+        Box(modifier = Modifier.padding(horizontal = 16.dp), contentAlignment = Alignment.Center) {
+            Text(
+                text = label,
+                style = DarrbiTheme.typography.bodyMedium,
+                color = if (selected) DarrbiTheme.colors.onPrimary else DarrbiTheme.colors.onSurface,
+                maxLines = 1,
+            )
+        }
+    }
+}
+
+/** Top banner shown to the rider after a courier match: the delivery OTP to relay to the receiver (guide §9.1). */
+@Composable
+private fun DeliveryOtpBanner(otp: Int, receiverName: String?, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier.statusBarsPadding().padding(horizontal = 16.dp, vertical = 12.dp).fillMaxWidth(0.9f),
+        shape = RoundedCornerShape(14.dp),
+        color = DarrbiTheme.colors.surface,
+        shadowElevation = 6.dp,
+        border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.primary),
+    ) {
+        Column(modifier = Modifier.padding(horizontal = 16.dp, vertical = 12.dp)) {
+            Text(
+                text = receiverName?.takeIf { it.isNotBlank() }
+                    ?.let { stringResource(R.string.courier_delivery_otp_share_named, it) }
+                    ?: stringResource(R.string.courier_delivery_otp_share),
+                style = DarrbiTheme.typography.label,
+                color = DarrbiTheme.colors.onSurfaceVariant,
+            )
+            Spacer(Modifier.height(4.dp))
+            Text(
+                text = otp.toString(),
+                style = DarrbiTheme.typography.titleLarge.copy(fontSize = 24.sp, letterSpacing = 6.sp),
+                color = DarrbiTheme.colors.primary,
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -1694,7 +2001,9 @@ private fun androidx.compose.foundation.layout.BoxScope.ProposeFareOverlay(
     onSubmit: (Double) -> Unit,
     onHeight: (Int) -> Unit,
 ) {
-    val recommended = state.selectedCab?.fare ?: state.offeredFare ?: 0.0
+    // Courier: bake in the weight × type factor (guide §5) so the recommended/band match the server's.
+    val baseRecommended = state.selectedCab?.fare ?: state.offeredFare ?: 0.0
+    val recommended = state.courierDetails?.takeIf { state.isCourier }?.let { baseRecommended * it.fareFactor } ?: baseRecommended
     val minFare = recommended * V2_MIN_FACTOR
     val maxFare = recommended * V2_MAX_FACTOR
     val step = if (recommended >= 50.0) 5f else 1f
@@ -1848,7 +2157,7 @@ private fun androidx.compose.foundation.layout.BoxScope.BiddingOverlay(
 
 /** Rounded +/- stepper button; [accent] = the filled-green increment per the reference. */
 @Composable
-private fun OfferStepButton(symbol: String, accent: Boolean, enabled: Boolean, onClick: () -> Unit) {
+internal fun OfferStepButton(symbol: String, accent: Boolean, enabled: Boolean, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.size(50.dp).clip(RoundedCornerShape(12.dp)).clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(12.dp),
@@ -1863,7 +2172,7 @@ private fun OfferStepButton(symbol: String, accent: Boolean, enabled: Boolean, o
 
 /** Full-width light-grey (tonal) button used for Change Price / Cancel Request. */
 @Composable
-private fun WideTonalButton(text: String, textColor: Color, enabled: Boolean, onClick: () -> Unit) {
+internal fun WideTonalButton(text: String, textColor: Color, enabled: Boolean, onClick: () -> Unit) {
     Surface(
         modifier = Modifier.fillMaxWidth().height(56.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = enabled, onClick = onClick),
         shape = RoundedCornerShape(14.dp),
@@ -1877,7 +2186,7 @@ private fun WideTonalButton(text: String, textColor: Color, enabled: Boolean, on
 
 /** Small banknote glyph for the payment row (no icon dependency). */
 @Composable
-private fun CashGlyph() {
+internal fun CashGlyph() {
     Box(
         modifier = Modifier.size(30.dp).clip(RoundedCornerShape(6.dp)).border(1.5.dp, DarrbiTheme.colors.onSurfaceVariant, RoundedCornerShape(6.dp)),
         contentAlignment = Alignment.Center,
@@ -1891,7 +2200,7 @@ private fun CashGlyph() {
  * route map, then a scroll of driver offer cards with a live TTL bar and Decline / Accept.
  */
 @Composable
-private fun SelectOffersList(
+internal fun SelectOffersList(
     bids: List<com.mytm.darrbi.domain.model.Bid>,
     inFlight: Boolean,
     onAccept: (String) -> Unit,
@@ -2063,6 +2372,24 @@ private fun dialNumber(context: android.content.Context, number: String) {
         context.startActivity(
             android.content.Intent(android.content.Intent.ACTION_DIAL, android.net.Uri.parse("tel:$number")),
         )
+    }
+}
+
+/** Opens turn-by-turn navigation to [lat]/[lng] in Google Maps (falls back to a generic geo: query). */
+private fun openNavigation(context: android.content.Context, lat: Double, lng: Double) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("google.navigation:q=$lat,$lng"))
+                .setPackage("com.google.android.apps.maps")
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure {
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("geo:$lat,$lng?q=$lat,$lng"))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
+        }
     }
 }
 
@@ -2254,9 +2581,9 @@ private fun DriverCabCard(trip: AcceptedTrip, onChat: () -> Unit, onCall: () -> 
                     Text(trip.driverName, style = DarrbiTheme.typography.title.copy(fontSize = 15.sp), color = DarrbiTheme.colors.onSurface, maxLines = 1)
                     Text(stringResource(R.string.profile_status_good), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
                 }
-                ContactCircle(iconRes = R.drawable.icon_chat, contentDescription = stringResource(R.string.cd_chat), onClick = onChat)
+                ContactCircle(iconRes = R.drawable.icon_chat, contentDescription = stringResource(R.string.cd_chat), onClick = onChat, iconSize = 30.dp)
                 Spacer(Modifier.width(12.dp))
-                ContactCircle(iconRes = R.drawable.icon_phone, contentDescription = stringResource(R.string.cd_call), onClick = onCall)
+                ContactCircle(iconRes = R.drawable.icon_phone, contentDescription = stringResource(R.string.cd_call), onClick = onCall, iconSize = 30.dp)
             }
         }
     }
@@ -2555,7 +2882,7 @@ private fun androidx.compose.foundation.layout.BoxScope.HelpOverlay(
                 Column {
                     HelpRow(iconRes = R.drawable.icon_phone, label = stringResource(R.string.rider_help_call_center), onClick = onCallCenter)
                     HorizontalDivider(color = DarrbiTheme.colors.outline)
-                    HelpRow(icon = Icons.AutoMirrored.Filled.Send, label = stringResource(R.string.rider_help_share_ride), onClick = onShare)
+                    HelpRow(iconRes = R.drawable.icon_share, label = stringResource(R.string.rider_help_share_ride), onClick = onShare)
                 }
             }
             Spacer(Modifier.height(16.dp))
@@ -2731,10 +3058,10 @@ private fun RatingStatRow(label: String, value: String) {
 
 /** Chat/call button on the on-the-way card — the drawable is shown as-is (no background, no tint). */
 @Composable
-internal fun ContactCircle(@androidx.annotation.DrawableRes iconRes: Int, contentDescription: String, onClick: () -> Unit) {
+internal fun ContactCircle(@androidx.annotation.DrawableRes iconRes: Int, iconSize: Dp? = null, contentDescription: String, onClick: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(44.dp)
+            .size(iconSize ?: 44.dp)
             .clip(CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,

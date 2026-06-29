@@ -332,6 +332,7 @@
     <string name="rider_set_location_from_map">Set Location From Map</string>
     <string name="rider_confirm_location">Confirm Location</string>
     <string name="cd_recenter">My location</string>
+    <string name="cd_open_navigation">Open navigation in Google Maps</string>
     <!-- Rider home dashboard -->
     <string name="rider_greeting_morning">Good morning, %1$s</string>
     <string name="rider_greeting_afternoon">Good afternoon, %1$s</string>
@@ -501,4 +502,326 @@
         <item>F</item>
         <item>S</item>
     </string-array>
+
+    <!-- Courier (parcel delivery) -->
+    <string name="courier_details_title">Parcel details</string>
+    <string name="courier_details_subtitle">Pickup is the sender, drop-off is the receiver.</string>
+    <string name="courier_sender">Sender</string>
+    <string name="courier_sender_phone">Sender phone</string>
+    <string name="courier_sender_name_optional">Sender name (optional)</string>
+    <string name="courier_receiver">Receiver</string>
+    <string name="courier_receiver_phone">Receiver phone</string>
+    <string name="courier_receiver_name_optional">Receiver name (optional)</string>
+    <string name="courier_parcel_type">Parcel type</string>
+    <string name="courier_weight_kg">Weight (kg)</string>
+    <string name="courier_note_optional">Note (optional)</string>
+    <string name="courier_continue">Continue</string>
+    <!-- "Up to 50 kg" capacity line on a courier cab row -->
+    <string name="courier_cab_capacity">Up to %1$s kg</string>
+    <string name="courier_cab_too_small">Too small for this parcel</string>
+    <!-- "Fragile · 80 kg" parcel summary on the captain's open-trip card -->
+    <string name="courier_summary_type_weight">%1$s · %2$s kg</string>
+    <!-- Rider: delivery OTP to relay to the receiver -->
+    <string name="courier_delivery_otp_share">Share this delivery code with the receiver</string>
+    <string name="courier_delivery_otp_share_named">Share this delivery code with %1$s</string>
+    <!-- Captain: delivery OTP entry at drop-off -->
+    <string name="courier_delivery_otp_title">Enter Delivery OTP</string>
+    <string name="courier_delivery_otp_subtitle">Ask the receiver for their delivery code to complete the trip.</string>
+    <string name="courier_delivery_otp_invalid">Invalid delivery OTP, please try again</string>
+    <!-- Parcel types (guide §2.2) -->
+    <string name="parcel_type_documents">Documents</string>
+    <string name="parcel_type_food">Food</string>
+    <string name="parcel_type_electronics">Electronics</string>
+    <string name="parcel_type_fragile">Fragile</string>
+    <string name="parcel_type_clothing">Clothing</string>
+    <string name="parcel_type_medicine">Medicine</string>
+    <string name="parcel_type_groceries">Groceries</string>
+    <string name="parcel_type_furniture">Furniture</string>
+    <string name="parcel_type_other">Other</string>
+    <!-- Courier form-field validation -->
+    <string name="courier_err_phone">Enter a valid Saudi mobile number (5XXXXXXXX)</string>
+    <string name="courier_err_name">Enter a valid name</string>
+    <!-- Courier create-trip errors (guide §11.1) -->
+    <string name="courier_err_details_required">Please complete the sender, receiver and parcel details</string>
+    <string name="courier_err_invalid_weight">Enter a valid parcel weight</string>
+    <string name="courier_err_exceeds_weight">This parcel is too heavy for the selected vehicle</string>
+    <string name="courier_err_exceeds_dimensions">This parcel is too large for the selected vehicle</string>
+    <string name="courier_err_not_supported">Courier details aren\'t supported for this vehicle</string>
+    <string name="courier_err_offer_out_of_band">Your fare is outside the allowed range</string>
+
+    <!-- Scheduled City-to-City (C2C) -->
+    <string name="schedule_title">Schedule your ride</string>
+    <string name="schedule_confirm_schedule">Confirm schedule</string>
+    <string name="schedule_time_label">Time</string>
+    <string name="schedule_am">AM</string>
+    <string name="schedule_pm">PM</string>
+    <string name="schedule_today">Today</string>
+    <string name="schedule_tomorrow">Tomorrow</string>
+    <!-- "Wed 10 June at 8:00 AM" -->
+    <string name="schedule_when_full">%1$s at %2$s</string>
+    <string name="schedule_origin_city_title">Origin city</string>
+    <string name="schedule_destination_city_title">Destination city</string>
+    <string name="schedule_select_city_hint">Search city</string>
+    <string name="schedule_no_city_match">No matching cities</string>
+    <string name="schedule_pickup_title">Pickup Location</string>
+    <string name="schedule_pickup_hint">Where from?</string>
+    <string name="schedule_dropoff_title">Drop Off Location</string>
+    <string name="schedule_dropoff_hint">Where to?</string>
+    <string name="schedule_find_offers_title">Find Offers</string>
+    <string name="schedule_find_offers">Find Offers</string>
+    <!-- "Scheduled for Tomorrow at 10:00 AM" -->
+    <string name="schedule_scheduled_for">Scheduled for %1$s</string>
+    <!-- "An Naseem, Jeddah" -->
+    <string name="schedule_point_city">%1$s, %2$s</string>
+    <string name="schedule_seats_label">Seats</string>
+    <string name="schedule_recommended_fare">Recommended Fare</string>
+    <!-- "Min SAR 409 · Max SAR 1023" -->
+    <string name="schedule_fare_band">Min %1$s · Max %2$s</string>
+    <string name="schedule_route_distance">%1$s km</string>
+    <string name="schedule_pay_via_wallet">Derrbi Wallet</string>
+    <string name="schedule_pay_label">Derrbi Pay</string>
+    <!-- Confirmation -->
+    <string name="schedule_confirmed_title">Ride Scheduled</string>
+    <string name="schedule_confirmed_notify">We\'ll notify you before your ride.</string>
+    <string name="schedule_upcoming">Upcoming</string>
+    <!-- Upcoming list -->
+    <string name="schedule_upcoming_title">Upcoming Rides</string>
+    <string name="schedule_badge_scheduled">Scheduled</string>
+    <string name="schedule_badge_finding">Finding offers</string>
+    <string name="schedule_badge_confirmed">Confirmed</string>
+    <string name="schedule_create_new">Create a New Ride</string>
+    <string name="schedule_no_upcoming">No upcoming rides</string>
+    <string name="schedule_no_upcoming_subtitle">Your scheduled City-to-City rides will appear here.</string>
+    <!-- Waiting / matched -->
+    <string name="schedule_waiting_title">This ride is scheduled and will be there on %1$s</string>
+    <string name="schedule_cancellation_fee">Ride Cancellation Fee Is %1$s</string>
+    <string name="schedule_cancel_ride">Cancel Ride</string>
+    <!-- Cancel results -->
+    <string name="schedule_cancelled_free">Your ride was cancelled</string>
+    <string name="schedule_cancelled_fee">Your ride was cancelled and a fee applied</string>
+    <!-- Sunday-first weekday initials for the calendar -->
+    <string-array name="schedule_weekday_initials">
+        <item>S</item>
+        <item>M</item>
+        <item>T</item>
+        <item>W</item>
+        <item>T</item>
+        <item>F</item>
+        <item>S</item>
+    </string-array>
+    <!-- C2C error-code → friendly messages -->
+    <string name="c2c_err_disabled">Scheduled rides are currently unavailable</string>
+    <string name="c2c_err_same_od">Origin and destination cities must be different</string>
+    <string name="c2c_err_invalid_city">Please choose a valid city</string>
+    <string name="c2c_err_departure_too_soon">Choose a departure at least an hour from now</string>
+    <string name="c2c_err_departure_too_far">Choose a departure within the next 30 days</string>
+    <string name="c2c_err_invalid_seats">Choose between 1 and 6 seats</string>
+    <string name="c2c_err_not_priced">This route isn\'t available yet</string>
+    <string name="c2c_err_offer_out_of_band">Your fare is outside the allowed range</string>
+    <string name="c2c_err_bidding_closed">Bidding has closed for this ride</string>
+    <string name="c2c_err_not_cancellable">This ride can no longer be cancelled</string>
+    <string name="c2c_err_create_failed">Couldn\'t schedule your ride, please try again</string>
+
+    <!-- ===================== Captain: City-to-City scheduled rides ===================== -->
+    <string name="captain_scheduled_title">Scheduled Rides</string>
+    <string name="captain_scheduled_refresh">Refresh</string>
+    <string name="captain_scheduled_available">Available Requests</string>
+    <string name="captain_scheduled_mine">My Scheduled Rides</string>
+    <string name="captain_scheduled_empty_available">No open intercity requests right now</string>
+    <string name="captain_scheduled_empty_mine">No scheduled rides yet</string>
+    <string name="captain_scheduled_seats">%1$d seats</string>
+    <string name="captain_scheduled_offered_label">Rider\'s offer</string>
+    <string name="captain_scheduled_bid">Bid</string>
+    <string name="captain_scheduled_place_bid">Place a Bid</string>
+    <string name="captain_scheduled_accept_fare">Accept %1$s</string>
+    <string name="captain_scheduled_counter_label">Your fare</string>
+    <string name="captain_scheduled_counter_bid">Place Counter Bid</string>
+    <string name="captain_scheduled_fare_band">Min %1$s · Max %2$s</string>
+    <string name="captain_scheduled_bid_placed">Bid placed</string>
+    <string name="captain_sched_open">Open</string>
+    <string name="captain_sched_matched">Matched</string>
+    <string name="captain_sched_reminded">Reminded</string>
+    <string name="captain_sched_activated">Active</string>
+    <string name="captain_bid_err_cab">Your cab isn\'t a City-to-City type</string>
+    <string name="captain_bid_err_band">Your fare is outside the allowed range</string>
+
+    <!-- ============================ Car Rental (RAC) ============================ -->
+    <string name="rental_title">Car Rental</string>
+    <string name="rental_my_bookings">My Bookings</string>
+    <string name="rental_search">Search</string>
+    <string name="rental_continue">Continue</string>
+    <string name="rental_apply">Apply</string>
+
+    <!-- Search home -->
+    <string name="rental_location_hint">Pickup city</string>
+    <string name="rental_return_station">Optional: Different Return Station</string>
+    <string name="rental_date_time">Date &amp; Time</string>
+    <string name="rental_select_date_time">Select Date &amp; Time</string>
+    <string name="rental_best_start">The best start to your trip</string>
+    <string name="rental_fast_pickup_title">Fast Pickup</string>
+    <string name="rental_fast_pickup_sub">Skip the counter and go.</string>
+    <string name="rental_easy_return_title">Easy Return</string>
+    <string name="rental_easy_return_sub">Quick departure guide.</string>
+    <string name="rental_how_it_works">How it Works</string>
+    <string name="rental_hiw_1">Complete your reservation online.</string>
+    <string name="rental_hiw_2">Receive instructions via email.</string>
+    <string name="rental_hiw_3">Reply with a copy of your ID and required documents.</string>
+    <string name="rental_hiw_4">We confirm your booking and send the vehicle location.</string>
+    <string name="rental_hiw_5">Pick up your car and hit the road.</string>
+
+    <!-- Date &amp; time -->
+    <string name="rental_pickup_at">Pickup</string>
+    <string name="rental_return_at">Return</string>
+    <string name="rental_pickup_date_time">Pickup date &amp; time</string>
+    <string name="rental_return_date_time">Return date &amp; time</string>
+
+    <!-- Results -->
+    <string name="rental_total_count">Total %1$d</string>
+    <string name="rental_results_note">Please note that the actual vehicle may differ from the image displayed.</string>
+    <string name="rental_filter">Filter</string>
+    <string name="rental_sort">Sort</string>
+    <string name="rental_per_day_format">%1$s/Day</string>
+    <string name="rental_total_format">%1$s total</string>
+    <string name="rental_unlimited_km">Unlimited KM available</string>
+    <string name="rental_limited_km">%1$d km/day included</string>
+    <string name="rental_seats_value">%1$d Seats</string>
+    <string name="rental_model_year">%1$d model</string>
+    <string name="rental_no_vehicles">No vehicles available for these dates</string>
+    <string name="rental_rating_format">%1$s (%2$d)</string>
+
+    <!-- Filter sheet -->
+    <string name="rental_filter_title">Filter</string>
+    <string name="rental_filter_car_type">Car Type</string>
+    <string name="rental_filter_seats">Seats Type</string>
+    <string name="rental_filter_transmission">Transmission</string>
+    <string name="rental_filter_all">All</string>
+    <string name="rental_filter_search_count">Search (%1$d)</string>
+    <string name="rental_transmission_automatic">Automatic</string>
+    <string name="rental_transmission_manual">Manual</string>
+
+    <!-- Sort sheet -->
+    <string name="rental_sort_title">Sort</string>
+    <string name="rental_sort_recommended">Recommended</string>
+    <string name="rental_sort_price_low">Price (Low to High)</string>
+    <string name="rental_sort_price_high">Price (High to Low)</string>
+    <string name="rental_sort_rating">Top Rated</string>
+
+    <!-- Vehicle detail -->
+    <string name="rental_specs_title">Specifications</string>
+    <string name="rental_features_title">Features</string>
+    <string name="rental_reviews_title">Reviews</string>
+    <string name="rental_pricing_title">Rental Rate</string>
+    <string name="rental_people_value">%1$d People</string>
+    <string name="rental_doors_value">%1$d doors</string>
+    <string name="rental_small_bag_value">%1$d Small bag</string>
+    <string name="rental_large_bag_value">%1$d Large bag</string>
+    <string name="rental_min_age">Minimum age of the youngest driver</string>
+    <string name="rental_total_label">Total</string>
+    <string name="rental_period_per_hour">Per hour</string>
+    <string name="rental_period_h2to3">2–3 hours</string>
+    <string name="rental_period_h4to5">4–5 hours</string>
+    <string name="rental_period_h6to12">6–12 hours</string>
+    <string name="rental_period_per_day">Per day</string>
+    <string name="rental_period_per_week">Per week</string>
+    <string name="rental_period_per_month">Per month</string>
+    <string name="rental_cdw_title">Collision Damage Waiver</string>
+    <string name="rental_cdw_deposit">Deposit %1$s</string>
+    <string name="rental_cdw_excess">Excess %1$s</string>
+    <string name="rental_cdw_per_day">+%1$s / day</string>
+    <string name="rental_cdw_included">Included</string>
+    <string name="rental_cdw_zero_excess">Zero excess</string>
+    <string name="rental_cdw_tier_none">No Waiver</string>
+    <string name="rental_cdw_tier_basic">Basic</string>
+    <string name="rental_cdw_tier_standard">Standard</string>
+    <string name="rental_cdw_tier_premium">Premium</string>
+    <string name="rental_branches_title">Pickup Locations</string>
+    <string name="rental_company_by">by %1$s</string>
+
+    <!-- Reservation / quote -->
+    <string name="rental_reservation_title">Reservation</string>
+    <string name="rental_reservation_info">Reservation Info</string>
+    <string name="rental_field_nid">NID/Iqama</string>
+    <string name="rental_field_license">Driving Licence Number</string>
+    <string name="rental_field_name">Name</string>
+    <string name="rental_field_dob">Date of Birth</string>
+    <string name="rental_dob_hint">yyyy/mm/dd</string>
+    <string name="rental_dob_note">Please mention the birthdate as per NID/Iqama</string>
+    <string name="rental_field_phone">Phone Number</string>
+    <string name="rental_field_email">Email</string>
+    <string name="rental_field_email_optional">Email (Optional)</string>
+    <string name="rental_rental_period">Rental Period</string>
+    <string name="rental_coupon_label">Coupon Code</string>
+    <string name="rental_coupon_applied">Coupon Applied</string>
+    <string name="rental_discount_amount">Discount Amount</string>
+    <string name="rental_deposit_label">Security Deposit</string>
+    <string name="rental_deposit_note">Held on your card and released on a clean return.</string>
+    <string name="rental_reserve_now">Reserve Now</string>
+    <string name="rental_phone_cc">+966</string>
+    <string name="rental_err_nid">Enter a valid 10-digit National ID / Iqama (starting 1 or 2)</string>
+    <string name="rental_err_phone">Enter a valid Saudi mobile number (5XXXXXXXX)</string>
+    <string name="rental_err_email">Enter a valid email address</string>
+    <string name="rental_terms_agree">I have read and agree to the Terms and Conditions</string>
+    <string name="rental_free_cancellation">Free cancellation more than 48h before pickup</string>
+    <string name="rental_quote_unavailable">This vehicle isn\'t available for the selected dates</string>
+    <string name="rental_pay_summary">You pay now</string>
+
+    <!-- Nafath -->
+    <string name="rental_nafath_title">Verify your identity</string>
+    <string name="rental_nafath_desc">Verify with Nafath using your National ID to continue.</string>
+    <string name="rental_nafath_verify">Verify with Nafath</string>
+    <string name="rental_nafath_verified">Identity verified</string>
+    <string name="rental_nafath_failed">Verification failed, please try again</string>
+
+    <!-- Confirmation -->
+    <string name="rental_success_title">Reservation Successful</string>
+    <string name="rental_success_desc">You will receive an email on the provided address shortly.</string>
+    <string name="rental_booking_id">Reservation ID: %1$s</string>
+
+    <!-- Bookings list -->
+    <string name="rental_bookings_title">My Bookings</string>
+    <string name="rental_bookings_empty">You have no bookings yet</string>
+    <string name="rental_book_a_car">Book a Car</string>
+    <string name="rental_booking_ref">Ref %1$s</string>
+    <string name="rental_status_pending">Upcoming</string>
+    <string name="rental_status_active">Active</string>
+    <string name="rental_status_completed">Completed</string>
+    <string name="rental_status_late">Overdue</string>
+    <string name="rental_status_cancelled">Cancelled</string>
+    <string name="rental_status_disputed">Disputed</string>
+    <string name="rental_status_unknown">Booking</string>
+
+    <!-- Booking detail / track -->
+    <string name="rental_detail_title">Booking</string>
+    <string name="rental_track_title">Your Rental</string>
+    <string name="rental_trip_distance">%1$s km</string>
+    <string name="rental_trip_fuel">Fuel %1$d%%</string>
+    <string name="rental_tajeer_contract">Tajeer contract %1$s</string>
+    <string name="rental_penalties_title">Penalties</string>
+    <string name="rental_penalty_late">Late return</string>
+    <string name="rental_penalty_fuel">Low fuel</string>
+    <string name="rental_penalty_zone">Out of zone</string>
+    <string name="rental_refund_format">Refund %1$s</string>
+    <string name="rental_cancel_booking">Cancel Booking</string>
+    <string name="rental_extend">Extend Rental</string>
+    <string name="rental_extend_title">Extend your rental</string>
+    <string name="rental_extend_hours">Additional hours</string>
+    <string name="rental_extend_request">Request Extension</string>
+    <string name="rental_extension_pending">Extension requested (%1$d h) — awaiting partner approval</string>
+    <string name="rental_rate_title">Rate your rental</string>
+    <string name="rental_rate_hint">Share your experience (optional)</string>
+    <string name="rental_payment_refs">Payment %1$s</string>
+
+    <!-- Toasts / messages -->
+    <string name="rental_cancelled">Booking cancelled</string>
+    <string name="rental_extension_requested">Extension requested</string>
+    <string name="rental_rated">Thanks for your rating</string>
+    <string name="rental_err_not_available">Vehicle not available for the selected dates</string>
+    <string name="rental_err_payment_failed">Payment failed — please try another card</string>
+    <string name="rental_err_guest">Please complete your profile before booking</string>
+    <string name="rental_err_invalid_dates">Check your pickup and return dates</string>
+    <string name="rental_err_generic">Something went wrong, please try again</string>
+
+    <!-- Content descriptions -->
+    <string name="rental_cd_vehicle_photo">Vehicle photo</string>
+    <string name="rental_cd_close">Close</string>
 </resources>

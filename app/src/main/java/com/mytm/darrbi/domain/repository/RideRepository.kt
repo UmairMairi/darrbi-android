@@ -78,8 +78,18 @@ interface RideRepository {
     /** CAPTAIN starts the trip after verifying the rider's [otp] (`PATCH trips/started/{tripId}`). */
     suspend fun startTrip(tripId: String, otp: Int): ApiResult<Unit>
 
-    /** CAPTAIN completes the trip at [dropOff] (`PATCH trips/completed/{tripId}`). */
-    suspend fun completeTrip(tripId: String, dropOff: PlaceLocation): ApiResult<Unit>
+    /**
+     * CAPTAIN completes the trip at [dropOff] (`PATCH trips/completed/{tripId}`). [deliveryOtp] is the
+     * receiver's code, required for a courier trip (guide §9.2) and null/omitted for a normal ride.
+     */
+    suspend fun completeTrip(tripId: String, dropOff: PlaceLocation, deliveryOtp: Int? = null): ApiResult<Unit>
+
+    /**
+     * Renders the trip route as a static map: downloads the image at [mapImageUrl] and uploads the bytes
+     * (multipart) for [tripId] with the trip-status [type] ([TripImageType]). Called by both the rider and
+     * the captain on every trip step; mirrors ride-android's `PATCH /trips/upload-photo/{tripId}`.
+     */
+    suspend fun submitTripMapImage(tripId: String, mapImageUrl: String, type: Int): ApiResult<Unit>
 
     /** CAPTAIN cancels an accepted trip with a [reason] (`PATCH trips/driver-cancelled/{tripId}`). */
     suspend fun cancelTripByDriver(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit>

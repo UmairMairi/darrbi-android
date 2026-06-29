@@ -1,6 +1,9 @@
 package com.mytm.darrbi.data.mapper
 
 import com.mytm.darrbi.data.remote.dto.BidDto
+import com.mytm.darrbi.data.remote.dto.CourierContactDto
+import com.mytm.darrbi.data.remote.dto.CourierMatchDto
+import com.mytm.darrbi.data.remote.dto.CourierSummaryDto
 import com.mytm.darrbi.data.remote.dto.CreateBidTripData
 import com.mytm.darrbi.data.remote.dto.FareRangeDto
 import com.mytm.darrbi.data.remote.dto.OpenTripDto
@@ -10,8 +13,13 @@ import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.BidStatus
 import com.mytm.darrbi.domain.model.BidTrip
 import com.mytm.darrbi.domain.model.BidType
+import com.mytm.darrbi.domain.model.CourierContact
+import com.mytm.darrbi.domain.model.CourierMatch
+import com.mytm.darrbi.domain.model.CourierSummary
 import com.mytm.darrbi.domain.model.FareRange
 import com.mytm.darrbi.domain.model.OpenTrip
+import com.mytm.darrbi.domain.model.ParcelType
+import com.mytm.darrbi.domain.model.ParcelWeightBucket
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.SelectedBid
 
@@ -53,7 +61,37 @@ fun OpenTripDto.toDomain(): OpenTrip? {
         riderRating = (rider?.rating ?: riderRating)?.takeIf { it > 0.0 },
         riderTotalReviews = rider?.totalReviews,
         riderImageUrl = (rider?.profileImage ?: riderImage)?.takeIf { it.isNotBlank() },
+        courier = courier?.toDomain(),
     )
+}
+
+/** Maps the driver-facing parcel SUMMARY (guide §7); never carries sender/receiver phones. */
+fun CourierSummaryDto.toDomain(): CourierSummary = CourierSummary(
+    parcelType = ParcelType.from(parcelType),
+    parcelTypeLabel = parcelTypeLabel?.takeIf { it.isNotBlank() },
+    parcelWeightKg = parcelWeightKg ?: 0.0,
+    weightBucket = ParcelWeightBucket.from(weightBucket),
+    note = note?.takeIf { it.isNotBlank() },
+    lengthCm = dimensions?.lengthCm,
+    widthCm = dimensions?.widthCm,
+    heightCm = dimensions?.heightCm,
+)
+
+/** Maps the courier MATCH block on `v2/bid-won` / `v2/bid-accepted` (guide §8) incl. the delivery OTP. */
+fun CourierMatchDto.toDomain(): CourierMatch = CourierMatch(
+    parcelType = ParcelType.from(parcelType),
+    parcelTypeLabel = parcelTypeLabel?.takeIf { it.isNotBlank() },
+    parcelWeightKg = parcelWeightKg ?: 0.0,
+    note = note?.takeIf { it.isNotBlank() },
+    deliveryOtp = deliveryOtp,
+    sender = sender?.toDomain(),
+    receiver = receiver?.toDomain(),
+)
+
+/** null when the contact carries no phone (a courier party always has a phone when present). */
+private fun CourierContactDto.toDomain(): CourierContact? {
+    val number = phone?.takeIf { it.isNotBlank() } ?: return null
+    return CourierContact(name = name?.takeIf { it.isNotBlank() }, phone = number)
 }
 
 /** null when the bid has no id. */

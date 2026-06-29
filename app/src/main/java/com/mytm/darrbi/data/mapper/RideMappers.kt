@@ -12,6 +12,7 @@ import com.mytm.darrbi.data.remote.dto.TripPointDto
 import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.AppliedPromo
 import com.mytm.darrbi.domain.model.CabOption
+import com.mytm.darrbi.domain.model.CategoryType
 import com.mytm.darrbi.domain.model.CancelReason
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OngoingTrip
@@ -57,6 +58,12 @@ fun CabDto.toDomain(): CabOption = CabOption(
     imageUrl = categoryIcon,
     etaMinutes = estimatedArrivalTime,
     available = available ?: true,
+    categoryType = categoryType?.let { CategoryType.from(it) },
+    maxWeightKg = maxWeightKg,
+    maxLengthCm = maxLengthCm,
+    maxWidthCm = maxWidthCm,
+    maxHeightCm = maxHeightCm,
+    maxDimSumCm = maxDimSumCm,
 )
 
 fun PromoData.toDomain(): AppliedPromo = AppliedPromo(
@@ -76,6 +83,7 @@ fun CabCategoryDto.toDomain(): RideCategory? {
         imageUrl = listOfNotNull(categoryIconUrl, categoryIcon, image, icon).firstOrNull { it.isNotBlank() },
         order = order ?: Int.MAX_VALUE,
         key = (type?.takeIf { it.isNotBlank() } ?: safeName).lowercase(),
+        categoryType = CategoryType.from(categoryType),
     )
 }
 

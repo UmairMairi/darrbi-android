@@ -5,6 +5,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,12 +28,16 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Inventory2
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.filled.Navigation
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
@@ -66,7 +71,9 @@ import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.TextStyle
@@ -100,9 +107,12 @@ import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiTextField
 import com.mytm.darrbi.presentation.components.CancelReasonsSheet
+import com.mytm.darrbi.domain.model.CourierMatch
+import com.mytm.darrbi.domain.model.CourierSummary
 import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.RideRequest
+import com.mytm.darrbi.presentation.rider.parcelTypeLabel
 import com.mytm.darrbi.presentation.common.LocationPermissionDeniedDialog
 import com.mytm.darrbi.presentation.rider.AnimatedCarMarker
 import com.mytm.darrbi.presentation.rider.ContactCircle
@@ -110,6 +120,8 @@ import com.mytm.darrbi.presentation.rider.rememberCarMarkerIcon
 import com.mytm.darrbi.presentation.rider.rememberMarkerIcon
 import com.mytm.darrbi.presentation.common.openAppSettings
 import com.mytm.darrbi.presentation.common.rememberLocationPermissionState
+import com.mytm.darrbi.presentation.schedule.displayName
+import com.mytm.darrbi.presentation.schedule.isArabicLocale
 
 /**
  * Captain dashboard: a full-screen map with a bottom card whose content is driven by `GET /captains`
@@ -121,6 +133,8 @@ fun CaptainDashboardScreen(
     onSeeDetails: () -> Unit,
     onProfile: () -> Unit = {},
     onChat: (com.mytm.darrbi.domain.model.RideRequest) -> Unit = {},
+    /** Open the City-to-City scheduled rides screen (open requests to bid on + the driver's upcoming rides). */
+    onOpenScheduled: () -> Unit = {},
     viewModel: CaptainDashboardViewModel = hiltViewModel(),
 ) {
     val state by viewModel.state.collectAsStateWithLifecycle()
@@ -229,9 +243,18 @@ fun CaptainDashboardScreen(
             viewModel.onEvent(CaptainDashboardEvent.ConsumeRiderCancelled)
         }
     }
+    // City-to-City scheduled bid placed / error.
+    val scheduledMsg = captainScheduleMessage(state.scheduledMessage)
+    LaunchedEffect(state.scheduledMessage) {
+        if (state.scheduledMessage != null) {
+            android.widget.Toast.makeText(ctx, scheduledMsg, android.widget.Toast.LENGTH_LONG).show()
+            viewModel.onEvent(CaptainDashboardEvent.ConsumeScheduledMessage)
+        }
+    }
 
     // System-back closes an open request detail (back to the list) instead of leaving the dashboard.
     BackHandler(enabled = state.biddingTrip != null) { viewModel.onEvent(CaptainDashboardEvent.DismissBidSheet) }
+    BackHandler(enabled = state.c2cBidTrip != null) { viewModel.onEvent(CaptainDashboardEvent.DismissScheduledBid) }
     BackHandler(enabled = state.showCancelSheet) { viewModel.onEvent(CaptainDashboardEvent.DismissCancelSheet) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -247,10 +270,34 @@ fun CaptainDashboardScreen(
                 state = state,
                 onEvent = viewModel::onEvent,
                 onProfile = onProfile,
+                onOpenScheduled = onOpenScheduled,
                 modifier = Modifier.fillMaxSize(),
             )
             if (isReady && locationPermission.isPermanentlyDenied) {
                 LocationPermissionDeniedDialog(onOpenSettings = { ctx.openAppSettings() })
+            }
+            // Bid sheet for an open intercity (City-to-City) request.
+            state.c2cBidTrip?.let { trip ->
+                val arabic = isArabicLocale()
+                Box(
+                    modifier = Modifier.fillMaxSize()
+                        .background(Color.Black.copy(alpha = 0.4f))
+                        .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {
+                            viewModel.onEvent(CaptainDashboardEvent.DismissScheduledBid)
+                        },
+                )
+                Box(modifier = Modifier.align(Alignment.BottomCenter)) {
+                    C2cBidSheet(
+                        trip = trip,
+                        quote = state.c2cBidQuote,
+                        isLoadingQuote = state.isLoadingC2cQuote,
+                        isPlacing = state.isPlacingBid,
+                        originName = state.c2cCities.firstOrNull { it.id == trip.originCityId }?.displayName(arabic) ?: trip.originCityId,
+                        destName = state.c2cCities.firstOrNull { it.id == trip.destinationCityId }?.displayName(arabic) ?: trip.destinationCityId,
+                        onAccept = { viewModel.onEvent(CaptainDashboardEvent.AcceptScheduledFare) },
+                        onCounter = { viewModel.onEvent(CaptainDashboardEvent.CounterScheduledBid(it)) },
+                    )
+                }
             }
             return@Box
         }
@@ -370,6 +417,36 @@ fun CaptainDashboardScreen(
         }
 
         val navContext = LocalContext.current
+        val density = LocalDensity.current
+        // Measured height of the active bottom overlay → lets the floating nav button sit just above it.
+        var overlayHeightPx by remember { mutableStateOf(0) }
+
+        // Floating "open in Google Maps" navigation shortcut (same control as the rider side). Shown on the
+        // right edge while a trip is active — heading to the rider (→ pickup) or dropping off (→ destination),
+        // just above the bottom card. Hidden during OTP entry (the captain is already at the pickup).
+        if (active != null && !state.awaitingOtp) {
+            val navTarget = if (state.tripInProgress) active.destination else active.pickup
+            Surface(
+                onClick = { openNavigation(navContext, navTarget.latitude, navTarget.longitude) },
+                shape = CircleShape,
+                color = DarrbiTheme.colors.surface,
+                shadowElevation = 4.dp,
+                modifier = Modifier
+                    .align(Alignment.BottomEnd)
+                    .padding(end = 16.dp, bottom = with(density) { overlayHeightPx.toDp() } + 16.dp)
+                    .size(48.dp),
+            ) {
+                Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Icon(
+                        imageVector = Icons.Filled.Navigation,
+                        contentDescription = stringResource(R.string.cd_open_navigation),
+                        tint = DarrbiTheme.colors.primary,
+                        modifier = Modifier.size(24.dp),
+                    )
+                }
+            }
+        }
+
         if (request != null) {
             // An incoming ride request takes over the bottom card (over the route map).
             BottomCard {
@@ -420,9 +497,22 @@ fun CaptainDashboardScreen(
                     onSubmit = { viewModel.onEvent(CaptainDashboardEvent.SubmitRiderRating) },
                 )
             }
+        } else if (active != null && state.awaitingDeliveryOtp) {
+            // Courier drop-off → enter the receiver's delivery OTP to complete the trip (guide §9.2).
+            BottomCard {
+                DeliveryOtpEntryContent(
+                    courier = state.courierMatch,
+                    otp = state.deliveryOtpInput,
+                    isCompleting = state.isCompleting,
+                    isError = state.deliveryOtpError,
+                    onOtp = { viewModel.onEvent(CaptainDashboardEvent.EnterDeliveryOtp(it)) },
+                    onSubmit = { viewModel.onEvent(CaptainDashboardEvent.SubmitDeliveryOtp) },
+                    onCancel = { viewModel.onEvent(CaptainDashboardEvent.DismissDeliveryOtp) },
+                )
+            }
         } else if (active != null && state.tripInProgress) {
             // Trip started → "dropping" screen: nav banner over the map + the drop-off card.
-            Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth()) {
+            Column(modifier = Modifier.align(Alignment.BottomCenter).fillMaxWidth().onSizeChanged { overlayHeightPx = it.height }) {
                 NavBanner(distanceKm = state.dropDistanceKm)
                 Spacer(Modifier.height(8.dp))
                 DarrbiCard(navigationBarPadding = true) {
@@ -431,6 +521,8 @@ fun CaptainDashboardScreen(
                         distanceKm = state.dropDistanceKm,
                         etaMinutes = state.dropTimeMinutes,
                         isCompleting = state.isCompleting,
+                        courier = state.courierMatch,
+                        onCallReceiver = { state.courierMatch?.receiver?.phone?.let { dialPhone(navContext, it) } },
                         onEndRide = { viewModel.onEvent(CaptainDashboardEvent.EndRide) },
                     )
                 }
@@ -451,19 +543,15 @@ fun CaptainDashboardScreen(
             }
         } else if (active != null) {
             // Accepted trip → navigate-to-rider card.
-            BottomCard {
+            BottomCard(modifier = Modifier.onSizeChanged { overlayHeightPx = it.height }) {
                 NavigateRiderContent(
                     trip = active,
                     pickupDistanceKm = state.requestPickupDistanceKm,
                     pickupTimeMinutes = state.requestPickupTimeMinutes,
-                    navigateStarted = state.navigateStarted,
                     isHandling = state.isHandlingRequest,
                     onCall = { active.riderMobile?.let { dialPhone(navContext, it) } },
                     onChat = { onChat(active) },
-                    onNavigate = {
-                        openNavigation(navContext, active.pickup.latitude, active.pickup.longitude)
-                        viewModel.onEvent(CaptainDashboardEvent.StartNavigate)
-                    },
+                    onNavigate = { openNavigation(navContext, active.pickup.latitude, active.pickup.longitude) },
                     onReached = { viewModel.onEvent(CaptainDashboardEvent.MarkReached) },
                 )
             }
@@ -498,11 +586,14 @@ fun CaptainDashboardScreen(
 }
 
 @Composable
-private fun androidx.compose.foundation.layout.BoxScope.BottomCard(content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit) {
+private fun androidx.compose.foundation.layout.BoxScope.BottomCard(
+    modifier: Modifier = Modifier,
+    content: @Composable androidx.compose.foundation.layout.ColumnScope.() -> Unit,
+) {
     // navigationBarPadding keeps the card content above the system nav bar; imePadding lifts it above the
     // keyboard (e.g. the PIN / IBAN inputs) so the card stays visible while typing.
     DarrbiCard(
-        modifier = Modifier.align(Alignment.BottomCenter).imePadding(),
+        modifier = Modifier.align(Alignment.BottomCenter).imePadding().then(modifier),
         navigationBarPadding = true,
         content = content,
     )
@@ -632,10 +723,11 @@ private fun DriverOpenTripsView(
     state: CaptainDashboardUiState,
     onEvent: (CaptainDashboardEvent) -> Unit,
     onProfile: () -> Unit,
+    onOpenScheduled: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
     Column(modifier = modifier.background(DarrbiTheme.colors.surface).statusBarsPadding()) {
-        // Top bar: menu (→ profile) · Online/Offline toggle · profile avatar.
+        // Top bar: menu (→ profile) · Online/Offline toggle · scheduled rides · profile avatar.
         Row(
             modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -646,17 +738,42 @@ private fun DriverOpenTripsView(
             Spacer(Modifier.weight(1f))
             OnlineToggle(online = state.isOnline, onChange = { onEvent(CaptainDashboardEvent.SetOnline(it)) })
             Spacer(Modifier.weight(1f))
+            CircleButton(onClick = onOpenScheduled) {
+                Icon(Icons.Filled.DateRange, stringResource(R.string.captain_scheduled_title), tint = DarrbiTheme.colors.onSurface, modifier = Modifier.size(22.dp))
+            }
+            Spacer(Modifier.width(8.dp))
             CircleButton(onClick = onProfile) {
                 Icon(Icons.Filled.Person, stringResource(R.string.cd_profile), tint = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.size(24.dp))
             }
         }
         if (!state.isOnline) OfflineBanner()
+        val arabic = isArabicLocale()
+        val hasScheduled = state.scheduledRequests.isNotEmpty()
+        val hasImmediate = state.openTrips.isNotEmpty()
         when {
-            state.openTrips.isNotEmpty() -> Column(
+            hasScheduled || hasImmediate -> Column(
                 modifier = Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp).navigationBarsPadding(),
                 verticalArrangement = Arrangement.spacedBy(14.dp),
             ) {
                 Spacer(Modifier.height(2.dp))
+                // City-to-City open intercity requests the driver can bid on (guide §7).
+                if (hasScheduled) {
+                    Text(
+                        stringResource(R.string.captain_scheduled_available),
+                        style = DarrbiTheme.typography.title,
+                        color = DarrbiTheme.colors.onSurface,
+                    )
+                    state.scheduledRequests.forEach { req ->
+                        key(req.tripId) {
+                            C2cOpenRequestCard(
+                                trip = req,
+                                originName = state.c2cCities.firstOrNull { it.id == req.originCityId }?.displayName(arabic) ?: req.originCityId,
+                                destName = state.c2cCities.firstOrNull { it.id == req.destinationCityId }?.displayName(arabic) ?: req.destinationCityId,
+                                onBid = { onEvent(CaptainDashboardEvent.OpenScheduledBid(req.tripId)) },
+                            )
+                        }
+                    }
+                }
                 state.openTrips.forEach { trip ->
                     key(trip.tripId) {
                         SwipeableOpenTripCard(
@@ -862,8 +979,43 @@ private fun OpenTripCard(trip: OpenTrip, onClick: () -> Unit) {
                     AddressRow(stringResource(R.string.captain_drop_off), trip.dropoff.address, DarrbiTheme.colors.error)
                 }
             }
+            // Courier: a parcel summary chip (no phones) so the captain can decide before bidding (guide §7).
+            trip.courier?.let { courier ->
+                Spacer(Modifier.height(10.dp))
+                CourierSummaryRow(courier)
+            }
         }
     }
+}
+
+/** A compact parcel-summary row for a courier open-trip item (icon + type · weight, optional note). */
+@Composable
+private fun CourierSummaryRow(summary: CourierSummary) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = DarrbiTheme.colors.surfaceVariant,
+    ) {
+        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Filled.Inventory2, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(18.dp))
+            Spacer(Modifier.width(10.dp))
+            Column {
+                Text(courierSummaryLabel(summary), style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface, maxLines = 1)
+                summary.note?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
+/** "Fragile · 80 kg" — prefers the server-provided label, falling back to the localized parcel-type name. */
+@Composable
+private fun courierSummaryLabel(summary: CourierSummary): String {
+    val type = summary.parcelTypeLabel?.takeIf { it.isNotBlank() }
+        ?: summary.parcelType?.let { parcelTypeLabel(it) }
+        ?: stringResource(R.string.parcel_type_other)
+    return stringResource(R.string.courier_summary_type_weight, type, formatAmount(summary.parcelWeightKg))
 }
 
 @Composable
@@ -1080,6 +1232,8 @@ private fun DroppingContent(
     distanceKm: Double?,
     etaMinutes: Int?,
     isCompleting: Boolean,
+    courier: CourierMatch?,
+    onCallReceiver: () -> Unit,
     onEndRide: () -> Unit,
 ) {
     Column(modifier = Modifier.fillMaxWidth()) {
@@ -1094,6 +1248,16 @@ private fun DroppingContent(
                 color = DarrbiTheme.colors.onSurface,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth().padding(vertical = 14.dp),
+            )
+        }
+        // Courier: receiver contact + parcel info so the captain can reach the receiver at drop-off.
+        if (courier != null) {
+            Spacer(Modifier.height(12.dp))
+            CourierMatchPanel(
+                courier = courier,
+                contactLabel = stringResource(R.string.courier_receiver),
+                contact = courier.receiver,
+                onCall = onCallReceiver,
             )
         }
         Spacer(Modifier.height(16.dp))
@@ -1120,6 +1284,115 @@ private fun DroppingContent(
         ) {
             Box(contentAlignment = Alignment.Center) {
                 Text(stringResource(R.string.captain_end_ride), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onError)
+            }
+        }
+    }
+}
+
+/**
+ * Courier match panel for the captain (guide §8.2): parcel summary plus the released sender/receiver
+ * contact with a call shortcut. Used on the dropping screen so the captain can reach the receiver.
+ */
+@Composable
+private fun CourierMatchPanel(courier: CourierMatch, contactLabel: String, contact: com.mytm.darrbi.domain.model.CourierContact?, onCall: () -> Unit) {
+    Surface(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(12.dp),
+        color = DarrbiTheme.colors.surfaceVariant,
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Icon(Icons.Filled.Inventory2, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(10.dp))
+                Text(courierMatchLabel(courier), style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface, maxLines = 1)
+            }
+            courier.note?.takeIf { it.isNotBlank() }?.let {
+                Spacer(Modifier.height(4.dp))
+                Text(it, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+            }
+            if (contact != null) {
+                Spacer(Modifier.height(10.dp))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(contactLabel, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+                        Text(
+                            text = contact.name?.takeIf { it.isNotBlank() }?.let { "$it · ${contact.phone}" } ?: contact.phone,
+                            style = DarrbiTheme.typography.bodyMedium,
+                            color = DarrbiTheme.colors.onSurface,
+                            maxLines = 1,
+                        )
+                    }
+                    Surface(
+                        modifier = Modifier.size(40.dp).clip(CircleShape).clickable(onClick = onCall),
+                        shape = CircleShape,
+                        color = DarrbiTheme.colors.primary,
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(Icons.Filled.Call, stringResource(R.string.cd_call), tint = DarrbiTheme.colors.onPrimary, modifier = Modifier.size(20.dp))
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** "Fragile · 80 kg" for a match block — prefers the server label, else the localized parcel-type name. */
+@Composable
+private fun courierMatchLabel(courier: CourierMatch): String {
+    val type = courier.parcelTypeLabel?.takeIf { it.isNotBlank() }
+        ?: courier.parcelType?.let { parcelTypeLabel(it) }
+        ?: stringResource(R.string.parcel_type_other)
+    return stringResource(R.string.courier_summary_type_weight, type, formatAmount(courier.parcelWeightKg))
+}
+
+/**
+ * Courier delivery-OTP entry card at drop-off (guide §9.2): the receiver's code that completes the trip.
+ * Wrong/missing OTP → `INVALID_DELIVERY_OTP`, so the captain re-enters it.
+ */
+@Composable
+private fun DeliveryOtpEntryContent(
+    courier: CourierMatch?,
+    otp: String,
+    isCompleting: Boolean,
+    isError: Boolean,
+    onOtp: (String) -> Unit,
+    onSubmit: () -> Unit,
+    onCancel: () -> Unit,
+) {
+    Column(modifier = Modifier.fillMaxWidth()) {
+        Text(stringResource(R.string.courier_delivery_otp_title), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
+        Spacer(Modifier.height(2.dp))
+        Text(stringResource(R.string.courier_delivery_otp_subtitle), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
+        Spacer(Modifier.height(16.dp))
+        PinInput(otp = otp, isError = isError, onOtp = onOtp)
+        if (isError) {
+            Spacer(Modifier.height(8.dp))
+            Text(stringResource(R.string.courier_delivery_otp_invalid), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.error)
+        }
+        if (courier != null) {
+            Spacer(Modifier.height(16.dp))
+            CourierMatchPanel(
+                courier = courier,
+                contactLabel = stringResource(R.string.courier_receiver),
+                contact = null,
+                onCall = {},
+            )
+        }
+        Spacer(Modifier.height(18.dp))
+        DarrbiPrimaryButton(
+            text = stringResource(R.string.captain_end_ride),
+            onClick = onSubmit,
+            enabled = !isCompleting && otp.length == PIN_LEN,
+        )
+        Spacer(Modifier.height(10.dp))
+        Surface(
+            modifier = Modifier.fillMaxWidth().height(48.dp).clip(RoundedCornerShape(14.dp)).clickable(enabled = !isCompleting, onClick = onCancel),
+            shape = RoundedCornerShape(14.dp),
+            color = DarrbiTheme.colors.surfaceVariant,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                Text(stringResource(R.string.common_cancel), style = DarrbiTheme.typography.button, color = DarrbiTheme.colors.onSurface)
             }
         }
     }
@@ -1276,6 +1549,11 @@ private fun RequestDetailContent(
                 HorizontalDivider(color = DarrbiTheme.colors.outline)
                 AddressRow(stringResource(R.string.captain_drop_off), trip.dropoff.address, DarrbiTheme.colors.error)
             }
+        }
+        // Courier: parcel summary (no phones) so the captain knows what they're carrying before bidding (guide §7).
+        trip.courier?.let { courier ->
+            Spacer(Modifier.height(12.dp))
+            CourierSummaryRow(courier)
         }
         if (errorCode != null) {
             Spacer(Modifier.height(10.dp))
@@ -1499,7 +1777,6 @@ private fun NavigateRiderContent(
     trip: RideRequest,
     pickupDistanceKm: Double?,
     pickupTimeMinutes: Int?,
-    navigateStarted: Boolean,
     isHandling: Boolean,
     onCall: () -> Unit,
     onChat: () -> Unit,
@@ -1522,9 +1799,9 @@ private fun NavigateRiderContent(
                 Text(trip.riderName, style = DarrbiTheme.typography.title.copy(fontSize = 16.sp), color = DarrbiTheme.colors.onSurface, maxLines = 1)
                 Text(stringResource(R.string.profile_status_good), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
             }
-            ContactCircle(iconRes = R.drawable.icon_chat, contentDescription = stringResource(R.string.cd_chat), onClick = onChat)
+            ContactCircle(iconRes = R.drawable.icon_chat, contentDescription = stringResource(R.string.cd_chat), onClick = onChat, iconSize = 30.dp)
             Spacer(Modifier.width(12.dp))
-            ContactCircle(iconRes = R.drawable.icon_phone, contentDescription = stringResource(R.string.cd_call), onClick = onCall)
+            ContactCircle(iconRes = R.drawable.icon_phone, contentDescription = stringResource(R.string.cd_call), onClick = onCall, iconSize = 30.dp)
         }
         Spacer(Modifier.height(16.dp))
         HorizontalDivider(color = DarrbiTheme.colors.outline)
@@ -1545,13 +1822,19 @@ private fun NavigateRiderContent(
             color = DarrbiTheme.colors.onSurfaceVariant,
         )
         Spacer(Modifier.height(16.dp))
-        if (navigateStarted) {
+        // Within the arrival radius the CTA becomes "Reached" (calls the reached-pickup API); while still far
+        // it stays "Navigate to Rider" and opens Google Maps. The distance updates live as the captain drives.
+        val withinReach = (pickupDistanceKm ?: Double.MAX_VALUE) <= PICKUP_REACH_RADIUS_KM
+        if (withinReach) {
             DarrbiPrimaryButton(text = stringResource(R.string.captain_reached), onClick = onReached, enabled = !isHandling)
         } else {
             DarrbiPrimaryButton(text = stringResource(R.string.captain_navigate_to_rider), onClick = onNavigate, enabled = !isHandling)
         }
     }
 }
+
+/** Arrival radius (km): inside this distance from the pickup, the "Navigate to Rider" CTA becomes "Reached". */
+private const val PICKUP_REACH_RADIUS_KM = 0.1
 
 /** Top-start 3-dot button that reveals a "Cancel Ride" popup while navigating to a rider. */
 @Composable

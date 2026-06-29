@@ -5,10 +5,12 @@ import com.mytm.darrbi.core.common.EnvConfig
 import com.mytm.darrbi.core.common.UserIdProvider
 import com.mytm.darrbi.data.mapper.toDomain
 import com.mytm.darrbi.data.remote.dto.BidDto
+import com.mytm.darrbi.data.remote.dto.CourierMatchDto
 import com.mytm.darrbi.data.remote.dto.FareRangeDto
 import com.mytm.darrbi.data.remote.dto.OpenTripDto
 import com.mytm.darrbi.domain.model.AcceptedTrip
 import com.mytm.darrbi.domain.model.Bid
+import com.mytm.darrbi.domain.model.CourierMatch
 import com.mytm.darrbi.domain.model.ChatMessage
 import com.mytm.darrbi.domain.model.ChatMessageStatus
 import com.mytm.darrbi.domain.model.ChatMessageType
@@ -202,6 +204,12 @@ class SocketServiceImpl @Inject constructor(
         return runCatching { json.decodeFromString(BidDto.serializer(), obj.toString()).toDomain() }.getOrNull()
     }
 
+    /** Decodes the courier MATCH block (sender/receiver + deliveryOtp) on bid-won / bid-accepted (guide §8). */
+    private fun decodeCourierMatch(obj: JSONObject?): CourierMatch? {
+        obj ?: return null
+        return runCatching { json.decodeFromString(CourierMatchDto.serializer(), obj.toString()).toDomain() }.getOrNull()
+    }
+
     /** `new-trip-request` → append the single trip to the open set (de-duped by id). */
     private fun onNewTripRequest(args: Array<out Any?>) {
         val trip = decodeOpenTrip(v2Data(args)?.optJSONObject("trip")) ?: return
@@ -262,6 +270,7 @@ class SocketServiceImpl @Inject constructor(
                 driverId = d.optString("driverId"),
                 agreedFare = d.optDouble("agreedFare", 0.0),
                 currency = d.optString("currency").ifBlank { "SAR" },
+                courier = decodeCourierMatch(d.optJSONObject("courier")),
             ),
         )
     }
@@ -271,7 +280,14 @@ class SocketServiceImpl @Inject constructor(
         val d = v2Data(args) ?: return
         val tripId = d.optString("tripId").takeIf { it.isNotBlank() } ?: return
         _openTrips.update { it.filterNot { t -> t.tripId == tripId } }
-        _v2Events.tryEmit(V2SocketEvent.BidWon(tripId, d.optString("bidId"), d.optDouble("agreedFare", 0.0)))
+        _v2Events.tryEmit(
+            V2SocketEvent.BidWon(
+                tripId = tripId,
+                bidId = d.optString("bidId"),
+                agreedFare = d.optDouble("agreedFare", 0.0),
+                courier = decodeCourierMatch(d.optJSONObject("courier")),
+            ),
+        )
     }
 
     private fun onBidLost(args: Array<out Any?>) {

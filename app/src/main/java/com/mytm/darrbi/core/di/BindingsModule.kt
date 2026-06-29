@@ -11,14 +11,18 @@ import com.mytm.darrbi.data.socket.SocketServiceImpl
 import com.mytm.darrbi.data.repository.AuthRepositoryImpl
 import com.mytm.darrbi.data.repository.ChatRepositoryImpl
 import com.mytm.darrbi.data.repository.OnboardingRepositoryImpl
+import com.mytm.darrbi.data.repository.RentalRepositoryImpl
 import com.mytm.darrbi.data.repository.RideRepositoryImpl
+import com.mytm.darrbi.data.repository.ScheduleRepositoryImpl
 import com.mytm.darrbi.data.repository.V2RideRepositoryImpl
 import com.mytm.darrbi.domain.repository.AuthRepository
 import com.mytm.darrbi.domain.repository.ChatRepository
 import com.mytm.darrbi.domain.repository.MapService
 import com.mytm.darrbi.domain.repository.OnboardingRepository
 import com.mytm.darrbi.domain.repository.PlacesRepository
+import com.mytm.darrbi.domain.repository.RentalRepository
 import com.mytm.darrbi.domain.repository.RideRepository
+import com.mytm.darrbi.domain.repository.ScheduleRepository
 import com.mytm.darrbi.domain.repository.SessionRepository
 import com.mytm.darrbi.domain.repository.V2RideRepository
 import com.mytm.darrbi.domain.repository.SocketService
@@ -69,6 +73,14 @@ abstract class BindingsModule {
     @Binds
     @Singleton
     abstract fun bindV2RideRepository(impl: V2RideRepositoryImpl): V2RideRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindScheduleRepository(impl: ScheduleRepositoryImpl): ScheduleRepository
+
+    @Binds
+    @Singleton
+    abstract fun bindRentalRepository(impl: RentalRepositoryImpl): RentalRepository
 
     @Binds
     @Singleton

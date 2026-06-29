@@ -107,6 +107,11 @@ object NetworkModule {
 
     @Provides
     @Singleton
+    fun provideScheduleApi(@MainApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.ScheduleApi =
+        retrofit.create(com.mytm.darrbi.data.remote.service.ScheduleApi::class.java)
+
+    @Provides
+    @Singleton
     fun provideCmsApi(@CmsApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.CmsApi =
         retrofit.create(com.mytm.darrbi.data.remote.service.CmsApi::class.java)
 
@@ -114,6 +119,13 @@ object NetworkModule {
     @Singleton
     fun provideChatApi(@MainApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.ChatApi =
         retrofit.create(com.mytm.darrbi.data.remote.service.ChatApi::class.java)
+
+    // RAC car-rental renter endpoints live on the Main gateway (`/v2/rac/renter/...`, MainEnvelope, sessionId
+    // auth) — NOT the legacy RideARide @RentalApi host. See RAC_MOBILE_INTEGRATION_GUIDE.md.
+    @Provides
+    @Singleton
+    fun provideRacApi(@MainApi retrofit: Retrofit): com.mytm.darrbi.data.remote.service.RacApi =
+        retrofit.create(com.mytm.darrbi.data.remote.service.RacApi::class.java)
 
     private fun buildRetrofit(baseUrl: String, client: OkHttpClient, factory: Converter.Factory): Retrofit =
         Retrofit.Builder()

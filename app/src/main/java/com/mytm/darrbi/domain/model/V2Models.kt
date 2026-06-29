@@ -41,6 +41,8 @@ data class OpenTrip(
     val riderRating: Double?,
     val riderTotalReviews: Int?,
     val riderImageUrl: String?,
+    /** Parcel SUMMARY for a courier trip (guide §7); null for a normal ride. No sender/receiver phones. */
+    val courier: CourierSummary? = null,
 )
 
 /** A competing bid (rider's view) or a driver's own placed bid. */

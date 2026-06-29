@@ -26,6 +26,7 @@ import com.mytm.darrbi.R
 import com.mytm.darrbi.domain.model.Ride
 import com.mytm.darrbi.presentation.chat.ChatScreen
 import com.mytm.darrbi.presentation.dashboard.CaptainDashboardScreen
+import com.mytm.darrbi.presentation.dashboard.CaptainScheduleScreen
 import com.mytm.darrbi.presentation.dashboard.CaptainStatusDetailScreen
 import com.mytm.darrbi.presentation.legal.LegalPage
 import com.mytm.darrbi.presentation.legal.LegalScreen
@@ -33,7 +34,9 @@ import com.mytm.darrbi.presentation.notifications.NotificationsScreen
 import com.mytm.darrbi.presentation.onboarding.OnboardingScreen
 import com.mytm.darrbi.presentation.profile.ProfileScreen
 import com.mytm.darrbi.presentation.reports.MyReportsScreen
+import com.mytm.darrbi.presentation.rental.RentalFlowScreen
 import com.mytm.darrbi.presentation.rider.RiderFlowScreen
+import com.mytm.darrbi.presentation.schedule.ScheduleFlowScreen
 import com.mytm.darrbi.presentation.rides.MyRidesScreen
 import com.mytm.darrbi.presentation.rides.ReportProblemScreen
 import com.mytm.darrbi.presentation.rides.RideDetailsScreen
@@ -50,7 +53,7 @@ private const val CUSTOMER_CARE_NUMBER = "+966500000000"
 
 /** Top-level destinations after the splash. */
 private enum class Route {
-    Onboarding, Dashboard, RiderHome, StatusDetail, Profile, TopupDetails,
+    Onboarding, Dashboard, CaptainSchedule, RiderHome, ScheduleHome, RentalHome, StatusDetail, Profile, TopupDetails,
     MyRides, RideDetails, ReportProblem, MyReports, Terms, Privacy,
     AppSettings, CustomerCare, Notifications, Chat,
 }
@@ -128,6 +131,7 @@ fun DarrbiRoot() {
                 Route.Dashboard -> CaptainDashboardScreen(
                     onSeeDetails = { route = Route.StatusDetail },
                     onProfile = { profileReturn = Route.Dashboard; route = Route.Profile },
+                    onOpenScheduled = { route = Route.CaptainSchedule },
                     onChat = { request ->
                         // Captain chatting the rider → local user is the captain.
                         chatPeer = ChatPeer(request.riderId, request.riderName, request.riderImageUrl, localUserIsRider = false)
@@ -143,7 +147,30 @@ fun DarrbiRoot() {
                         chatReturn = Route.RiderHome
                         route = Route.Chat
                     },
+                    // SCHEDULE category tile → the scheduled City-to-City flow.
+                    onOpenSchedule = { route = Route.ScheduleHome },
+                    // RENT-A-CAR category tile → the self-drive car-rental flow.
+                    onOpenRental = { route = Route.RentalHome },
                 )
+                Route.ScheduleHome -> {
+                    BackHandler { route = Route.RiderHome }
+                    ScheduleFlowScreen(
+                        onBack = { route = Route.RiderHome },
+                        onChat = { driverId, name, imageUrl ->
+                            chatPeer = ChatPeer(driverId, name, imageUrl, localUserIsRider = true)
+                            chatReturn = Route.ScheduleHome
+                            route = Route.Chat
+                        },
+                    )
+                }
+                Route.RentalHome -> {
+                    BackHandler { route = Route.RiderHome }
+                    RentalFlowScreen(onBack = { route = Route.RiderHome })
+                }
+                Route.CaptainSchedule -> {
+                    BackHandler { route = Route.Dashboard }
+                    CaptainScheduleScreen(onBack = { route = Route.Dashboard })
+                }
                 Route.StatusDetail -> {
                     BackHandler { route = Route.Dashboard }
                     CaptainStatusDetailScreen(onDone = { route = Route.Dashboard })

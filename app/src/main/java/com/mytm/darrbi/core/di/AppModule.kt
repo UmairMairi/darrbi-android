@@ -37,6 +37,7 @@ object AppModule {
         rentalUrl = BuildConfig.RENTAL_URL,
         rentalToken = BuildConfig.RENTAL_TOKEN,
         secretKey = BuildConfig.SECRET_KEY,
+        mapsApiKey = BuildConfig.MAPS_API_KEY,
         isDebug = BuildConfig.DEBUG,
     )
 

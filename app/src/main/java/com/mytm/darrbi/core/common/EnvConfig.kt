@@ -13,5 +13,7 @@ data class EnvConfig(
     val rentalUrl: String,
     val rentalToken: String,
     val secretKey: String,
+    /** Google Maps key (Static Maps API) used to build the trip-route map snapshot URL. */
+    val mapsApiKey: String,
     val isDebug: Boolean,
 )

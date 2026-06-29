@@ -4,6 +4,7 @@ import com.mytm.darrbi.core.common.ApiResult
 import com.mytm.darrbi.domain.model.Bid
 import com.mytm.darrbi.domain.model.BidTrip
 import com.mytm.darrbi.domain.model.BidType
+import com.mytm.darrbi.domain.model.CourierDetails
 import com.mytm.darrbi.domain.model.OpenTrip
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.SelectedBid
@@ -18,7 +19,8 @@ class CreateBidTripUseCase @Inject constructor(private val repository: V2RideRep
         cabId: String,
         categoryId: String?,
         offeredFare: Double,
-    ): ApiResult<BidTrip> = repository.createBidTrip(pickup, destination, cabId, categoryId, offeredFare)
+        courier: CourierDetails? = null,
+    ): ApiResult<BidTrip> = repository.createBidTrip(pickup, destination, cabId, categoryId, offeredFare, courier)
 }
 
 /** DRIVER: pull the open (awaiting-bids) trips in range. */

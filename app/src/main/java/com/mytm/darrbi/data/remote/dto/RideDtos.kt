@@ -36,6 +36,8 @@ data class CabCategoryDto(
     val type: String? = null,
     val order: Int? = null,
     val status: Boolean? = null,
+    /** Service-category discriminator (guide §2.1): 1 DEFAULT, 2 COURIER, 3 SCHEDULE, 4 RENT_A_CAR, 5 CARGO. */
+    val categoryType: Int? = null,
 )
 
 /** `GET trips/rider-recent-addresses` → `data` wraps the list under `recentAddresses`. */
@@ -68,6 +70,14 @@ data class CabDto(
     val estimatedArrivalTime: String? = null,
     val shareEstimatedTimeArrival: Int? = null,
     val available: Boolean? = null,
+    /** Service-category discriminator joined from the parent category (guide §3.1); null on older payloads. */
+    val categoryType: Int? = null,
+    /** Courier capacity columns (guide §3); NULL = no limit / not a courier cab. */
+    val maxWeightKg: Double? = null,
+    val maxLengthCm: Int? = null,
+    val maxWidthCm: Int? = null,
+    val maxHeightCm: Int? = null,
+    val maxDimSumCm: Int? = null,
 )
 
 @Serializable
@@ -146,6 +156,11 @@ data class CompleteTripRequest(
     val address: String,
     val latitude: Double,
     val longitude: Double,
+    /**
+     * Courier trips only (guide §9.2): the receiver's delivery OTP, required to complete at drop-off.
+     * Omitted (explicitNulls = false) for a normal ride, which has no completion gate.
+     */
+    val deliveryOtp: Int? = null,
 )
 
 /** `POST reviews/rider` body — the rider's star rating for the captain (ride-android: ReviewRequestModel). */

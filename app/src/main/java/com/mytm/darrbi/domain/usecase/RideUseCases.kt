@@ -103,10 +103,16 @@ class StartTripUseCase @Inject constructor(private val repository: RideRepositor
     suspend operator fun invoke(tripId: String, otp: Int): ApiResult<Unit> = repository.startTrip(tripId, otp)
 }
 
-/** CAPTAIN completes the trip at the drop-off. */
+/** CAPTAIN completes the trip at the drop-off ([deliveryOtp] required for a courier trip). */
 class CompleteTripUseCase @Inject constructor(private val repository: RideRepository) {
-    suspend operator fun invoke(tripId: String, dropOff: PlaceLocation): ApiResult<Unit> =
-        repository.completeTrip(tripId, dropOff)
+    suspend operator fun invoke(tripId: String, dropOff: PlaceLocation, deliveryOtp: Int? = null): ApiResult<Unit> =
+        repository.completeTrip(tripId, dropOff, deliveryOtp)
+}
+
+/** Renders + uploads the trip static-map image (rider + captain, on each trip step). [type] = trip status. */
+class SubmitTripMapImageUseCase @Inject constructor(private val repository: RideRepository) {
+    suspend operator fun invoke(tripId: String, mapImageUrl: String, type: Int): ApiResult<Unit> =
+        repository.submitTripMapImage(tripId, mapImageUrl, type)
 }
 
 /** CAPTAIN cancels an accepted trip with a [reason]. */

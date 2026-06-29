@@ -28,6 +28,12 @@ import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.model.RecentLocation
 import com.mytm.darrbi.domain.model.RideCategory
 import com.mytm.darrbi.domain.repository.RideRepository
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import okhttp3.MediaType.Companion.toMediaTypeOrNull
+import okhttp3.MultipartBody
+import okhttp3.RequestBody.Companion.toRequestBody
+import java.net.URL
 import javax.inject.Inject
 
 class RideRepositoryImpl @Inject constructor(
@@ -197,7 +203,7 @@ class RideRepositoryImpl @Inject constructor(
     override suspend fun startTrip(tripId: String, otp: Int): ApiResult<Unit> =
         safeApiCall { api.startTrip(tripId, StartTripRequest(tripOtp = otp)) }.unwrapMainUnit()
 
-    override suspend fun completeTrip(tripId: String, dropOff: PlaceLocation): ApiResult<Unit> =
+    override suspend fun completeTrip(tripId: String, dropOff: PlaceLocation, deliveryOtp: Int?): ApiResult<Unit> =
         safeApiCall {
             api.completeTrip(
                 tripId,
@@ -205,9 +211,22 @@ class RideRepositoryImpl @Inject constructor(
                     address = dropOff.address.ifBlank { dropOff.name },
                     latitude = dropOff.latitude,
                     longitude = dropOff.longitude,
+                    deliveryOtp = deliveryOtp,
                 ),
             )
         }.unwrapMainUnit()
+
+    override suspend fun submitTripMapImage(tripId: String, mapImageUrl: String, type: Int): ApiResult<Unit> {
+        // Render the static map: download the PNG, then upload the bytes as both rider+driver photos
+        // (matching ride-android's `callUploadTripImage`, which sends the same file for both parts).
+        val bytes = withContext(Dispatchers.IO) { runCatching { URL(mapImageUrl).readBytes() }.getOrNull() }
+            ?: return ApiResult.Error(-1, "Trip map image download failed")
+        val photo = bytes.toRequestBody("image/*".toMediaTypeOrNull())
+        val riderPart = MultipartBody.Part.createFormData("riderPhoto", "trip_map.png", photo)
+        val driverPart = MultipartBody.Part.createFormData("driverPhoto", "trip_map.png", photo)
+        val typeBody = type.toString().toRequestBody("text/plain".toMediaTypeOrNull())
+        return safeApiCall { api.uploadTripStaticMapImage(tripId, riderPart, driverPart, typeBody) }.unwrapMainUnit()
+    }
 
     override suspend fun cancelTripByDriver(tripId: String, reason: String, destination: PlaceLocation): ApiResult<Unit> =
         safeApiCall { api.driverCancelTrip(tripId, declineBody(destination, reason)) }.unwrapMainUnit()

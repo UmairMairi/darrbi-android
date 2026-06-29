@@ -5,8 +5,16 @@
 > **Transport:** WebSocket (Socket.IO) for real-time + REST (api-gateway `/v2/trips`) as a fallback for every action.
 > **Base URLs (demo):** REST `http://<host>:3010`  •  WebSocket `http://<host>:8100`
 > **Auth:** every REST call sends the login JWT in the **`sessionid`** header (NOT `Authorization`). Sockets identify the user with `subscribe-user`.
+>
+> **↑ Start at the master guide:** `docs/V2_MOBILE_MASTER_GUIDE.md` is the single entry point for all three modes (Quick Start, the shared house response/error contract, the bid lifecycle, the error-code catalog). This guide is **Mode A — Immediate bidding** in depth; the [Courier](V2_COURIER_MOBILE_INTEGRATION_GUIDE.md) and [City-to-City](V2_CITY_TO_CITY_MOBILE_INTEGRATION_GUIDE.md) guides build on it.
 
 All sample values below are real shapes from the running system — you can copy them as fixtures.
+
+> **Revision 2026-06-18 — PII + reliability**
+> - **Profiles everywhere during bidding:** every driver-facing open-trip item now carries a **`rider`** block; every bid in the rider's list (and `bid-accepted`) carries a **`driver`** block (incl. vehicle); `bid-won` carries the **`rider`**. So both sides see name / photo / rating / reviews *before and at* match — see §5.1, §5.5, §6.2, §6.4.
+> - **`PAYMENT_HOLD_FAILED` is now recoverable:** a failed hold (e.g. low wallet) no longer strands the trip. The trip stays `AWAITING_BIDS`, the bid stays `PENDING`; the rider tops up and re-selects the same bid. (Previously a retry wrongly returned `TRIP_NOT_OPEN`.)
+> - **Winner is freed on other trips:** when a driver wins one trip, their still-pending bids on other open trips are auto-cancelled (driver gets `v2/bid-lost` reason `DRIVER_BUSY`; affected riders get a `BID_REMOVED` `trip-bids-update`).
+> - **Socket actions use your subscribed identity:** the server resolves driver/rider from your `subscribe-user` binding, NOT from any id in the payload — so a spoofed `driverId`/`riderId` in a socket message is ignored. Always `subscribe-user` first.
 
 ---
 
@@ -68,7 +76,13 @@ addressType: 1 = pickup, 2 = destination
 }
 ```
 
-**Client→server socket actions** send a flat payload + an optional Socket.IO **ack callback**. The ack receives `{ ok, data }` on success or `{ ok:false, error:{ code, message, details? } }` on failure.
+**Both REST responses AND client→server socket ack callbacks use the project's house response shape — there is NO `ok` field.**
+- **Success:** `{ "statusCode": 200, "data": { … } }` (create endpoints return `201`).
+- **Failure:** a **real HTTP 4xx/5xx** body `{ "statusCode": <4xx/5xx>, "message": "<human string>", "data": { "code": "<MACHINE_CODE>", …<extra fields flattened in> } }`. The machine `code` and any detail fields live **flattened inside `data`** (no nested `error`/`details` object).
+
+Client→server socket actions send a flat payload + an optional Socket.IO **ack callback**; the ack receives exactly this same `{ statusCode, data }` / `{ statusCode, message, data:{ code, … } }` shape.
+
+> **Heads-up:** server→client socket **events** (§5.1 etc.) keep their own envelope `{ "v":2, "event":"…", "emittedAt":<epochMs>, "data":{…} }` — that is UNCHANGED. Only REST responses and socket **ack** callbacks use the house `{ statusCode, … }` shape.
 
 ---
 
@@ -155,7 +169,15 @@ socket.emit('update-customer-location', { userID, lat, lon });  // rider
       "fareRange": { "currency": "SAR", "recommended": 61.26, "min": 49.01, "max": 122.52, "riderOfferedFare": 60 },
       "riderOfferedFare": 60,
       "requestExpiresAt": "2026-06-15T09:34:11.000Z",
-      "createdAt": "2026-06-15T09:32:11.000Z"
+      "createdAt": "2026-06-15T09:32:11.000Z",
+      "rider": {                       // PII so the driver can decide before bidding
+        "riderId": "966110000074",
+        "name": "Dalal Al-Harbi",
+        "arabicName": "دلال الحربي",
+        "profileImage": "https://cdn.example.com/u/dalal.jpg",
+        "rating": 4.8,
+        "totalReviews": 36
+      }
     }
   }
 }
@@ -182,12 +204,21 @@ socket.emit('update-customer-location', { userID, lat, lon });  // rider
         "fareRange": { "currency": "SAR", "recommended": 59.16, "min": 47.33, "max": 118.32, "riderOfferedFare": 60 },
         "riderOfferedFare": 60,
         "requestExpiresAt": "2026-06-15T19:36:03.000Z",
-        "createdAt": "2026-06-15T19:34:03.421Z"
+        "createdAt": "2026-06-15T19:34:03.421Z",
+        "rider": {
+          "riderId": "966110000074",
+          "name": "Dalal Al-Harbi",
+          "arabicName": "دلال الحربي",
+          "profileImage": "https://cdn.example.com/u/dalal.jpg",
+          "rating": 4.8,
+          "totalReviews": 36
+        }
       }
     ]
   }
 }
 ```
+> Every driver-facing open-trip item (`new-trip-request`, `open-trips-list`, the `added`/`v2/sync-open-trips` items, and `GET /v2/trips/open-in-range`) now carries a **`rider`** block (name, arabicName, profileImage, rating, totalReviews) so the driver sees who's requesting before bidding. `rating`/`totalReviews` are `0` for a brand-new rider.
 
 **`open-trips-update` (server → driver)** — delta sample:
 ```jsonc
@@ -211,7 +242,7 @@ socket.emit('v2/sync-open-trips',
   (ack) => { /* ack below */ }
 );
 // ack (success)
-{ "ok": true, "data": { "trips": [ /* same items as open-trips-list */ ], "now": "2026-06-15T19:34:35.609Z" } }
+{ "statusCode": 200, "data": { "trips": [ /* same items as open-trips-list */ ], "now": "2026-06-15T19:34:35.609Z" } }
 ```
 REST fallback: `GET /v2/trips/open-in-range?cabId=db8db63e-...&lat=31.4593&long=74.2763` (header `sessionid`).
 
@@ -227,16 +258,16 @@ socket.emit('v2/place-bid', {
 }, ack);
 
 // ack (success)
-{ "ok": true, "data": {
+{ "statusCode": 200, "data": {
     "bidId": "96dfa402-...-uuid", "tripId": "9c1e7b2a-...", "driverId": "966220000022",
     "bidType": 2, "bidFare": 55, "currency": "SAR", "status": 1,
     "etaToPickupSec": 300, "message": "5 min away",
     "expiredAt": "2026-06-15T19:32:37.000Z", "createdAt": "2026-06-15T19:31:52.000Z"
 } }
 
-// ack (failure)
-{ "ok": false, "error": { "code": "BID_BELOW_FLOOR", "details": { "minFare": 49.01, "submitted": 30 } } }
-{ "ok": false, "error": { "code": "DRIVER_INELIGIBLE", "failedConditions": ["driverModeSwitch","isWASLApproved"] } }
+// ack (failure) — real HTTP status; code + extra fields flattened into data
+{ "statusCode": 400, "message": "Bid below the fare floor", "data": { "code": "BID_BELOW_FLOOR", "minFare": 49.01, "submitted": 30 } }
+{ "statusCode": 409, "message": "Driver is not eligible", "data": { "code": "DRIVER_INELIGIBLE", "failedConditions": ["driverModeSwitch","isWASLApproved"] } }
 ```
 REST fallback: `POST /v2/trips/:tripId/bids` with body `{ bidType, bidFare?, etaToPickupSec?, message?, cabId? }`.
 
@@ -245,7 +276,7 @@ REST fallback: `POST /v2/trips/:tripId/bids` with body `{ bidType, bidFare?, eta
 ### 5.4 Withdraw a bid — `v2/withdraw-bid` (driver → server)
 ```jsonc
 socket.emit('v2/withdraw-bid', { tripId: "9c1e7b2a-...", bidId: "96dfa402-..." }, ack);
-// ack: { "ok": true, "data": { "bidId": "96dfa402-...", "status": 4 } }   // 4 = WITHDRAWN
+// ack: { "statusCode": 200, "data": { "bidId": "96dfa402-...", "status": 4 } }   // 4 = WITHDRAWN
 ```
 REST: `DELETE /v2/trips/:tripId/bids/:bidId`.
 
@@ -253,13 +284,14 @@ REST: `DELETE /v2/trips/:tripId/bids/:bidId`.
 | Event | `data` sample | Meaning / action |
 |---|---|---|
 | `v2/bid-ack` | `{ driverId, bid:{...} }` | server stored your bid (mirror of the ack) |
-| `v2/bid-won` | `{ tripId, bidId, agreedFare:55, currency:"SAR" }` | **you won** → proceed to pickup; switch to V1 `trip-detail`/OTP flow |
+| `v2/bid-won` | `{ tripId, bidId, agreedFare:55, currency:"SAR", rider:{ riderId, name, arabicName, profileImage, rating, totalReviews } }` | **you won** → proceed to pickup; the `rider` block has the passenger's PII; switch to V1 `trip-detail`/OTP flow |
 | `v2/bid-lost` | `{ tripId, bidId, reason:"ANOTHER_DRIVER_SELECTED" }` | rider chose someone else / you lost the driver race |
 | `v2/bid-rejected` | `{ tripId, bidId, reason:"RIDER_DISMISSED" }` | rider dismissed your bid |
 | `v2/bid-expired` | `{ tripId, bidId }` | your 45s bid TTL elapsed (you may re-bid) |
 | `v2/trip-closed` | `{ tripId, reason:"RIDER_CANCELLED", yourBidId }` | trip ended before match (`RIDER_CANCELLED`/`EXPIRED`/`NO_DRIVER`) |
 
-`reason` for `v2/bid-lost` ∈ `ANOTHER_DRIVER_SELECTED | LOST_DRIVER_RACE | DRIVER_INELIGIBLE`.
+`reason` for `v2/bid-lost` ∈ `ANOTHER_DRIVER_SELECTED | LOST_DRIVER_RACE | DRIVER_INELIGIBLE | DRIVER_BUSY`.
+> `DRIVER_BUSY` = you won a *different* trip, so your still-pending bids on other open trips are auto-cancelled. Drop them from your UI.
 
 ---
 
@@ -279,17 +311,20 @@ REST: `DELETE /v2/trips/:tripId/bids/:bidId`.
     { "addressType": 2, "latitude": 31.5200, "longitude": 74.3500, "address": "Dropoff, Lahore" }
   ]
 }
-// response (201)
+// response — HTTP 201, house { statusCode, data }
 { "statusCode": 201, "data": {
     "id": "1bf9ea24-...-uuid", "message": "Trip added successfully",
     "status": 15, "riderOfferedFare": 60,
     "recommendedFare": 59.16, "minFare": 47.33, "maxFare": 118.32, "currency": "SAR",
     "tripRequestTimeLimit": "2026-06-15 19:36:03"
 } }
-// error: offered fare outside the band
-{ "statusCode": 400, "message": "Offered fare 10 is below the minimum 47.33 SAR" }
+// error: offered fare outside the band — REAL HTTP 400; code + fields flattened into data
+{ "statusCode": 400,
+  "message": "Offered fare 10 is below the minimum 47.33 SAR",
+  "data": { "code": "OFFER_OUT_OF_BAND", "minFare": 47.33, "submitted": 10 }
+}
 ```
-Show the rider `recommendedFare` / `minFare` / `maxFare` so they pick a sensible offer. The offer must be `min ≤ riderOfferedFare ≤ max`.
+Show the rider `recommendedFare` / `minFare` / `maxFare` so they pick a sensible offer. The offer must be `min ≤ riderOfferedFare ≤ max`. **`POST /v2/trips` speaks the same house success `{ statusCode:201, data }` / real-HTTP-status failure `{ statusCode, message, data:{ code, …details } }` shape as every other V2 endpoint** (the human-readable string is the top-level `message`; the machine `code` and any detail fields are flattened inside `data`).
 
 ### 6.2 Watch the competing bids — `v2/trip-bids-update` (server → rider)
 ```jsonc
@@ -302,26 +337,49 @@ Show the rider `recommendedFare` / `minFare` / `maxFare` so they pick a sensible
     "changedBidId": "96dfa402-...",
     "count": 2,
     "bids": [                              // sorted cheapest-first; REPLACE your list
-      { "bidId": "b-1", "driverId": "966220000022", "bidType": 1, "bidFare": 60, "currency": "SAR", "status": 1, "etaToPickupSec": 240, "pickupDistanceKm": 1.6, "message": null },
-      { "bidId": "b-2", "driverId": "966220000031", "bidType": 2, "bidFare": 70, "currency": "SAR", "status": 1, "etaToPickupSec": 180, "pickupDistanceKm": 0.9, "message": "On my way" }
+      {
+        "bidId": "b-1", "driverId": "966220000022", "bidType": 1, "bidFare": 60,
+        "currency": "SAR", "status": 1, "etaToPickupSec": 240, "pickupDistanceKm": 1.6, "message": null,
+        "driver": {                        // driver PII so the rider can choose
+          "driverId": "966220000022",
+          "name": "Nasser Al-Otaibi",
+          "arabicName": "ناصر العتيبي",
+          "profileImage": "https://cdn.example.com/u/nasser.jpg",
+          "mobile": "966553179200",
+          "rating": 5,
+          "totalReviews": 1,
+          "vehicle": { "plateNo": "5848-طنس", "sequenceNo": "963258741", "model": "كامري", "color": "رمادي" }
+        }
+      },
+      {
+        "bidId": "b-2", "driverId": "966220000031", "bidType": 2, "bidFare": 70,
+        "currency": "SAR", "status": 1, "etaToPickupSec": 180, "pickupDistanceKm": 0.9, "message": "On my way",
+        "driver": { "driverId": "966220000031", "name": "Omar Q.", "profileImage": "", "rating": 4.6, "totalReviews": 210, "vehicle": { "plateNo": "1122-ABC", "model": "Sonata", "color": "white" } }
+      }
     ]
   }
 }
 ```
+> Each bid now embeds a **`driver`** block (name, arabicName, profileImage, mobile, rating, totalReviews, vehicle). `rating`/`totalReviews` are `0` for a new driver; `vehicle` is `null` if the cab/plate isn't on file yet. The same `driver` block is included in `GET /v2/trips/:tripId/bids`.
 Other rider events: `v2/no-bids` `{ tripId, ... }` (early nudge to raise the offer) and `v2/bidding-timeout` `{ tripId, tripStatus:10 }` (window elapsed with no selection).
 
 REST fallback: `GET /v2/trips/:tripId/bids`
 ```jsonc
-{ "ok": true, "data": { "tripId":"1bf9ea24-...", "tripStatus":15, "riderOfferedFare":60, "currency":"SAR", "bids":[ /* as above */ ] } }
+{ "statusCode": 200, "data": { "tripId":"1bf9ea24-...", "tripStatus":15, "riderOfferedFare":60, "currency":"SAR", "bids":[ /* as above */ ] } }
 ```
 
 ### 6.3 Select / reject a bid, raise offer, cancel
 ```jsonc
 // SELECT a driver (commit the match):
 socket.emit('v2/select-bid', { tripId: "1bf9ea24-...", bidId: "b-1" }, ack);
-// ack: { "ok": true, "data": { "tripId":"1bf9ea24-...", "bidId":"b-1", "driverId":"966220000022", "agreedFare":60, "tripStatus":2 } }
-// ack failure: { "ok": false, "error": { "code": "DRIVER_RACE_LOST" } }
-//             { "ok": false, "error": { "code": "PAYMENT_HOLD_FAILED" } }
+// ack: { "statusCode": 200, "data": { "tripId":"1bf9ea24-...", "bidId":"b-1", "driverId":"966220000022", "agreedFare":60, "tripStatus":2 } }
+// ack failure: { "statusCode": 409, "message": "Another rider selected that driver first", "data": { "code": "DRIVER_RACE_LOST" } }
+//             { "statusCode": 402, "message": "Could not hold the agreed fare", "data": { "code": "PAYMENT_HOLD_FAILED" } }
+//
+// PAYMENT_HOLD_FAILED is RECOVERABLE: the trip stays AWAITING_BIDS and the bid
+// stays PENDING. Prompt the rider to top up / switch payment method and call
+// select again on the SAME bid — it will succeed once funds are available.
+// (Earlier this stranded the trip; a retry now no longer returns TRIP_NOT_OPEN.)
 
 // REJECT one bid (keep collecting others):
 socket.emit('v2/reject-bid', { tripId: "1bf9ea24-...", bidId: "b-2" }, ack);
@@ -331,7 +389,7 @@ socket.emit('v2/...', ...); // REST: PATCH /v2/trips/:tripId/raise-offer  body {
 
 // CANCEL the open request:
 socket.emit('v2/cancel-open-trip', { tripId: "1bf9ea24-...", declinedReason: "changed my mind" }, ack);
-// ack: { "ok": true, "data": { "tripId":"1bf9ea24-...", "tripStatus":6 } }
+// ack: { "statusCode": 200, "data": { "tripId":"1bf9ea24-...", "tripStatus":6 } }
 ```
 REST equivalents: `PATCH /v2/trips/:tripId/bids/:bidId/accept`, `.../reject`, `PATCH /v2/trips/:tripId/raise-offer`, `PATCH /v2/trips/:tripId/cancel`.
 
@@ -341,7 +399,17 @@ REST equivalents: `PATCH /v2/trips/:tripId/bids/:bidId/accept`, `.../reject`, `P
   "v": 2, "event": "v2/bid-accepted", "emittedAt": 1718409640000,
   "data": {
     "tripId": "1bf9ea24-...", "bidId": "b-1", "driverId": "966220000022",
-    "agreedFare": 60, "currency": "SAR"
+    "agreedFare": 60, "currency": "SAR",
+    "driver": {                          // chosen driver's PII
+      "driverId": "966220000022",
+      "name": "Nasser Al-Otaibi",
+      "arabicName": "ناصر العتيبي",
+      "profileImage": "https://cdn.example.com/u/nasser.jpg",
+      "mobile": "966553179200",
+      "rating": 5,
+      "totalReviews": 1,
+      "vehicle": { "plateNo": "5848-طنس", "sequenceNo": "963258741", "model": "كامري", "color": "رمادي" }
+    }
   }
 }
 ```
@@ -351,32 +419,32 @@ An alias `driver-selected` carries the same data for clients that prefer it. Aft
 
 ## 7. REST API reference (`/v2/trips`) — quick table
 
-All require header `sessionid: <token>`. `:tripId` / `:bidId` are path params.
+All require header `sessionid: <token>`. `:tripId` / `:bidId` are path params. **Every row returns the house envelope: success `{ statusCode:200, data:{…} }` (create returns `201`), failure a real HTTP 4xx/5xx with `{ statusCode, message, data:{ code, …details } }`.** The `Returns` column shows the contents of `data`.
 
-| # | Method | Path | Actor | Body | Returns |
+| # | Method | Path | Actor | Body | Returns (`data`) |
 |---|---|---|---|---|---|
-| 1 | POST | `/v2/trips` | Rider | create body + `riderOfferedFare` | `{ id, status:15, recommendedFare, minFare, maxFare }` |
-| 2 | GET | `/v2/trips/open-in-range?cabId=&lat=&long=` | Driver | — | `{ ok, data:{ trips:[...] } }` |
-| 3 | POST | `/v2/trips/:tripId/bids` | Driver | `{ bidType, bidFare?, etaToPickupSec?, message?, cabId? }` | `{ ok, data:{ bidId, status:1, ... } }` |
-| 4 | DELETE | `/v2/trips/:tripId/bids/:bidId` | Driver | — | `{ ok, data:{ bidId, status:4 } }` |
-| 5 | GET | `/v2/trips/:tripId/bids` | Rider | — | `{ ok, data:{ bids:[...] } }` |
-| 6 | PATCH | `/v2/trips/:tripId/bids/:bidId/accept` | Rider | `{ sessionId? }` | `{ ok, data:{ driverId, agreedFare, tripStatus:2 } }` |
-| 7 | PATCH | `/v2/trips/:tripId/bids/:bidId/reject` | Rider | — | `{ ok, data:{ bidId, status:3 } }` |
-| 8 | PATCH | `/v2/trips/:tripId/raise-offer` | Rider | `{ newOfferedFare }` | `{ ok, data:{ riderOfferedFare } }` |
-| 9 | PATCH | `/v2/trips/:tripId/cancel` | Rider | `{ declinedReason? }` | `{ ok, data:{ tripStatus:6 } }` |
+| 1 | POST | `/v2/trips` | Rider | create body + `riderOfferedFare` | `201` `{ data:{ id, status:15, recommendedFare, minFare, maxFare, currency } }` |
+| 2 | GET | `/v2/trips/open-in-range?cabId=&lat=&long=` | Driver | — | `{ data:{ trips:[ {…, rider:{…} } ] } }` |
+| 3 | POST | `/v2/trips/:tripId/bids` | Driver | `{ bidType, bidFare?, etaToPickupSec?, message?, cabId? }` | `{ data:{ bidId, status:1, ... } }` |
+| 4 | DELETE | `/v2/trips/:tripId/bids/:bidId` | Driver | — | `{ data:{ bidId, status:4 } }` |
+| 5 | GET | `/v2/trips/:tripId/bids` | Rider | — | `{ data:{ bids:[ {…, driver:{…} } ] } }` |
+| 6 | PATCH | `/v2/trips/:tripId/bids/:bidId/accept` | Rider | `{ sessionId? }` | `{ data:{ driverId, agreedFare, tripStatus:2 } }` |
+| 7 | PATCH | `/v2/trips/:tripId/bids/:bidId/reject` | Rider | — | `{ data:{ bidId, status:3 } }` |
+| 8 | PATCH | `/v2/trips/:tripId/raise-offer` | Rider | `{ newOfferedFare }` | `{ data:{ riderOfferedFare } }` |
+| 9 | PATCH | `/v2/trips/:tripId/cancel` | Rider | `{ declinedReason? }` | `{ data:{ tripStatus:6 } }` |
 
 The socket actions in §5–§6 map 1:1 to these patterns, so you can use either transport (socket recommended for real-time).
 
 ---
 
-## 8. Error code catalog (action acks & REST `{ok:false}`)
+## 8. Error code catalog (the `data.code` on any non-2xx REST response or socket ack)
 
 | code | applies to | meaning |
 |---|---|---|
-| `DRIVER_INELIGIBLE` | place-bid, sync | driver fails the online/approval gate (carries `failedConditions[]`) |
+| `DRIVER_INELIGIBLE` | place-bid, sync | driver fails the online/approval gate (HTTP 409; carries `data.failedConditions[]`) |
 | `DRIVER_OUT_OF_RANGE` | place-bid | pickup beyond the search radius |
 | `CAB_TYPE_MISMATCH` | place-bid | driver's cab ≠ trip's cab |
-| `BID_BELOW_FLOOR` / `BID_ABOVE_CEILING` | place-bid | bidFare outside `[minFare, maxFare]` (carries `details`) |
+| `BID_BELOW_FLOOR` / `BID_ABOVE_CEILING` | place-bid | bidFare outside `[minFare, maxFare]` (HTTP 400; carries `data.minFare`/`data.submitted`) |
 | `TRIP_NOT_OPEN` | place-bid, select | trip is no longer accepting bids/selection |
 | `TRIP_NOT_FOUND` | all | unknown/purged trip |
 | `BID_NOT_FOUND` | withdraw/select/reject | unknown bid |
@@ -385,7 +453,7 @@ The socket actions in §5–§6 map 1:1 to these patterns, so you can use either
 | `BID_ALREADY_TERMINAL` | place/withdraw | bid already accepted/lost (idempotent) |
 | `DRIVER_RACE_LOST` | select | that driver got bound by another rider first |
 | `NOT_TRIP_OWNER` | rider actions | rider doesn't own the trip |
-| `PAYMENT_HOLD_FAILED` | select | could not hold the agreed fare (e.g. insufficient wallet) |
+| `PAYMENT_HOLD_FAILED` | select | could not hold the agreed fare (e.g. insufficient wallet). **Recoverable** — trip stays open & bid stays PENDING; top up and re-select the same bid |
 | `TRIP_ALREADY_ASSIGNED` / `TRIP_ALREADY_TERMINAL` | cancel | too late to cancel |
 | `VALIDATION_ERROR` | all | malformed payload |
 | `INTERNAL_ERROR` | all | unexpected failure |
@@ -401,18 +469,18 @@ POST /verifyotp { "mobileNo":"966533670676","otp":"676","tId":"2f4cafb8..." } ->
 
 # 2) Rider creates a BID trip (offer 30 was rejected as < min; 60 accepted)
 POST /v2/trips  (sessionid: rider)  { cabId, paymentMethod:2, riderOfferedFare:60, addresses:[pickup,dropoff] }
-   -> 201 { id:"1bf9ea24...", status:15, recommendedFare:59.16, minFare:47.33, maxFare:118.32 }
+   -> 201 { statusCode:201, data:{ id:"1bf9ea24...", status:15, recommendedFare:59.16, minFare:47.33, maxFare:118.32, currency:"SAR" } }
 
 # 3) Driver (966220000022) connects socket, syncs, and bids
 socket.emit('subscribe-user', { userID:"966220000022" })
 socket.emit('v2/sync-open-trips', { cabId, location }, ack)
-   -> ack { ok:true, data:{ trips:[ { tripId:"1bf9ea24...", pickupDistanceKm:0.02, etaToPickupSec:2, fareRange:{min:47.33,recommended:59.16,max:118.32} } ] } }
+   -> ack { statusCode:200, data:{ trips:[ { tripId:"1bf9ea24...", pickupDistanceKm:0.02, etaToPickupSec:2, fareRange:{min:47.33,recommended:59.16,max:118.32} } ] } }
 POST /v2/trips/1bf9ea24.../bids  (sessionid: driver) { bidType:2, bidFare:55 }
-   -> { ok:true, data:{ bidId:"96dfa402...", status:1, expiredAt:"...+45s" } }
+   -> { statusCode:200, data:{ bidId:"96dfa402...", status:1, expiredAt:"...+45s" } }
 
 # 4) Rider sees + selects the bid
-GET   /v2/trips/1bf9ea24.../bids                    -> { ok:true, data:{ bids:[ {bidId:"96dfa402...", bidFare:55} ] } }
-PATCH /v2/trips/1bf9ea24.../bids/96dfa402.../accept -> { ok:true, data:{ driverId:"966220000022", agreedFare:55, tripStatus:2 } }
+GET   /v2/trips/1bf9ea24.../bids                    -> { statusCode:200, data:{ bids:[ {bidId:"96dfa402...", bidFare:55} ] } }
+PATCH /v2/trips/1bf9ea24.../bids/96dfa402.../accept -> { statusCode:200, data:{ driverId:"966220000022", agreedFare:55, tripStatus:2 } }
 
 # 5) Result in DB / events
 trip: status=2 (ACCEPTED_BY_DRIVER), driverId=966220000022, tripBaseAmount=55, riderAmount=55+tax, tripOtp set, open_rides removed
@@ -441,6 +509,8 @@ driver socket: v2/bid-won { agreedFare:55 }   |   rider socket: v2/bid-accepted 
 - [ ] Validate the rider's offer client-side against `minFare`/`maxFare` before `POST /v2/trips`.
 - [ ] Bids expire in 45s — show a countdown; handle `v2/bid-expired` and allow re-bid.
 - [ ] Handle `DRIVER_INELIGIBLE.failedConditions` to tell the driver exactly what to fix (go online, WASL, etc.).
+- [ ] Render the embedded profiles: driver shows each open trip's `rider` block; rider shows each bid's `driver` block (name, photo, rating, reviews, vehicle). Treat missing photo as `""` and `rating/totalReviews` `0` for new users.
+- [ ] On `PAYMENT_HOLD_FAILED` at select, keep the trip/bid on screen and offer top-up + retry (do NOT treat it as terminal).
 - [ ] After `v2/bid-won` / `v2/bid-accepted`, switch BOTH apps to the existing V1 assigned-trip flow.
 - [ ] Respect rate limits: `sendotp` ~15s/number, trip-create ~30s/rider.
 - [ ] Treat snapshots (`open-trips-list`, `v2/trip-bids-update`) as authoritative; deltas as incremental.

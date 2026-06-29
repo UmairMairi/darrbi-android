@@ -63,6 +63,50 @@ data class DriverProfileDto(
     val vehicle: VehicleDto? = null,
 )
 
+/** Parcel dimensions (cm) on a courier summary / match block; null when the rider didn't provide them. */
+@Serializable
+data class CourierDimensionsDto(
+    val lengthCm: Int? = null,
+    val widthCm: Int? = null,
+    val heightCm: Int? = null,
+)
+
+/**
+ * Driver-facing parcel SUMMARY on an open-trip item (guide §7) — type/weight/note/dimensions, never the
+ * sender/receiver phones. Present only for courier trips.
+ */
+@Serializable
+data class CourierSummaryDto(
+    val parcelType: Int? = null,
+    val parcelTypeLabel: String? = null,
+    val parcelWeightKg: Double? = null,
+    val weightBucket: Int? = null,
+    val note: String? = null,
+    val dimensions: CourierDimensionsDto? = null,
+)
+
+/** A courier party (sender/receiver) `{name, phone}` released to the winner at match (guide §8). */
+@Serializable
+data class CourierContactDto(
+    val name: String? = null,
+    val phone: String? = null,
+)
+
+/**
+ * Courier MATCH block on `v2/bid-won` / `v2/bid-accepted` (guide §8.2/§8.3): parcel info plus the
+ * sender/receiver contacts and the `deliveryOtp` needed to COMPLETE the trip at drop-off.
+ */
+@Serializable
+data class CourierMatchDto(
+    val parcelType: Int? = null,
+    val parcelTypeLabel: String? = null,
+    val parcelWeightKg: Double? = null,
+    val note: String? = null,
+    val deliveryOtp: Int? = null,
+    val sender: CourierContactDto? = null,
+    val receiver: CourierContactDto? = null,
+)
+
 /** One open (awaiting-bids) trip in the driver's broadcast list. */
 @Serializable
 data class OpenTripDto(
@@ -80,6 +124,8 @@ data class OpenTripDto(
     val createdAt: String? = null,
     /** Rider PII block (guide §5.1). Preferred over the legacy flat fields below. */
     val rider: RiderProfileDto? = null,
+    /** Parcel SUMMARY for a courier trip (guide §7); null for a normal ride. */
+    val courier: CourierSummaryDto? = null,
     // Legacy flat fields — kept as a fallback for older payloads that don't nest the rider block.
     val riderName: String? = null,
     val riderRating: Double? = null,
@@ -154,6 +200,28 @@ data class SelectBidData(
 
 // ---- request bodies ----
 
+/**
+ * Courier `courier{}` block sent in the create-trip body (guide §4/§6.1). Required (with sender+receiver
+ * phone + parcelType + parcelWeightKg) when the chosen cab is a courier cab; omitted otherwise.
+ */
+@Serializable
+data class CourierBody(
+    val senderPhone: String,
+    val senderName: String? = null,
+    val receiverPhone: String,
+    val receiverName: String? = null,
+    /** [ParcelType] wire value (1–9). */
+    val parcelType: Int,
+    /** Authoritative for capacity limits & fare. */
+    val parcelWeightKg: Double,
+    /** Optional UI weight bucket (1–5); limits/fare ignore it. */
+    val weightBucket: Int? = null,
+    val lengthCm: Int? = null,
+    val widthCm: Int? = null,
+    val heightCm: Int? = null,
+    val parcelNote: String? = null,
+)
+
 /** `POST v2/trips` body — the V1 create body plus `riderOfferedFare` (+ `categoryId` from the home screen). */
 @Serializable
 data class CreateBidTripRequest(
@@ -163,6 +231,8 @@ data class CreateBidTripRequest(
     val tripType: Int = 1,
     val riderOfferedFare: Double,
     val addresses: List<TripAddressBody>,
+    /** Courier (parcel) metadata (guide §6.1); omitted (explicitNulls = false) for a normal ride. */
+    val courier: CourierBody? = null,
 )
 
 /** `POST v2/trips/:id/bids` body. `bidFare` required for COUNTER (bidType=2); omitted for ACCEPT (1). */
