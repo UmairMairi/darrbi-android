@@ -79,6 +79,8 @@ data class RiderBookingUiState(
     // category the booking flow proceeds with (remembered when a tile or the "Where to?" bar is tapped).
     val userName: String? = null,
     val userImageUrl: String? = null,
+    /** Logged-in user's phone (from the verify-OTP profile); used to prefill the courier sender. */
+    val userMobile: String? = null,
     val categories: List<RideCategory> = emptyList(),
     val isLoadingCategories: Boolean = false,
     val recentLocations: List<RecentLocation> = emptyList(),
@@ -286,6 +288,7 @@ class RiderBookingViewModel @Inject constructor(
             it.copy(
                 userName = session.user?.name?.takeIf { name -> name.isNotBlank() },
                 userImageUrl = session.user?.profileImageUrl?.takeIf { url -> url.isNotBlank() },
+                userMobile = session.user?.mobileNo?.takeIf { m -> m.isNotBlank() },
             )
         }
         // Load the home service categories + recent quick-picks for the dashboard.

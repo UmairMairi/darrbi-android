@@ -354,6 +354,7 @@
     <string name="cat_sub_scheduled">Schedule your rides</string>
     <!-- Rider ride selection -->
     <string name="rider_current_location">Current Location</string>
+    <string name="rider_choose_ride">Choose a ride</string>
     <string name="rider_recommended">Recommended for you</string>
     <string name="rider_more_available_rides">More available rides</string>
     <string name="rider_min_away">min away</string>
@@ -507,6 +508,7 @@
     <string name="courier_details_title">Parcel details</string>
     <string name="courier_details_subtitle">Pickup is the sender, drop-off is the receiver.</string>
     <string name="courier_sender">Sender</string>
+    <string name="courier_sender_is_me">Same as my account</string>
     <string name="courier_sender_phone">Sender phone</string>
     <string name="courier_sender_name_optional">Sender name (optional)</string>
     <string name="courier_receiver">Receiver</string>
@@ -682,6 +684,7 @@
     <string name="rental_sort">Sort</string>
     <string name="rental_per_day_format">%1$s/Day</string>
     <string name="rental_total_format">%1$s total</string>
+    <string name="rental_days_x_rate">%1$d × %2$s/day</string>
     <string name="rental_unlimited_km">Unlimited KM available</string>
     <string name="rental_limited_km">%1$d km/day included</string>
     <string name="rental_seats_value">%1$d Seats</string>
@@ -709,6 +712,30 @@
     <!-- Vehicle detail -->
     <string name="rental_specs_title">Specifications</string>
     <string name="rental_features_title">Features</string>
+    <string name="rental_details_title">Car Details</string>
+    <string name="rental_stat_seats">Seats</string>
+    <string name="rental_stat_doors">Doors</string>
+    <string name="rental_stat_transmission">Transmission</string>
+    <string name="rental_stat_mileage">Mileage</string>
+    <string name="rental_stat_km_day">km/day</string>
+    <string name="rental_stat_unlimited">Unlimited</string>
+    <string name="rental_detail_make">Make</string>
+    <string name="rental_detail_model">Model</string>
+    <string name="rental_detail_year">Year</string>
+    <string name="rental_detail_category">Category</string>
+    <string name="rental_detail_color">Color</string>
+    <string name="rental_detail_fuel">Fuel type</string>
+    <string name="rental_detail_transmission">Transmission</string>
+    <string name="rental_detail_engine">Engine</string>
+    <string name="rental_detail_seats">Seats</string>
+    <string name="rental_detail_doors">Doors</string>
+    <string name="rental_detail_luggage">Luggage</string>
+    <string name="rental_detail_mileage">Mileage</string>
+    <string name="rental_engine_cc">%1$d cc</string>
+    <string name="rental_fuel_petrol">Petrol</string>
+    <string name="rental_fuel_diesel">Diesel</string>
+    <string name="rental_fuel_electric">Electric</string>
+    <string name="rental_fuel_hybrid">Hybrid</string>
     <string name="rental_reviews_title">Reviews</string>
     <string name="rental_pricing_title">Rental Rate</string>
     <string name="rental_people_value">%1$d People</string>
@@ -735,6 +762,7 @@
     <string name="rental_cdw_tier_standard">Standard</string>
     <string name="rental_cdw_tier_premium">Premium</string>
     <string name="rental_branches_title">Pickup Locations</string>
+    <string name="rental_get_directions">Get directions</string>
     <string name="rental_company_by">by %1$s</string>
 
     <!-- Reservation / quote -->

@@ -34,6 +34,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
@@ -126,6 +127,7 @@ import com.mytm.darrbi.domain.model.LatLngPoint
 import com.mytm.darrbi.domain.model.PlaceLocation
 import com.mytm.darrbi.domain.repository.NearbyDriver
 import com.mytm.darrbi.core.designsystem.DarrbiTheme
+import com.mytm.darrbi.core.designsystem.components.DarrbiCheckbox
 import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiTextField
 import com.mytm.darrbi.presentation.components.CancelReasonsSheet
@@ -316,12 +318,13 @@ fun RiderFlowScreen(
                 modifier = Modifier.fillMaxSize(),
             )
             RiderStep.DestinationSearch -> SearchOverlay(
-                title = null,
+                title = stringResource(R.string.rider_where_to),
                 hint = stringResource(R.string.rider_where_to),
                 state = state,
                 onEvent = viewModel::onEvent,
                 showCurrentLocation = false,
                 onRecenter = recenter,
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.PickupSearch -> SearchOverlay(
                 title = stringResource(R.string.rider_pickup_location),
@@ -330,33 +333,39 @@ fun RiderFlowScreen(
                 onEvent = viewModel::onEvent,
                 showCurrentLocation = true,
                 onRecenter = recenter,
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.MapPicker -> MapPickerOverlay(
                 // Open centred on the current location; fall back to the shared camera's last position.
                 start = state.myLocation?.let { LatLng(it.latitude, it.longitude) } ?: cameraPositionState.position.target,
                 showMyLocation = locationPermission.isGranted,
                 onConfirm = { lat, lng -> viewModel.onEvent(RiderBookingEvent.ConfirmMapLocation(lat, lng)) },
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.ConfirmPickup -> ConfirmPickupOverlay(
                 address = state.pickup?.address.orEmpty(),
                 onEdit = { viewModel.onEvent(RiderBookingEvent.EditPickup) },
                 onConfirm = { viewModel.onEvent(RiderBookingEvent.ProceedToRideSelection) },
                 onHeight = { routeSheetHeightPx = it },
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.CourierDetails -> CourierDetailsOverlay(
                 state = state,
                 onSubmit = { details -> viewModel.onEvent(RiderBookingEvent.SubmitCourierDetails(details)) },
                 onHeight = { routeSheetHeightPx = it },
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.SelectRide -> SelectRideOverlay(
                 state = state,
                 onEvent = viewModel::onEvent,
                 onHeight = { routeSheetHeightPx = it },
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.ProposeFare -> ProposeFareOverlay(
                 state = state,
                 onSubmit = { fare -> viewModel.onEvent(RiderBookingEvent.SubmitOffer(fare)) },
                 onHeight = { routeSheetHeightPx = it },
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.Bidding -> if (state.bids.isEmpty()) {
                 BiddingOverlay(
@@ -439,6 +448,7 @@ fun RiderFlowScreen(
                 onEvent = viewModel::onEvent,
                 showCurrentLocation = false,
                 onRecenter = recenter,
+                onBack = { viewModel.onEvent(RiderBookingEvent.Back) },
             )
             RiderStep.ChangeDropConfirm -> state.acceptedTrip?.let { trip ->
                 ChangeDropConfirmOverlay(
@@ -939,27 +949,35 @@ private fun CategoryTile(
     val title = if (isArabic()) category.nameArabic?.takeIf { it.isNotBlank() } ?: category.name else category.name
     val subtitle = categorySubtitle(category)
     Surface(
-        modifier = modifier.height(if (fullWidth) 104.dp else 150.dp).clickable { onCategory(category) },
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.height(if (fullWidth) 108.dp else 156.dp).clickable { onCategory(category) },
+        shape = RoundedCornerShape(20.dp),
         color = tint,
     ) {
         if (fullWidth) {
+            // Wide banner: illustration leading, title block trailing, both centered.
             Row(
-                modifier = Modifier.fillMaxSize().padding(horizontal = 18.dp),
+                modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CategoryImage(category.imageUrl, Modifier.size(80.dp))
-                Spacer(Modifier.width(16.dp))
-                CategoryText(title, subtitle)
+                CategoryImage(category.imageUrl, Modifier.size(84.dp))
+                Spacer(Modifier.width(18.dp))
+                CategoryTitleBlock(title, subtitle, Modifier.weight(1f))
             }
         } else {
-            Column(modifier = Modifier.fillMaxSize().padding(5.dp)) {
-                Row(modifier = Modifier.weight(1f), verticalAlignment = Alignment.CenterVertically) {
-                    CategoryImage(category.imageUrl, Modifier.size(80.dp))
-                    Spacer(Modifier.width(5.dp))
-                    CategoryText(title, subtitle)
+            // Centered hero: illustration centered in the top half, title + subtitle centered beneath.
+            Column(
+                modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 18.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+            ) {
+                Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                    CategoryImage(category.imageUrl, Modifier.size(96.dp))
                 }
-                if (isTaxi && nearbyCount > 0) NearbyCaptainsBadge(nearbyCount)
+                Spacer(Modifier.height(10.dp))
+                if (isTaxi && nearbyCount > 0) {
+                    NearbyCaptainsBadge(nearbyCount)
+                    Spacer(Modifier.height(8.dp))
+                }
+                CategoryTitleBlock(title, subtitle, centered = true)
             }
         }
     }
@@ -996,23 +1014,30 @@ private fun CategoryImage(imageUrl: String?, modifier: Modifier) {
     )
 }
 
+/** Title + tagline block, reused by both the square tiles and the wide banner. */
 @Composable
-private fun androidx.compose.foundation.layout.RowScope.CategoryText(title: String, subtitle: String?) {
-    Column(modifier = Modifier.weight(1f)) {
+private fun CategoryTitleBlock(title: String, subtitle: String?, modifier: Modifier = Modifier, centered: Boolean = false) {
+    val align = if (centered) androidx.compose.ui.text.style.TextAlign.Center else androidx.compose.ui.text.style.TextAlign.Start
+    Column(
+        modifier = modifier,
+        horizontalAlignment = if (centered) Alignment.CenterHorizontally else Alignment.Start,
+    ) {
         Text(
             text = title,
             style = DarrbiTheme.typography.title,
             color = DarrbiTheme.colors.onSurface,
             maxLines = 2,
+            textAlign = align,
             overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
         )
         subtitle?.let {
-            Spacer(Modifier.height(2.dp))
+            Spacer(Modifier.height(3.dp))
             Text(
                 text = it,
                 style = DarrbiTheme.typography.label,
                 color = DarrbiTheme.colors.onSurfaceVariant,
-                maxLines = 2,
+                maxLines = 1,
+                textAlign = align,
                 overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
             )
         }
@@ -1189,21 +1214,22 @@ private fun CategoriesSkeleton() {
 @Composable
 private fun SkeletonCategoryTile(brush: Brush, modifier: Modifier) {
     Surface(
-        modifier = modifier.height(150.dp),
-        shape = RoundedCornerShape(16.dp),
+        modifier = modifier.height(156.dp),
+        shape = RoundedCornerShape(20.dp),
         color = DarrbiTheme.colors.surface,
         border = androidx.compose.foundation.BorderStroke(1.dp, DarrbiTheme.colors.outline),
     ) {
-        Row(
-            modifier = Modifier.fillMaxSize().padding(14.dp),
-            verticalAlignment = Alignment.CenterVertically,
+        Column(
+            modifier = Modifier.fillMaxSize().padding(horizontal = 12.dp, vertical = 18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            ShimmerBox(brush, Modifier.size(60.dp), CircleShape)
-            Spacer(Modifier.width(12.dp))
-            Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ShimmerBox(brush, Modifier.fillMaxWidth(0.7f).height(14.dp))
-                ShimmerBox(brush, Modifier.fillMaxWidth(0.45f).height(12.dp))
+            Box(modifier = Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                ShimmerBox(brush, Modifier.size(64.dp), CircleShape)
             }
+            Spacer(Modifier.height(10.dp))
+            ShimmerBox(brush, Modifier.fillMaxWidth(0.6f).height(15.dp))
+            Spacer(Modifier.height(8.dp))
+            ShimmerBox(brush, Modifier.fillMaxWidth(0.4f).height(12.dp))
         }
     }
 }
@@ -1244,12 +1270,13 @@ private fun isArabic(): Boolean =
 
 @Composable
 private fun androidx.compose.foundation.layout.BoxScope.SearchOverlay(
-    title: String?,
+    title: String,
     hint: String,
     state: RiderBookingUiState,
     onEvent: (RiderBookingEvent) -> Unit,
     showCurrentLocation: Boolean,
     onRecenter: () -> Unit,
+    onBack: () -> Unit,
 ) {
     // Recenter button, top-end — sits BELOW the persistent profile avatar so they don't overlap.
     Box(
@@ -1284,9 +1311,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SearchOverlay(
                 .padding(horizontal = 16.dp, vertical = 20.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            if (title != null) {
-                Text(title, style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface, modifier = Modifier.padding(start = 4.dp))
-            }
+            OverlayBackHeader(title = title, onBack = onBack)
             SearchField(value = state.query, hint = hint, onValueChange = { onEvent(RiderBookingEvent.QueryChanged(it)) })
             SetLocationFromMapButton(onClick = { onEvent(RiderBookingEvent.OpenMapPicker) })
             val hasRows = showCurrentLocation || state.suggestions.isNotEmpty()
@@ -1331,6 +1356,7 @@ private fun androidx.compose.foundation.layout.BoxScope.MapPickerOverlay(
     start: LatLng,
     showMyLocation: Boolean,
     onConfirm: (Double, Double) -> Unit,
+    onBack: () -> Unit,
 ) {
     val cameraPositionState = rememberCameraPositionState { position = CameraPosition.fromLatLngZoom(start, 16f) }
     GoogleMap(
@@ -1354,7 +1380,7 @@ private fun androidx.compose.foundation.layout.BoxScope.MapPickerOverlay(
         color = DarrbiTheme.colors.surface,
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
-            Text(stringResource(R.string.rider_set_location_from_map), style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface)
+            OverlayBackHeader(title = stringResource(R.string.rider_set_location_from_map), onBack = onBack)
             Spacer(Modifier.height(16.dp))
             DarrbiPrimaryButton(
                 text = stringResource(R.string.rider_confirm_location),
@@ -1432,6 +1458,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPickupOverlay(
     onEdit: () -> Unit,
     onConfirm: () -> Unit,
     onHeight: (Int) -> Unit,
+    onBack: () -> Unit,
 ) {
     // The pickup + destination markers and route are drawn on the map itself (see RiderMap).
     Surface(
@@ -1440,10 +1467,13 @@ private fun androidx.compose.foundation.layout.BoxScope.ConfirmPickupOverlay(
         color = DarrbiTheme.colors.surface,
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(stringResource(R.string.rider_pickup_location), style = DarrbiTheme.typography.title.copy(fontSize = 16.sp), color = DarrbiTheme.colors.onSurface, modifier = Modifier.weight(1f))
-                Text(stringResource(R.string.rider_edit), style = DarrbiTheme.typography.button.copy(fontSize = 14.sp), color = DarrbiTheme.colors.primary, modifier = Modifier.clickable(onClick = onEdit))
-            }
+            OverlayBackHeader(
+                title = stringResource(R.string.rider_pickup_location),
+                onBack = onBack,
+                trailing = {
+                    Text(stringResource(R.string.rider_edit), style = DarrbiTheme.typography.button.copy(fontSize = 14.sp), color = DarrbiTheme.colors.primary, modifier = Modifier.clickable(onClick = onEdit))
+                },
+            )
             Spacer(Modifier.height(8.dp))
             HorizontalDivider(color = DarrbiTheme.colors.outline)
             Spacer(Modifier.height(8.dp))
@@ -1467,6 +1497,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
     state: RiderBookingUiState,
     onEvent: (RiderBookingEvent) -> Unit,
     onHeight: (Int) -> Unit,
+    onBack: () -> Unit,
 ) {
     var showPromo by remember { mutableStateOf(false) }
     var showAddBalance by remember { mutableStateOf(false) }
@@ -1479,6 +1510,8 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
         shadowElevation = 8.dp,
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 14.dp)) {
+            OverlayBackHeader(title = stringResource(R.string.rider_choose_ride), onBack = onBack)
+            Spacer(Modifier.height(12.dp))
             RouteHeader(
                 pickup = state.pickup?.address?.takeIf { it.isNotBlank() } ?: stringResource(R.string.rider_current_location),
                 destination = state.destination?.address.orEmpty(),
@@ -1507,6 +1540,7 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
                             selected = cab.id == state.selectedCabId,
                             promo = state.promo,
                             enabled = carryable,
+                            showSeats = !state.isCourier,
                             onClick = { if (carryable) onEvent(RiderBookingEvent.SelectCab(cab.id)) },
                         )
                         if (index < state.cabs.lastIndex) HorizontalDivider(color = DarrbiTheme.colors.outline)
@@ -1562,6 +1596,51 @@ private fun androidx.compose.foundation.layout.BoxScope.SelectRideOverlay(
     }
 }
 
+/**
+ * Sheet header: a circular back button + bold title, matching the captain-app reference. Shown on every
+ * pre-trip overlay so the rider can step back and review/correct earlier details. [trailing] hosts an
+ * optional end-aligned action (e.g. the pickup "Edit" link).
+ */
+@Composable
+internal fun OverlayBackHeader(
+    title: String,
+    onBack: () -> Unit,
+    modifier: Modifier = Modifier,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    Row(modifier = modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        // Same back-button spec as the onboarding CardTitle (40dp circle, 18dp icon, surface fill).
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(CircleShape)
+                .background(DarrbiTheme.colors.surface)
+                .border(1.dp, DarrbiTheme.colors.outline, CircleShape)
+                .clickable(onClick = onBack),
+            contentAlignment = Alignment.Center,
+        ) {
+            Icon(
+                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
+                contentDescription = stringResource(R.string.cd_back),
+                tint = DarrbiTheme.colors.onSurface,
+                modifier = Modifier.size(15.dp),
+            )
+        }
+        Spacer(Modifier.width(12.dp))
+        Text(
+            text = title,
+            style = DarrbiTheme.typography.title,
+            color = DarrbiTheme.colors.onSurface,
+            modifier = Modifier.weight(1f),
+            maxLines = 1,
+        )
+        if (trailing != null) {
+            Spacer(Modifier.width(12.dp))
+            trailing()
+        }
+    }
+}
+
 @Composable
 internal fun RouteHeader(pickup: String, destination: String) {
     Row(verticalAlignment = Alignment.CenterVertically) {
@@ -1582,7 +1661,7 @@ internal fun RouteHeader(pickup: String, destination: String) {
 }
 
 @Composable
-private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onClick: () -> Unit, enabled: Boolean = true) {
+private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onClick: () -> Unit, enabled: Boolean = true, showSeats: Boolean = true) {
     // Disabled (over-capacity) courier cabs are dimmed and non-selectable (guide §3.2).
     val contentAlpha = if (enabled) 1f else 0.4f
     Row(
@@ -1608,7 +1687,8 @@ private fun CabRow(cab: CabOption, selected: Boolean, promo: AppliedPromo?, onCl
         Column(modifier = Modifier.weight(1f)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(cab.name, style = DarrbiTheme.typography.title.copy(fontSize = 15.sp), color = DarrbiTheme.colors.onSurface, maxLines = 1)
-                if (cab.seats > 0) {
+                // Seat count is irrelevant for cargo/delivery parcels, so it's hidden there.
+                if (showSeats && cab.seats > 0) {
                     Spacer(Modifier.width(10.dp))
                     Icon(Icons.Filled.Person, null, tint = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.size(16.dp))
                     Spacer(Modifier.width(2.dp))
@@ -1834,10 +1914,16 @@ private fun androidx.compose.foundation.layout.BoxScope.CourierDetailsOverlay(
     state: RiderBookingUiState,
     onSubmit: (CourierDetails) -> Unit,
     onHeight: (Int) -> Unit,
+    onBack: () -> Unit,
 ) {
     val existing = state.courierDetails
     var senderPhone by remember { mutableStateOf(existing?.senderPhone.orEmpty()) }
     var senderName by remember { mutableStateOf(existing?.senderName.orEmpty()) }
+    // "Sender is me" — fills the sender fields from the logged-in account and locks them while checked.
+    val accountPhone = remember(state.userMobile) { normalizeSaudiLocal(state.userMobile.orEmpty()) }
+    val accountName = state.userName.orEmpty()
+    val canUseAccount = accountPhone.isNotBlank() || accountName.isNotBlank()
+    var senderIsMe by remember { mutableStateOf(false) }
     var receiverPhone by remember { mutableStateOf(existing?.receiverPhone.orEmpty()) }
     var receiverName by remember { mutableStateOf(existing?.receiverName.orEmpty()) }
     var weight by remember { mutableStateOf(existing?.parcelWeightKg?.let { formatFare(it) }.orEmpty()) }
@@ -1857,23 +1943,43 @@ private fun androidx.compose.foundation.layout.BoxScope.CourierDetailsOverlay(
         color = DarrbiTheme.colors.surface,
         shadowElevation = 8.dp,
     ) {
-        Column(
-            modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()
-                .heightIn(max = 560.dp).verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-        ) {
-            Text(stringResource(R.string.courier_details_title), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
-            Spacer(Modifier.height(2.dp))
-            Text(stringResource(R.string.courier_details_subtitle), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)
-            Spacer(Modifier.height(14.dp))
-
+        Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().imePadding()) {
+            // Fixed header — back + title + subtitle stay pinned while the form below scrolls.
+            Column(modifier = Modifier.padding(start = 20.dp, end = 20.dp, top = 16.dp, bottom = 14.dp)) {
+                OverlayBackHeader(title = stringResource(R.string.courier_details_title), onBack = onBack)
+                Spacer(Modifier.height(6.dp))
+                Text(stringResource(R.string.courier_details_subtitle), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.padding(start = 52.dp))
+            }
+            // Scrollable form.
+            Column(
+                modifier = Modifier.heightIn(max = 500.dp).verticalScroll(rememberScrollState())
+                    .padding(start = 20.dp, end = 20.dp, bottom = 16.dp),
+            ) {
             Text(stringResource(R.string.courier_sender), style = DarrbiTheme.typography.title.copy(fontSize = 14.sp), color = DarrbiTheme.colors.onSurface)
+            if (canUseAccount) {
+                Spacer(Modifier.height(8.dp))
+                DarrbiCheckbox(
+                    checked = senderIsMe,
+                    onCheckedChange = { checked ->
+                        senderIsMe = checked
+                        if (checked) {
+                            senderPhone = accountPhone
+                            senderName = accountName
+                        } else {
+                            senderPhone = ""
+                            senderName = ""
+                        }
+                    },
+                    label = stringResource(R.string.courier_sender_is_me),
+                )
+            }
             Spacer(Modifier.height(8.dp))
             DarrbiTextField(
                 value = senderPhone,
                 onValueChange = { senderPhone = normalizeSaudiLocal(it) },
                 label = stringResource(R.string.courier_sender_phone),
                 keyboardType = KeyboardType.Phone,
+                readOnly = senderIsMe,
                 isError = senderPhone.isNotEmpty() && !senderPhoneValid,
                 supportingText = if (senderPhone.isNotEmpty() && !senderPhoneValid) stringResource(R.string.courier_err_phone) else null,
                 leadingContent = { CourierPhonePrefix() },
@@ -1883,6 +1989,7 @@ private fun androidx.compose.foundation.layout.BoxScope.CourierDetailsOverlay(
                 value = senderName,
                 onValueChange = { if (it.length <= COURIER_NAME_MAX) senderName = it },
                 label = stringResource(R.string.courier_sender_name_optional),
+                readOnly = senderIsMe,
                 isError = senderName.isNotBlank() && !senderNameValid,
                 supportingText = if (senderName.isNotBlank() && !senderNameValid) stringResource(R.string.courier_err_name) else null,
             )
@@ -1940,6 +2047,7 @@ private fun androidx.compose.foundation.layout.BoxScope.CourierDetailsOverlay(
                 },
                 enabled = valid,
             )
+            }
         }
     }
 }
@@ -2000,6 +2108,7 @@ private fun androidx.compose.foundation.layout.BoxScope.ProposeFareOverlay(
     state: RiderBookingUiState,
     onSubmit: (Double) -> Unit,
     onHeight: (Int) -> Unit,
+    onBack: () -> Unit,
 ) {
     // Courier: bake in the weight × type factor (guide §5) so the recommended/band match the server's.
     val baseRecommended = state.selectedCab?.fare ?: state.offeredFare ?: 0.0
@@ -2015,6 +2124,8 @@ private fun androidx.compose.foundation.layout.BoxScope.ProposeFareOverlay(
         shadowElevation = 8.dp,
     ) {
         Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(horizontal = 20.dp, vertical = 16.dp)) {
+            OverlayBackHeader(title = stringResource(R.string.rider_set_fare), onBack = onBack)
+            Spacer(Modifier.height(12.dp))
             RouteHeader(
                 pickup = state.pickup?.address?.takeIf { it.isNotBlank() } ?: stringResource(R.string.rider_current_location),
                 destination = state.destination?.address.orEmpty(),
@@ -2022,8 +2133,6 @@ private fun androidx.compose.foundation.layout.BoxScope.ProposeFareOverlay(
             Spacer(Modifier.height(12.dp))
             HorizontalDivider(color = DarrbiTheme.colors.outline)
             Spacer(Modifier.height(12.dp))
-            Text(stringResource(R.string.rider_set_fare), style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
-            Spacer(Modifier.height(4.dp))
             Text(
                 stringResource(R.string.rider_recommended_fare, formatFare(recommended)),
                 style = DarrbiTheme.typography.label,

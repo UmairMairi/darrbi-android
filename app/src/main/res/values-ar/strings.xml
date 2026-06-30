@@ -353,6 +353,7 @@
     <string name="cat_sub_scheduled">جدول رحلاتك</string>
     <!-- Rider ride selection -->
     <string name="rider_current_location">الموقع الحالي</string>
+    <string name="rider_choose_ride">اختر رحلة</string>
     <string name="rider_recommended">موصى به لك</string>
     <string name="rider_more_available_rides">المزيد من الرحلات المتوفّرة</string>
     <string name="rider_min_away">دقيقة</string>
@@ -505,6 +506,7 @@
     <string name="courier_details_title">تفاصيل الطرد</string>
     <string name="courier_details_subtitle">نقطة الانطلاق هي المُرسِل، والوجهة هي المُستلِم.</string>
     <string name="courier_sender">المُرسِل</string>
+    <string name="courier_sender_is_me">نفس بيانات حسابي</string>
     <string name="courier_sender_phone">هاتف المُرسِل</string>
     <string name="courier_sender_name_optional">اسم المُرسِل (اختياري)</string>
     <string name="courier_receiver">المُستلِم</string>
@@ -669,6 +671,7 @@
     <string name="rental_sort">ترتيب</string>
     <string name="rental_per_day_format">%1$s/يوم</string>
     <string name="rental_total_format">%1$s الإجمالي</string>
+    <string name="rental_days_x_rate">%1$d × %2$s/يوم</string>
     <string name="rental_unlimited_km">كيلومترات غير محدودة</string>
     <string name="rental_limited_km">%1$d كم/يوم مشمولة</string>
     <string name="rental_seats_value">%1$d مقاعد</string>
@@ -696,6 +699,30 @@
     <!-- تفاصيل السيارة -->
     <string name="rental_specs_title">المواصفات</string>
     <string name="rental_features_title">المميزات</string>
+    <string name="rental_details_title">تفاصيل السيارة</string>
+    <string name="rental_stat_seats">المقاعد</string>
+    <string name="rental_stat_doors">الأبواب</string>
+    <string name="rental_stat_transmission">ناقل الحركة</string>
+    <string name="rental_stat_mileage">المسافة</string>
+    <string name="rental_stat_km_day">كم/يوم</string>
+    <string name="rental_stat_unlimited">غير محدود</string>
+    <string name="rental_detail_make">الصانع</string>
+    <string name="rental_detail_model">الطراز</string>
+    <string name="rental_detail_year">السنة</string>
+    <string name="rental_detail_category">الفئة</string>
+    <string name="rental_detail_color">اللون</string>
+    <string name="rental_detail_fuel">نوع الوقود</string>
+    <string name="rental_detail_transmission">ناقل الحركة</string>
+    <string name="rental_detail_engine">المحرك</string>
+    <string name="rental_detail_seats">المقاعد</string>
+    <string name="rental_detail_doors">الأبواب</string>
+    <string name="rental_detail_luggage">الأمتعة</string>
+    <string name="rental_detail_mileage">المسافة</string>
+    <string name="rental_engine_cc">%1$d سي سي</string>
+    <string name="rental_fuel_petrol">بنزين</string>
+    <string name="rental_fuel_diesel">ديزل</string>
+    <string name="rental_fuel_electric">كهربائي</string>
+    <string name="rental_fuel_hybrid">هجين</string>
     <string name="rental_reviews_title">التقييمات</string>
     <string name="rental_pricing_title">أسعار التأجير</string>
     <string name="rental_people_value">%1$d أشخاص</string>
@@ -722,6 +749,7 @@
     <string name="rental_cdw_tier_standard">قياسي</string>
     <string name="rental_cdw_tier_premium">شامل</string>
     <string name="rental_branches_title">مواقع الاستلام</string>
+    <string name="rental_get_directions">الحصول على الاتجاهات</string>
     <string name="rental_company_by">بواسطة %1$s</string>
 
     <!-- الحجز / التسعير -->

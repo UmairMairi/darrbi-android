@@ -122,8 +122,14 @@ data class RentalUiState(
     /** Saudi NID/Iqama: exactly 10 digits, starting 1 (citizen) or 2 (resident). Required + sent to Nafath. */
     val nidValid: Boolean get() = SaudiId.isValid(renterNid)
 
-    /** Inline NID error once a full 10-digit number is entered that fails the rule. */
-    val nidError: Boolean get() = renterNid.length >= 10 && !nidValid
+    /**
+     * Inline NID/Iqama error. Surfaces early when the first digit isn't a valid prefix (1 = NID, 2 = Iqama)
+     * so the renter gets immediate feedback, and again once a full 10-digit number is entered that still
+     * fails the rule. A correct prefix that's simply not finished typing stays error-free.
+     */
+    val nidError: Boolean
+        get() = renterNid.isNotEmpty() && !nidValid &&
+            (renterNid.first() !in '1'..'2' || renterNid.length >= 10)
 
     val licenseValid: Boolean get() = renterLicense.isNotBlank()
 

@@ -43,9 +43,17 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DateRange
+import androidx.compose.material.icons.filled.DirectionsCar
+import androidx.compose.material.icons.filled.EventSeat
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.LocationOn
+import androidx.compose.material.icons.filled.Navigation
+import androidx.compose.material.icons.filled.Payments
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.SensorDoor
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Shield
+import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -68,6 +76,8 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -82,6 +92,7 @@ import com.mytm.darrbi.core.designsystem.components.DarrbiPrimaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiSecondaryButton
 import com.mytm.darrbi.core.designsystem.components.DarrbiTextField
 import com.mytm.darrbi.domain.model.CdwTierOption
+import com.mytm.darrbi.domain.model.PickupBranch
 import com.mytm.darrbi.domain.model.RentalBooking
 import com.mytm.darrbi.domain.model.RentalBookingDetail
 import com.mytm.darrbi.domain.model.RentalBookingStatus
@@ -192,7 +203,7 @@ internal fun RentalHeader(title: String, onBack: () -> Unit, action: (@Composabl
 
 @Composable
 internal fun RentalSectionTitle(text: String, modifier: Modifier = Modifier) {
-    Text(text, style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface, modifier = modifier)
+    Text(text, style = DarrbiTheme.typography.title.copy(fontSize = 16.sp), color = DarrbiTheme.colors.onSurface, modifier = modifier)
 }
 
 @Composable
@@ -619,8 +630,11 @@ internal fun RentalDobSheet(
     var viewYear by remember { mutableIntStateOf(seed.get(Calendar.YEAR)) }
     var viewMonth by remember { mutableIntStateOf(seed.get(Calendar.MONTH)) }
     var selectedDay by remember { mutableStateOf(initialMillis?.let(::dayStart)) }
+    // Whether the tappable year is expanded into the year-list picker.
+    var showYearList by remember { mutableStateOf(false) }
 
     val currentYear = remember { Calendar.getInstance().get(Calendar.YEAR) }
+    val currentMonth = remember { Calendar.getInstance().get(Calendar.MONTH) }
     val locale = LocalConfiguration.current.locales[0]
     val monthName = remember(viewYear, viewMonth) {
         SimpleDateFormat("MMMM", locale).format(
@@ -637,40 +651,52 @@ internal fun RentalDobSheet(
                 modifier = Modifier.fillMaxWidth().padding(bottom = 12.dp),
                 textAlign = TextAlign.Center,
             )
-            // Year stepper — back is always allowed; forward stops at the current year (no future DOB).
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                CalArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, enabled = true) { viewYear -= 1 }
-                Text(viewYear.toString(), style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-                CalArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, enabled = viewYear < currentYear) { viewYear += 1 }
-            }
-            // Month stepper.
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
-                CalArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, enabled = true) {
-                    if (viewMonth == 0) { viewMonth = 11; viewYear -= 1 } else viewMonth -= 1
-                }
-                Text(monthName, style = DarrbiTheme.typography.title, color = DarrbiTheme.colors.onSurface, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
-                CalArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, enabled = !monthAtOrAfterNow(viewYear, viewMonth)) {
-                    if (viewMonth == 11) { viewMonth = 0; viewYear += 1 } else viewMonth += 1
+            // Header: tappable year (top-left, opens the year list) + month nav on the right.
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth().padding(horizontal = 4.dp)) {
+                CalendarYearTab(year = viewYear, expanded = showYearList) { showYearList = !showYearList }
+                Spacer(Modifier.weight(1f))
+                if (!showYearList) {
+                    CalArrow(Icons.AutoMirrored.Filled.KeyboardArrowLeft, enabled = true) {
+                        if (viewMonth == 0) { viewMonth = 11; viewYear -= 1 } else viewMonth -= 1
+                    }
+                    Text(monthName, style = DarrbiTheme.typography.title.copy(fontSize = 16.sp), color = DarrbiTheme.colors.onSurface, textAlign = TextAlign.Center, modifier = Modifier.widthIn(min = 96.dp))
+                    CalArrow(Icons.AutoMirrored.Filled.KeyboardArrowRight, enabled = !monthAtOrAfterNow(viewYear, viewMonth)) {
+                        if (viewMonth == 11) { viewMonth = 0; viewYear += 1 } else viewMonth += 1
+                    }
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Row(modifier = Modifier.fillMaxWidth()) {
-                weekdayInitials(locale).forEach { d ->
-                    Text(d, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+            if (showYearList) {
+                // Pick a year to jump the calendar; DOB can't be in the future, so cap at the current year.
+                YearPickerGrid(
+                    selectedYear = viewYear,
+                    minYear = currentYear - 100,
+                    maxYear = currentYear,
+                    onPick = { picked ->
+                        viewYear = picked
+                        if (viewYear == currentYear && viewMonth > currentMonth) viewMonth = currentMonth
+                        showYearList = false
+                    },
+                )
+            } else {
+                Row(modifier = Modifier.fillMaxWidth()) {
+                    weekdayInitials(locale).forEach { d ->
+                        Text(d, style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant, textAlign = TextAlign.Center, modifier = Modifier.weight(1f))
+                    }
                 }
+                Spacer(Modifier.height(6.dp))
+                DobCalendarGrid(
+                    year = viewYear,
+                    month = viewMonth,
+                    nowMillis = nowMillis,
+                    selectedDay = selectedDay,
+                    onPick = { selectedDay = it },
+                )
             }
-            Spacer(Modifier.height(6.dp))
-            DobCalendarGrid(
-                year = viewYear,
-                month = viewMonth,
-                nowMillis = nowMillis,
-                selectedDay = selectedDay,
-                onPick = { selectedDay = it },
-            )
             Spacer(Modifier.height(20.dp))
             DarrbiPrimaryButton(
                 text = stringResource(R.string.rental_apply),
-                enabled = selectedDay != null,
+                enabled = selectedDay != null && !showYearList,
                 onClick = { selectedDay?.let(onConfirm) },
             )
         }
@@ -680,6 +706,81 @@ internal fun RentalDobSheet(
 private fun monthAtOrAfterNow(year: Int, month: Int): Boolean {
     val now = Calendar.getInstance()
     return year > now.get(Calendar.YEAR) || (year == now.get(Calendar.YEAR) && month >= now.get(Calendar.MONTH))
+}
+
+/**
+ * Tappable year label with a caret, sized to sit in a calendar header's top-left corner. Tapping it is
+ * meant to toggle a [YearPickerGrid]. Reusable across any calendar sheet that wants quick year jumps.
+ */
+@Composable
+internal fun CalendarYearTab(year: Int, expanded: Boolean, onClick: () -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(10.dp),
+        color = if (expanded) DarrbiTheme.colors.primary.copy(alpha = 0.12f) else DarrbiTheme.colors.surfaceVariant,
+        modifier = Modifier.clickable(onClick = onClick),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, end = 8.dp, top = 7.dp, bottom = 7.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                year.toString(),
+                style = DarrbiTheme.typography.title.copy(fontSize = 16.sp),
+                color = if (expanded) DarrbiTheme.colors.primary else DarrbiTheme.colors.onSurface,
+            )
+            Spacer(Modifier.width(2.dp))
+            Icon(
+                Icons.Filled.KeyboardArrowDown,
+                null,
+                tint = if (expanded) DarrbiTheme.colors.primary else DarrbiTheme.colors.onSurfaceVariant,
+                modifier = Modifier.size(20.dp).rotate(if (expanded) 180f else 0f),
+            )
+        }
+    }
+}
+
+/**
+ * Reusable scrollable grid of selectable years (newest first), highlighting [selectedYear]. The list
+ * opens already scrolled so the selected year sits near the top. Years span [minYear]..[maxYear].
+ * Drop this into any calendar sheet to let the user jump years quickly.
+ */
+@Composable
+internal fun YearPickerGrid(
+    selectedYear: Int,
+    minYear: Int,
+    maxYear: Int,
+    modifier: Modifier = Modifier,
+    onPick: (Int) -> Unit,
+) {
+    val columns = 3
+    val rowHeight = 52.dp
+    val years = remember(minYear, maxYear) { (maxYear downTo minYear).toList() }
+    val selRow = (years.indexOf(selectedYear).coerceAtLeast(0)) / columns
+    val density = LocalDensity.current
+    val initialScroll = with(density) { (rowHeight * (selRow - 1).coerceAtLeast(0)).roundToPx() }
+    val scroll = rememberScrollState(initial = initialScroll)
+    Column(modifier = modifier.fillMaxWidth().height(rowHeight * 5).verticalScroll(scroll)) {
+        years.chunked(columns).forEach { row ->
+            Row(modifier = Modifier.fillMaxWidth()) {
+                row.forEach { y ->
+                    val isSelected = y == selectedYear
+                    Box(
+                        modifier = Modifier.weight(1f).height(rowHeight).padding(4.dp).clip(RoundedCornerShape(12.dp))
+                            .background(if (isSelected) DarrbiTheme.colors.primary else DarrbiTheme.colors.surfaceVariant)
+                            .clickable { onPick(y) },
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Text(
+                            y.toString(),
+                            style = if (isSelected) DarrbiTheme.typography.bodyMedium else DarrbiTheme.typography.body,
+                            color = if (isSelected) DarrbiTheme.colors.onPrimary else DarrbiTheme.colors.onSurface,
+                        )
+                    }
+                }
+                repeat(columns - row.size) { Box(Modifier.weight(1f).height(rowHeight)) }
+            }
+        }
+    }
 }
 
 /** Single-select month grid for DOB; mirrors [RentalCalendarGrid] but disables FUTURE days. */
@@ -1144,59 +1245,102 @@ internal fun RentalDetailContent(
     vehicle: RentalVehicleDetail,
     onContinue: () -> Unit,
     modifier: Modifier = Modifier,
+    rentalDays: Int = 1,
 ) {
+    val context = LocalContext.current
+    // Which photo is the hero; tapping a thumbnail promotes it. Resets when the vehicle changes.
+    var heroIndex by remember(vehicle.id) { mutableStateOf(0) }
+    val photos = vehicle.photos
     Column(modifier = modifier.fillMaxSize()) {
         Column(modifier = Modifier.weight(1f).verticalScroll(rememberScrollState())) {
             // Full-bleed hero image — spans the screen width with a softly rounded lower edge.
-            vehicle.photos.firstOrNull()?.let { photo ->
+            photos.getOrNull(heroIndex)?.let { photo ->
                 AsyncImage(
                     model = photo,
                     contentDescription = stringResource(R.string.rental_cd_vehicle_photo),
                     contentScale = ContentScale.Crop,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(240.dp)
+                        .height(220.dp)
                         .clip(RoundedCornerShape(bottomStart = 24.dp, bottomEnd = 24.dp))
                         .background(DarrbiTheme.colors.surfaceVariant),
                 )
             }
 
+            // Gallery strip — every photo as a thumbnail; tap to make it the hero.
+            if (photos.size > 1) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState())
+                        .padding(horizontal = 20.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    photos.forEachIndexed { index, thumb ->
+                        val selected = index == heroIndex
+                        AsyncImage(
+                            model = thumb,
+                            contentDescription = null,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier
+                                .size(width = 76.dp, height = 56.dp)
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(DarrbiTheme.colors.surfaceVariant)
+                                .border(
+                                    width = if (selected) 2.dp else 1.dp,
+                                    color = if (selected) DarrbiTheme.colors.primary else DarrbiTheme.colors.outline,
+                                    shape = RoundedCornerShape(10.dp),
+                                )
+                                .clickable { heroIndex = index },
+                        )
+                    }
+                }
+            }
+
             Column(modifier = Modifier.padding(horizontal = 20.dp)) {
-                Spacer(Modifier.height(16.dp))
+                Spacer(Modifier.height(if (photos.size > 1) 4.dp else 16.dp))
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     vehicle.category?.let { CategoryBadge(it) }
                     Spacer(Modifier.weight(1f))
                     vehicle.year?.let { Text(stringResource(R.string.rental_model_year, it), style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant) }
                 }
                 Spacer(Modifier.height(10.dp))
-                Text(vehicle.displayName, style = DarrbiTheme.typography.titleLarge, color = DarrbiTheme.colors.onSurface)
-                vehicle.company?.let {
-                    Spacer(Modifier.height(2.dp))
-                    Text(stringResource(R.string.rental_company_by, it.name), style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
-                }
-                if ((vehicle.ratingAvg ?: 0.0) > 0.0) {
-                    Spacer(Modifier.height(8.dp))
-                    RatingPill(vehicle.ratingAvg, vehicle.ratingCount)
+                Text(vehicle.displayName, style = DarrbiTheme.typography.titleLarge.copy(fontSize = 22.sp), color = DarrbiTheme.colors.onSurface)
+                // Company and rating sit on one line for a cleaner header.
+                val hasRating = (vehicle.ratingAvg ?: 0.0) > 0.0
+                if (vehicle.company != null || hasRating) {
+                    Spacer(Modifier.height(4.dp))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        vehicle.company?.let {
+                            Text(stringResource(R.string.rental_company_by, it.name), style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
+                        }
+                        if (hasRating) {
+                            if (vehicle.company != null) {
+                                Text("  •  ", style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
+                            }
+                            Icon(Icons.Filled.Star, null, tint = DarrbiTheme.colors.warning, modifier = Modifier.size(13.dp))
+                            Spacer(Modifier.width(3.dp))
+                            Text(
+                                stringResource(R.string.rental_rating_format, formatFare(vehicle.ratingAvg ?: 0.0), vehicle.ratingCount ?: 0),
+                                style = DarrbiTheme.typography.caption,
+                                color = DarrbiTheme.colors.onSurfaceVariant,
+                            )
+                        }
+                    }
                 }
 
-                // Specs as chips.
+                // Quick stats strip — the key facts at a glance.
                 Spacer(Modifier.height(16.dp))
-                FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                    vehicle.specs.seats?.let { SpecChip(stringResource(R.string.rental_people_value, it)) }
-                    vehicle.specs.doors?.let { SpecChip(stringResource(R.string.rental_doors_value, it)) }
-                    vehicle.transmission?.let { SpecChip(transmissionLabel(it)) }
-                    vehicle.specs.smallLuggage?.let { SpecChip(stringResource(R.string.rental_small_bag_value, it)) }
-                    vehicle.specs.largeLuggage?.let { SpecChip(stringResource(R.string.rental_large_bag_value, it)) }
-                    SpecChip(
-                        if (vehicle.mileagePolicy.isUnlimited) stringResource(R.string.rental_unlimited_km)
-                        else stringResource(R.string.rental_limited_km, vehicle.mileagePolicy.includedKmPerDay ?: 0),
-                    )
-                }
+                QuickStatsRow(vehicle)
+
+                // Full spec sheet.
+                Spacer(Modifier.height(16.dp))
+                CarDetailsSection(vehicle)
 
                 // CDW tiers (read-only here; chosen on the reservation step).
                 if (vehicle.cdwTiers.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
-                    DetailSectionCard(stringResource(R.string.rental_cdw_title)) {
+                    DetailSectionCard(stringResource(R.string.rental_cdw_title), icon = Icons.Filled.Shield) {
                         vehicle.cdwTiers.forEach { tier ->
                             RentalKeyValueRow(
                                 label = cdwTierLabel(tier.tier),
@@ -1209,18 +1353,10 @@ internal fun RentalDetailContent(
                 // Pickup branches.
                 if (vehicle.pickupBranches.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
-                    DetailSectionCard(stringResource(R.string.rental_branches_title)) {
-                        vehicle.pickupBranches.forEach { branch ->
-                            Row(modifier = Modifier.fillMaxWidth().padding(vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                                Icon(Icons.Filled.LocationOn, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(18.dp))
-                                Spacer(Modifier.width(10.dp))
-                                Column {
-                                    Text(branch.name, style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface)
-                                    listOfNotNull(branch.address, branch.city).joinToString(", ").takeIf { it.isNotBlank() }?.let {
-                                        Text(it, style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
-                                    }
-                                }
-                            }
+                    DetailSectionCard(stringResource(R.string.rental_branches_title), icon = Icons.Filled.LocationOn) {
+                        vehicle.pickupBranches.forEachIndexed { index, branch ->
+                            if (index > 0) Spacer(Modifier.height(10.dp))
+                            PickupBranchCard(branch) { lat, lng -> openRentalNavigation(context, lat, lng) }
                         }
                     }
                 }
@@ -1228,7 +1364,7 @@ internal fun RentalDetailContent(
                 // Reviews.
                 if (vehicle.reviews.isNotEmpty()) {
                     Spacer(Modifier.height(12.dp))
-                    DetailSectionCard(stringResource(R.string.rental_reviews_title)) {
+                    DetailSectionCard(stringResource(R.string.rental_reviews_title), icon = Icons.Filled.Star) {
                         vehicle.reviews.take(5).forEachIndexed { index, review ->
                             if (index > 0) HorizontalDivider(color = DarrbiTheme.colors.outline.copy(alpha = 0.5f), modifier = Modifier.padding(vertical = 8.dp))
                             Column(modifier = Modifier.fillMaxWidth()) {
@@ -1256,13 +1392,23 @@ internal fun RentalDetailContent(
                 Spacer(Modifier.height(24.dp))
             }
         }
-        // Total + Continue footer.
+        // Total + Continue footer. The total scales with the selected number of rental days.
         Surface(color = DarrbiTheme.colors.surface, shadowElevation = 8.dp) {
             Column(modifier = Modifier.fillMaxWidth().navigationBarsPadding().padding(20.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(stringResource(R.string.rental_total_label), style = DarrbiTheme.typography.body, color = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+                    val days = rentalDays.coerceAtLeast(1)
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(stringResource(R.string.rental_total_label), style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface)
+                        vehicle.pricing.perDay?.let {
+                            Text(
+                                stringResource(R.string.rental_days_x_rate, days, money(vehicle.currency, it)),
+                                style = DarrbiTheme.typography.caption,
+                                color = DarrbiTheme.colors.onSurfaceVariant,
+                            )
+                        }
+                    }
                     vehicle.pricing.perDay?.let {
-                        Text(stringResource(R.string.rental_per_day_format, money(vehicle.currency, it)), style = DarrbiTheme.typography.titleLarge.copy(fontSize = 20.sp), color = DarrbiTheme.colors.primary)
+                        Text(money(vehicle.currency, it * days), style = DarrbiTheme.typography.titleLarge.copy(fontSize = 18.sp), color = DarrbiTheme.colors.primary)
                     }
                 }
                 Spacer(Modifier.height(12.dp))
@@ -1272,26 +1418,204 @@ internal fun RentalDetailContent(
     }
 }
 
-/** Rounded pill summarising one vehicle feature (seats, doors, transmission, mileage…). */
+/** One column inside [QuickStatsRow]: an icon, a bold value, and a muted label. */
+private data class QuickStat(val icon: androidx.compose.ui.graphics.vector.ImageVector, val value: String, val label: String)
+
+/**
+ * An elegant "stat strip" of the key vehicle facts (seats / doors / transmission / mileage), laid out
+ * as evenly-weighted columns separated by hairline dividers. Replaces the old wrap of check-chips.
+ */
 @Composable
-private fun SpecChip(text: String) {
-    Surface(shape = RoundedCornerShape(10.dp), color = DarrbiTheme.colors.surfaceVariant) {
-        Row(modifier = Modifier.padding(horizontal = 12.dp, vertical = 9.dp), verticalAlignment = Alignment.CenterVertically) {
-            Icon(Icons.Filled.Check, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(14.dp))
-            Spacer(Modifier.width(6.dp))
-            Text(text, style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface)
+private fun QuickStatsRow(vehicle: RentalVehicleDetail) {
+    val stats = buildList {
+        vehicle.specs.seats?.let { add(QuickStat(Icons.Filled.EventSeat, it.toString(), stringResource(R.string.rental_stat_seats))) }
+        vehicle.specs.doors?.let { add(QuickStat(Icons.Filled.SensorDoor, it.toString(), stringResource(R.string.rental_stat_doors))) }
+        vehicle.transmission?.let { t ->
+            transmissionLabel(t).takeIf { it.isNotBlank() }?.let { add(QuickStat(Icons.Filled.Settings, it, stringResource(R.string.rental_stat_transmission))) }
+        }
+        if (vehicle.mileagePolicy.isUnlimited) {
+            add(QuickStat(Icons.Filled.Speed, stringResource(R.string.rental_stat_unlimited), stringResource(R.string.rental_stat_mileage)))
+        } else vehicle.mileagePolicy.includedKmPerDay?.let {
+            add(QuickStat(Icons.Filled.Speed, it.toString(), stringResource(R.string.rental_stat_km_day)))
+        }
+    }
+    if (stats.isEmpty()) return
+    Surface(shape = RoundedCornerShape(18.dp), color = DarrbiTheme.colors.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+        Row(modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+            stats.forEachIndexed { index, stat ->
+                if (index > 0) {
+                    Box(Modifier.width(1.dp).height(38.dp).background(DarrbiTheme.colors.outline.copy(alpha = 0.5f)))
+                }
+                Column(modifier = Modifier.weight(1f).padding(horizontal = 4.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Icon(stat.icon, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(20.dp))
+                    Spacer(Modifier.height(7.dp))
+                    Text(
+                        stat.value,
+                        style = DarrbiTheme.typography.bodyMedium,
+                        color = DarrbiTheme.colors.onSurface,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                    Text(
+                        stat.label,
+                        style = DarrbiTheme.typography.caption,
+                        color = DarrbiTheme.colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                    )
+                }
+            }
         }
     }
 }
 
-/** A titled, rounded surface that groups a block of detail content. */
+/** A titled, rounded surface that groups a block of detail content, with an optional leading header icon. */
 @Composable
-private fun DetailSectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Surface(shape = RoundedCornerShape(16.dp), color = DarrbiTheme.colors.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
+private fun DetailSectionCard(
+    title: String,
+    icon: androidx.compose.ui.graphics.vector.ImageVector? = null,
+    content: @Composable ColumnScope.() -> Unit,
+) {
+    Surface(shape = RoundedCornerShape(18.dp), color = DarrbiTheme.colors.surfaceVariant, modifier = Modifier.fillMaxWidth()) {
         Column(modifier = Modifier.padding(16.dp)) {
-            RentalSectionTitle(title)
-            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                icon?.let {
+                    Icon(it, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(18.dp))
+                    Spacer(Modifier.width(8.dp))
+                }
+                RentalSectionTitle(title)
+            }
+            Spacer(Modifier.height(12.dp))
             content()
+        }
+    }
+}
+
+/** A spec row inside the Car Details card; renders nothing when the value is blank. */
+@Composable
+private fun DetailRow(label: String, value: String?, showDivider: Boolean) {
+    if (value.isNullOrBlank()) return
+    if (showDivider) HorizontalDivider(color = DarrbiTheme.colors.outline.copy(alpha = 0.4f), modifier = Modifier.padding(vertical = 2.dp))
+    Row(modifier = Modifier.fillMaxWidth().padding(vertical = 7.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = DarrbiTheme.typography.body, color = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.weight(1f))
+        Text(value, style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface)
+    }
+}
+
+/** Localised fuel-type label; falls back to the title-cased server value. */
+@Composable
+private fun fuelTypeLabel(value: String?): String? = when (value?.lowercase(Locale.US)?.trim()) {
+    null, "" -> null
+    "petrol", "gasoline", "gas" -> stringResource(R.string.rental_fuel_petrol)
+    "diesel" -> stringResource(R.string.rental_fuel_diesel)
+    "electric", "ev" -> stringResource(R.string.rental_fuel_electric)
+    "hybrid" -> stringResource(R.string.rental_fuel_hybrid)
+    else -> value.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+}
+
+/** Structured spec sheet for the vehicle; only rows with data are shown. */
+@Composable
+private fun CarDetailsSection(vehicle: RentalVehicleDetail) {
+    val luggage = listOfNotNull(
+        vehicle.specs.smallLuggage?.takeIf { it > 0 }?.let { stringResource(R.string.rental_small_bag_value, it) },
+        vehicle.specs.largeLuggage?.takeIf { it > 0 }?.let { stringResource(R.string.rental_large_bag_value, it) },
+    ).joinToString(" · ").takeIf { it.isNotBlank() }
+    val mileage = if (vehicle.mileagePolicy.isUnlimited) stringResource(R.string.rental_unlimited_km)
+        else vehicle.mileagePolicy.includedKmPerDay?.let { stringResource(R.string.rental_limited_km, it) }
+
+    val rows = listOf(
+        stringResource(R.string.rental_detail_make) to vehicle.make.ifBlank { null },
+        stringResource(R.string.rental_detail_model) to vehicle.model.ifBlank { null },
+        stringResource(R.string.rental_detail_year) to vehicle.year?.toString(),
+        stringResource(R.string.rental_detail_category) to vehicle.category,
+        stringResource(R.string.rental_detail_color) to vehicle.color,
+        stringResource(R.string.rental_detail_fuel) to fuelTypeLabel(vehicle.fuelType),
+        stringResource(R.string.rental_detail_transmission) to vehicle.transmission?.let { transmissionLabel(it) }?.takeIf { it.isNotBlank() },
+        stringResource(R.string.rental_detail_engine) to vehicle.engineCc?.let { stringResource(R.string.rental_engine_cc, it) },
+        stringResource(R.string.rental_detail_seats) to vehicle.specs.seats?.toString(),
+        stringResource(R.string.rental_detail_doors) to vehicle.specs.doors?.toString(),
+        stringResource(R.string.rental_detail_luggage) to luggage,
+        stringResource(R.string.rental_detail_mileage) to mileage,
+    ).filter { !it.second.isNullOrBlank() }
+
+    DetailSectionCard(stringResource(R.string.rental_details_title), icon = Icons.Filled.DirectionsCar) {
+        rows.forEachIndexed { index, (label, value) -> DetailRow(label, value, showDivider = index > 0) }
+    }
+}
+
+/**
+ * One pickup branch presented as a self-contained card: a pinned avatar, name + address, optional
+ * parking note, and a full-width "Get directions" action that launches Google Maps navigation.
+ */
+@Composable
+private fun PickupBranchCard(branch: PickupBranch, onNavigate: (Double, Double) -> Unit) {
+    Surface(
+        shape = RoundedCornerShape(14.dp),
+        color = DarrbiTheme.colors.surface,
+        border = BorderStroke(1.dp, DarrbiTheme.colors.outline.copy(alpha = 0.6f)),
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Column(modifier = Modifier.padding(14.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Box(
+                    modifier = Modifier.size(40.dp).clip(CircleShape).background(DarrbiTheme.colors.primary.copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Icon(Icons.Filled.LocationOn, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(20.dp))
+                }
+                Spacer(Modifier.width(12.dp))
+                Column(modifier = Modifier.weight(1f)) {
+                    Text(branch.name, style = DarrbiTheme.typography.bodyMedium, color = DarrbiTheme.colors.onSurface)
+                    listOfNotNull(branch.address, branch.city).joinToString(", ").takeIf { it.isNotBlank() }?.let {
+                        Spacer(Modifier.height(2.dp))
+                        Text(it, style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
+                    }
+                }
+            }
+            branch.parkingInstructions?.takeIf { it.isNotBlank() }?.let {
+                Spacer(Modifier.height(8.dp))
+                Text(it, style = DarrbiTheme.typography.caption, color = DarrbiTheme.colors.onSurfaceVariant)
+            }
+            if (branch.latitude != null && branch.longitude != null) {
+                Spacer(Modifier.height(12.dp))
+                Surface(
+                    shape = RoundedCornerShape(12.dp),
+                    color = DarrbiTheme.colors.primary.copy(alpha = 0.1f),
+                    modifier = Modifier.fillMaxWidth().clickable { onNavigate(branch.latitude, branch.longitude) },
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 12.dp),
+                        horizontalArrangement = Arrangement.Center,
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        Icon(Icons.Filled.Navigation, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text(
+                            stringResource(R.string.rental_get_directions),
+                            style = DarrbiTheme.typography.button.copy(fontSize = 14.sp),
+                            color = DarrbiTheme.colors.primary,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+/** Opens turn-by-turn navigation to [lat]/[lng] in Google Maps (falls back to a generic geo: query). */
+private fun openRentalNavigation(context: android.content.Context, lat: Double, lng: Double) {
+    runCatching {
+        context.startActivity(
+            android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("google.navigation:q=$lat,$lng"))
+                .setPackage("com.google.android.apps.maps")
+                .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+        )
+    }.onFailure {
+        runCatching {
+            context.startActivity(
+                android.content.Intent(android.content.Intent.ACTION_VIEW, android.net.Uri.parse("geo:$lat,$lng?q=$lat,$lng"))
+                    .addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK),
+            )
         }
     }
 }
@@ -1302,7 +1626,7 @@ private fun RentalRateSection(vehicle: RentalVehicleDetail) {
     var expanded by remember { mutableStateOf(false) }
     val rotation by animateFloatAsState(targetValue = if (expanded) 180f else 0f, label = "rateChevron")
     Surface(
-        shape = RoundedCornerShape(16.dp),
+        shape = RoundedCornerShape(18.dp),
         color = DarrbiTheme.colors.surfaceVariant,
         modifier = Modifier.fillMaxWidth().animateContentSize(),
     ) {
@@ -1311,6 +1635,8 @@ private fun RentalRateSection(vehicle: RentalVehicleDetail) {
                 modifier = Modifier.fillMaxWidth().clickable { expanded = !expanded }.padding(16.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
+                Icon(Icons.Filled.Payments, null, tint = DarrbiTheme.colors.primary, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
                 Column(modifier = Modifier.weight(1f)) {
                     RentalSectionTitle(stringResource(R.string.rental_pricing_title))
                     vehicle.pricing.perDay?.let {
@@ -1321,25 +1647,52 @@ private fun RentalRateSection(vehicle: RentalVehicleDetail) {
                 Icon(Icons.Filled.KeyboardArrowDown, null, tint = DarrbiTheme.colors.onSurfaceVariant, modifier = Modifier.rotate(rotation))
             }
             if (expanded) {
-                Column(modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp)) {
-                    HorizontalDivider(color = DarrbiTheme.colors.outline.copy(alpha = 0.5f), modifier = Modifier.padding(bottom = 8.dp))
-                    PricingLine(R.string.rental_period_per_hour, vehicle.pricing.perHour, vehicle.currency)
-                    PricingLine(R.string.rental_period_h2to3, vehicle.pricing.h2to3, vehicle.currency)
-                    PricingLine(R.string.rental_period_h4to5, vehicle.pricing.h4to5, vehicle.currency)
-                    PricingLine(R.string.rental_period_h6to12, vehicle.pricing.h6to12, vehicle.currency)
-                    PricingLine(R.string.rental_period_per_day, vehicle.pricing.perDay, vehicle.currency)
-                    PricingLine(R.string.rental_period_per_week, vehicle.pricing.perWeek, vehicle.currency)
-                    PricingLine(R.string.rental_period_per_month, vehicle.pricing.perMonth, vehicle.currency)
+                Column(
+                    modifier = Modifier.padding(start = 16.dp, end = 16.dp, bottom = 16.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    PricingTierRow(R.string.rental_period_per_hour, vehicle.pricing.perHour, vehicle.currency)
+                    PricingTierRow(R.string.rental_period_h2to3, vehicle.pricing.h2to3, vehicle.currency)
+                    PricingTierRow(R.string.rental_period_h4to5, vehicle.pricing.h4to5, vehicle.currency)
+                    PricingTierRow(R.string.rental_period_h6to12, vehicle.pricing.h6to12, vehicle.currency)
+                    PricingTierRow(R.string.rental_period_per_day, vehicle.pricing.perDay, vehicle.currency, highlighted = true)
+                    PricingTierRow(R.string.rental_period_per_week, vehicle.pricing.perWeek, vehicle.currency)
+                    PricingTierRow(R.string.rental_period_per_month, vehicle.pricing.perMonth, vehicle.currency)
                 }
             }
         }
     }
 }
 
+/**
+ * A single pricing tier inside the expanded rate breakdown — a soft pill with the period on the left
+ * and the amount on the right. The per-day anchor is tinted and emphasised. Renders nothing if unpriced.
+ */
 @Composable
-private fun PricingLine(labelRes: Int, value: Double?, currency: String) {
+private fun PricingTierRow(labelRes: Int, value: Double?, currency: String, highlighted: Boolean = false) {
     if (value == null) return
-    RentalKeyValueRow(stringResource(labelRes), money(currency, value))
+    Surface(
+        shape = RoundedCornerShape(12.dp),
+        color = if (highlighted) DarrbiTheme.colors.primary.copy(alpha = 0.1f) else DarrbiTheme.colors.surface,
+        modifier = Modifier.fillMaxWidth(),
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text(
+                stringResource(labelRes),
+                style = if (highlighted) DarrbiTheme.typography.bodyMedium else DarrbiTheme.typography.body,
+                color = DarrbiTheme.colors.onSurface,
+                modifier = Modifier.weight(1f),
+            )
+            Text(
+                money(currency, value),
+                style = DarrbiTheme.typography.bodyMedium,
+                color = if (highlighted) DarrbiTheme.colors.primary else DarrbiTheme.colors.onSurface,
+            )
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------

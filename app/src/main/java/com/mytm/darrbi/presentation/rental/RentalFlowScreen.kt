@@ -72,7 +72,12 @@ fun RentalFlowScreen(
                 RentalHeader(title = stringResource(R.string.rental_title), onBack = { viewModel.onEvent(RentalEvent.Back) })
                 val vehicle = state.vehicle
                 if (vehicle != null) {
-                    RentalDetailContent(vehicle = vehicle, onContinue = { viewModel.onEvent(RentalEvent.Continue) }, modifier = Modifier.weight(1f))
+                    RentalDetailContent(
+                        vehicle = vehicle,
+                        onContinue = { viewModel.onEvent(RentalEvent.Continue) },
+                        modifier = Modifier.weight(1f),
+                        rentalDays = rentalDaysBetween(state.pickupAtMillis, state.returnAtMillis),
+                    )
                 }
             }
 
@@ -175,6 +180,16 @@ fun RentalFlowScreen(
             }
         }
     }
+}
+
+/**
+ * Number of billable rental days for the chosen pickup→return window (rounded up, minimum 1).
+ * Falls back to 1 when no range has been selected yet so the detail total stays sensible.
+ */
+private fun rentalDaysBetween(pickupMillis: Long?, returnMillis: Long?): Int {
+    if (pickupMillis == null || returnMillis == null || returnMillis <= pickupMillis) return 1
+    val dayMs = 24L * 60L * 60L * 1000L
+    return Math.ceil((returnMillis - pickupMillis).toDouble() / dayMs).toInt().coerceAtLeast(1)
 }
 
 /** Dimmed, tap-to-dismiss backdrop behind a bottom sheet. */
