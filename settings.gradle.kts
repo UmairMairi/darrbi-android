@@ -24,4 +24,9 @@ dependencyResolutionManagement {
 
 rootProject.name = "Darrbi"
 include(":app")
+// Compose Multiplatform module (Android + iOS) for the cross-platform migration. Lives alongside :app,
+// which remains the production Android app until features are migrated in.
+// :composeApp is the shared library (UI + iOS framework); :androidApp is the thin Android host.
+include(":composeApp")
+include(":androidApp")
  

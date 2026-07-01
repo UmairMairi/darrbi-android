@@ -16,3 +16,11 @@ local.properties
 
 # Checked-in secrets removed from VCS
 secrets.defaults.properties
+
+# Kotlin Multiplatform / Compose Multiplatform + iOS
+**/build/
+.kotlin/
+# Xcode project is generated from iosApp/project.yml via `xcodegen generate`
+/iosApp/iosApp.xcodeproj/
+/iosApp/build/
+**/xcuserdata/

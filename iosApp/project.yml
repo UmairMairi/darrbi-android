@@ -1,0 +1,57 @@
+name: iosApp
+options:
+  bundleIdPrefix: com.mytm.darrbi
+  deploymentTarget:
+    iOS: "15.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    # Let the Gradle "build framework" script phase run (Xcode 15+ sandboxes scripts by default).
+    ENABLE_USER_SCRIPT_SANDBOXING: "NO"
+    # Static ComposeApp framework is linked into the binary; no signing needed for the simulator.
+    CODE_SIGNING_REQUIRED: "NO"
+    CODE_SIGNING_ALLOWED: "NO"
+    CODE_SIGN_IDENTITY: ""
+
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    deploymentTarget: "15.0"
+    sources:
+      - path: iosApp
+    info:
+      path: iosApp/Info.plist
+      properties:
+        CFBundleDisplayName: Darrbi
+        CFBundleShortVersionString: "1.0"
+        CFBundleVersion: "1"
+        # Required by Compose Multiplatform on iOS (high-refresh ProMotion displays).
+        CADisableMinimumFrameDurationOnPhone: true
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.mytm.darrbi.ios
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        # Locate the Kotlin-built ComposeApp framework for the active configuration + SDK.
+        FRAMEWORK_SEARCH_PATHS:
+          - $(inherited)
+          - $(SRCROOT)/../composeApp/build/xcode-frameworks/$(CONFIGURATION)/$(SDK_NAME)
+        OTHER_LDFLAGS:
+          - $(inherited)
+          - -framework
+          - ComposeApp
+    preBuildScripts:
+      - name: "Build Compose/Kotlin framework"
+        basedOnDependencyAnalysis: false
+        script: |
+          # Build + place the ComposeApp framework for the architecture Xcode is targeting.
+          export JAVA_HOME=/Library/Java/JavaVirtualMachines/temurin-17.jdk/Contents/Home
+          cd "$SRCROOT/.."
+          ./gradlew :composeApp:embedAndSignAppleFrameworkForXcode
