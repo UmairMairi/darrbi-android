@@ -172,7 +172,9 @@ class OnboardingViewModel @Inject constructor(
     private fun continueFromUserType() {
         when (_state.value.userType) {
             UserType.Rider -> goTo(OnboardingStep.Name)
-            UserType.Captain -> goTo(OnboardingStep.CaptainRideType)
+            // "Select Your Preference" (ride type + referral) is skipped for drivers — go straight to the
+            // car-option step. CaptainRideType is now unreachable (kept for a possible future re-enable).
+            UserType.Captain -> goTo(OnboardingStep.CaptainCarOption)
         }
     }
 
@@ -279,7 +281,8 @@ class OnboardingViewModel @Inject constructor(
                 OnboardingStep.UserType -> OnboardingStep.Otp
                 OnboardingStep.Name -> OnboardingStep.UserType
                 OnboardingStep.CaptainRideType -> OnboardingStep.UserType
-                OnboardingStep.CaptainCarOption -> OnboardingStep.CaptainRideType
+                // CaptainRideType is skipped, so the car-option step steps back to the user-type screen.
+                OnboardingStep.CaptainCarOption -> OnboardingStep.UserType
                 OnboardingStep.CaptainDetails -> OnboardingStep.CaptainCarOption
                 OnboardingStep.CarSequence -> OnboardingStep.CaptainDetails
                 OnboardingStep.CarDetails -> OnboardingStep.CarSequence

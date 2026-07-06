@@ -7,6 +7,7 @@ import com.mytm.darrbi.domain.model.IbanInfo
 import com.mytm.darrbi.domain.model.Notification
 import com.mytm.darrbi.domain.model.Ride
 import com.mytm.darrbi.domain.model.TopupTransaction
+import com.mytm.darrbi.domain.model.UserProfile
 import com.mytm.darrbi.domain.model.UserReport
 
 /** Onboarding backend calls that run after OTP verification (same endpoints as ride-android). */
@@ -38,6 +39,9 @@ interface OnboardingRepository {
 
     /** Captain account: `GET /captains` — fetched after login for a returning captain. */
     suspend fun getCaptainDetails(): ApiResult<CaptainDetails>
+
+    /** The signed-in user's profile: `GET /getuserdetails` (also refreshes the cached session copy). */
+    suspend fun getUserDetails(): ApiResult<UserProfile>
 
     /** Flips the active mode (rider ⇄ captain) server-side via `POST /captains/change-driver-mode`. */
     suspend fun changeDriverMode(): ApiResult<Unit>

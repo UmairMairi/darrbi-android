@@ -790,6 +790,11 @@ class RiderBookingViewModel @Inject constructor(
         val cab = state.selectedCab ?: return
         val pickup = state.pickup ?: return
         val destination = state.destination ?: return
+        // Backstop: never create a trip for a cab with no available captain.
+        if (!cab.hasCaptain) {
+            _state.update { it.copy(bidNotice = NOTICE_NO_CAPTAIN) }
+            return
+        }
         // Clear any previous "no captain" result so a retry shows the waiting state immediately.
         _state.update { it.copy(isBooking = true, noCaptainFound = false, errorMessage = null) }
         viewModelScope.launch {
@@ -812,6 +817,11 @@ class RiderBookingViewModel @Inject constructor(
         val state = _state.value
         val cab = state.selectedCab ?: return
         if (state.pickup == null || state.destination == null) return
+        // No captain available for this cab → don't start ride creation; tell the rider to pick another.
+        if (!cab.hasCaptain) {
+            _state.update { it.copy(bidNotice = NOTICE_NO_CAPTAIN) }
+            return
+        }
         // Courier: seed the offer with the weight × type-adjusted recommended (guide §5) so it lands in band;
         // a normal ride keeps any previously-entered offer, else the bare cab fare.
         val courier = state.courierDetails?.takeIf { state.isCourier }
@@ -826,6 +836,11 @@ class RiderBookingViewModel @Inject constructor(
         val pickup = state.pickup ?: return
         val destination = state.destination ?: return
         if (state.isCreatingBidTrip) return
+        // Backstop: never create a bid trip for a cab with no available captain.
+        if (!cab.hasCaptain) {
+            _state.update { it.copy(bidNotice = NOTICE_NO_CAPTAIN) }
+            return
+        }
         // Ensure the rider's socket is connected + subscribed to their room so the `v2/trip-bids-update`
         // pushes (and the eventual bid-accepted) are delivered while bidding.
         socketService.connect()
@@ -1346,6 +1361,7 @@ class RiderBookingViewModel @Inject constructor(
         const val NOTICE_NO_BIDS = "NO_BIDS"
         const val NOTICE_TIMEOUT = "TIMEOUT"
         const val NOTICE_PAYMENT_HOLD = "PAYMENT_HOLD"
+        const val NOTICE_NO_CAPTAIN = "NO_CAPTAIN"
         /** V2 select-bid error code that's recoverable by topping up and retrying the same bid. */
         const val CODE_PAYMENT_HOLD_FAILED = "PAYMENT_HOLD_FAILED"
         const val RESTORE_MAX_FACTOR = 2.5

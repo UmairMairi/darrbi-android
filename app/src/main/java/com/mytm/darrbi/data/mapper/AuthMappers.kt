@@ -1,6 +1,7 @@
 package com.mytm.darrbi.data.mapper
 
 import com.mytm.darrbi.data.remote.dto.SendOtpData
+import com.mytm.darrbi.data.remote.dto.UserDetailsData
 import com.mytm.darrbi.data.remote.dto.VerifyOtpData
 import com.mytm.darrbi.domain.model.AuthSession
 import com.mytm.darrbi.domain.model.OtpRequest
@@ -31,5 +32,19 @@ private fun VerifyOtpData.UserDetails?.toUserProfile(): UserProfile {
         mobileNo = this?.mobileNo,
         profileImageUrl = this?.profileImage,
         rating = this?.rating?.takeIf { it > 0.0 },
+    )
+}
+
+/** `GET /getuserdetails` → the profile model shown on the profile screen. */
+fun UserDetailsData.toUserProfile(): UserProfile {
+    val resolvedName = fullName?.takeIf { it.isNotBlank() }
+        ?: listOfNotNull(firstName, lastName).joinToString(" ").trim()
+    return UserProfile(
+        name = resolvedName,
+        dateOfBirth = dateOfBirth,
+        referralCode = referralCode,
+        mobileNo = mobileNo,
+        profileImageUrl = profileImage,
+        rating = rating?.takeIf { it > 0.0 },
     )
 }

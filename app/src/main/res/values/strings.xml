@@ -276,6 +276,16 @@
     <string name="logout_dismiss">Dismiss</string>
     <string name="logout_confirm">Yes, Log Out</string>
 
+    <!-- Coming soon (unavailable profile features) -->
+    <string name="coming_soon_title">Coming Soon</string>
+    <string name="coming_soon_message">%1$s isn\'t available just yet. We\'re working hard to bring it to you soon.</string>
+    <string name="coming_soon_action">Got it</string>
+
+    <!-- Session expired (forced logout on token expiry) -->
+    <string name="session_expired_title">Session expired</string>
+    <string name="session_expired_message">Your session has expired for your security. Please log in again to continue.</string>
+    <string name="session_expired_action">Log In Again</string>
+
     <!-- My Reports -->
     <string name="menu_my_reports">My Reports</string>
     <string name="my_reports_title">My Reports</string>
@@ -348,10 +358,10 @@
     <string name="rider_categories_retry">Couldn\'t load services. Tap to retry.</string>
     <!-- Category taglines (the API provides no subtitle; matched by service type) -->
     <string name="cat_sub_taxi">Set your own Fare</string>
-    <string name="cat_sub_rental">Self Drive</string>
-    <string name="cat_sub_cargo">Large shipments</string>
-    <string name="cat_sub_delivery">Fast &amp; Local</string>
-    <string name="cat_sub_scheduled">Schedule your rides</string>
+    <string name="cat_sub_rental">Unlock instantly</string>
+    <string name="cat_sub_cargo">From parcel to pallets</string>
+    <string name="cat_sub_delivery">Door to Door shipment</string>
+    <string name="cat_sub_scheduled">Let\'s move to other city with Darrbi</string>
     <!-- Rider ride selection -->
     <string name="rider_current_location">Current Location</string>
     <string name="rider_choose_ride">Choose a ride</string>
@@ -359,6 +369,7 @@
     <string name="rider_more_available_rides">More available rides</string>
     <string name="rider_min_away">min away</string>
     <string name="rider_no_captain">No Captain Available.</string>
+    <string name="rider_no_captain_book_blocked">No captain is available for this ride right now. Please choose another option or try again shortly.</string>
     <string name="rider_balance">Balance</string>
     <string name="rider_promo">+PROMO</string>
     <string name="rider_confirm_ride">Confirm Ride</string>
@@ -402,7 +413,7 @@
     <string name="rider_your_offer_fare">Your offer: %1$s SAR</string>
     <string name="rider_waiting_offers">Waiting for offers…</string>
     <string name="rider_raise_offer">Raise offer</string>
-    <string name="rider_searching_drivers">Searching For Drivers Nearby</string>
+    <string name="rider_searching_drivers">Searching for captains nearby</string>
     <string name="rider_your_offer_label">Your Offer</string>
     <string name="rider_sar_label">SAR</string>
     <string name="rider_sar_amount">SAR %1$s</string>

@@ -18,6 +18,7 @@ import com.mytm.darrbi.data.remote.dto.TopupHistoryRequest
 import com.mytm.darrbi.data.remote.dto.TripHistoryData
 import com.mytm.darrbi.data.remote.dto.UpdateCustomerData
 import com.mytm.darrbi.data.remote.dto.UpdateCustomerRequest
+import com.mytm.darrbi.data.remote.dto.UserDetailsData
 import kotlinx.serialization.json.JsonElement
 import retrofit2.http.Body
 import retrofit2.http.GET
@@ -42,6 +43,10 @@ interface OnboardingApi {
 
     @GET("captains")
     suspend fun getCaptainDetails(): MainEnvelope<CaptainDetailsData>
+
+    /** The signed-in user's full profile (ride-android's `/getuserdetails`). */
+    @GET("getuserdetails")
+    suspend fun getUserDetails(): MainEnvelope<UserDetailsData>
 
     /** Server-side toggle of the active mode (rider ⇄ captain); no body, body ignored. */
     @POST("captains/change-driver-mode")

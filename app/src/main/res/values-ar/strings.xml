@@ -275,6 +275,16 @@
     <string name="logout_dismiss">تجاهل</string>
     <string name="logout_confirm">نعم، سجّل الخروج</string>
 
+    <!-- Coming soon (unavailable profile features) -->
+    <string name="coming_soon_title">قريبًا</string>
+    <string name="coming_soon_message">%1$s غير متاحة بعد. نعمل جاهدين على توفيرها لك قريبًا.</string>
+    <string name="coming_soon_action">حسنًا</string>
+
+    <!-- Session expired (forced logout on token expiry) -->
+    <string name="session_expired_title">انتهت الجلسة</string>
+    <string name="session_expired_message">انتهت صلاحية جلستك للحفاظ على أمان حسابك. الرجاء تسجيل الدخول مرة أخرى للمتابعة.</string>
+    <string name="session_expired_action">تسجيل الدخول مرة أخرى</string>
+
     <!-- My Reports -->
     <string name="menu_my_reports">تقاريري</string>
     <string name="my_reports_title">تقاريري</string>
@@ -347,10 +357,10 @@
     <string name="rider_categories_retry">تعذّر تحميل الخدمات. اضغط لإعادة المحاولة.</string>
     <!-- Category taglines (the API provides no subtitle; matched by service type) -->
     <string name="cat_sub_taxi">حدّد أجرتك بنفسك</string>
-    <string name="cat_sub_rental">قيادة ذاتية</string>
-    <string name="cat_sub_cargo">شحنات كبيرة</string>
-    <string name="cat_sub_delivery">سريع ومحلي</string>
-    <string name="cat_sub_scheduled">جدول رحلاتك</string>
+    <string name="cat_sub_rental">افتح السيارة فورًا</string>
+    <string name="cat_sub_cargo">من الطرود إلى المنصّات</string>
+    <string name="cat_sub_delivery">شحن من الباب إلى الباب</string>
+    <string name="cat_sub_scheduled">لننتقل إلى مدينة أخرى مع دربي</string>
     <!-- Rider ride selection -->
     <string name="rider_current_location">الموقع الحالي</string>
     <string name="rider_choose_ride">اختر رحلة</string>
@@ -358,6 +368,7 @@
     <string name="rider_more_available_rides">المزيد من الرحلات المتوفّرة</string>
     <string name="rider_min_away">دقيقة</string>
     <string name="rider_no_captain">لا يوجد كابتن متاح.</string>
+    <string name="rider_no_captain_book_blocked">لا يوجد كابتن متاح لهذه الرحلة حاليًا. الرجاء اختيار خيار آخر أو المحاولة بعد قليل.</string>
     <string name="rider_balance">الرصيد</string>
     <string name="rider_promo">+ رمز ترويجي</string>
     <string name="rider_confirm_ride">تأكيد الرحلة</string>
@@ -401,7 +412,7 @@
     <string name="rider_your_offer_fare">عرضك: %1$s ريال</string>
     <string name="rider_waiting_offers">في انتظار العروض…</string>
     <string name="rider_raise_offer">ارفع العرض</string>
-    <string name="rider_searching_drivers">جارٍ البحث عن سائقين قريبين</string>
+    <string name="rider_searching_drivers">جارٍ البحث عن كباتن بالقرب منك</string>
     <string name="rider_your_offer_label">عرضك</string>
     <string name="rider_sar_label">ر.س</string>
     <string name="rider_sar_amount">%1$s ر.س</string>

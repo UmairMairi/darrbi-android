@@ -76,6 +76,8 @@ fun ProfileScreen(
     viewModel: ProfileViewModel = hiltViewModel(),
 ) {
     var showLogout by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
+    // Non-null = show the "coming soon" sheet for that feature's label (Car Deal Details / Saved Cards).
+    var comingSoonLabel by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf<Int?>(null) }
     var showAddBalance by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var showUpdateIban by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(false) }
     var ehsanDonation by androidx.compose.runtime.remember { androidx.compose.runtime.mutableStateOf(true) }
@@ -93,8 +95,8 @@ fun ProfileScreen(
     } ?: "—"
     // RIDER/CAPTAIN now lives in the segmented toggle below the wallet (per the reference), not the menu.
     val menu = buildList {
-        add(ProfileMenuItem(R.drawable.icon_car_details, R.string.menu_car_deal_details) {})
-        add(ProfileMenuItem(R.drawable.icon_saved_cards, R.string.menu_saved_cards) {})
+        add(ProfileMenuItem(R.drawable.icon_car_details, R.string.menu_car_deal_details) { comingSoonLabel = R.string.menu_car_deal_details })
+        add(ProfileMenuItem(R.drawable.icon_saved_cards, R.string.menu_saved_cards) { comingSoonLabel = R.string.menu_saved_cards })
         add(ProfileMenuItem(R.drawable.icon_my_rides, R.string.menu_my_rides, onMyRides))
         add(ProfileMenuItem(R.drawable.icon_app_settings, R.string.menu_app_settings, onAppSettings))
         add(ProfileMenuItem(R.drawable.icon_customer_care, R.string.menu_customer_care, onCustomerCare))
@@ -109,6 +111,9 @@ fun ProfileScreen(
             onDismiss = { showLogout = false },
             onConfirm = { showLogout = false; onLogout() },
         )
+    }
+    comingSoonLabel?.let { labelRes ->
+        ComingSoonSheet(featureLabelRes = labelRes, onDismiss = { comingSoonLabel = null })
     }
     if (showAddBalance) {
         com.mytm.darrbi.presentation.topup.AddBalanceSheet(

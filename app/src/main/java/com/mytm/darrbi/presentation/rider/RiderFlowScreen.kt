@@ -186,11 +186,13 @@ fun RiderFlowScreen(
     val noBidsMsg = stringResource(R.string.rider_bid_no_bids)
     val bidTimeoutMsg = stringResource(R.string.rider_bid_timeout)
     val paymentHoldMsg = stringResource(R.string.rider_bid_payment_hold)
+    val noCaptainMsg = stringResource(R.string.rider_no_captain_book_blocked)
     LaunchedEffect(state.bidNotice) {
         state.bidNotice?.let {
             val msg = when (it) {
                 "TIMEOUT" -> bidTimeoutMsg
                 "PAYMENT_HOLD" -> paymentHoldMsg
+                "NO_CAPTAIN" -> noCaptainMsg
                 else -> noBidsMsg
             }
             android.widget.Toast.makeText(errorContext, msg, android.widget.Toast.LENGTH_LONG).show()
@@ -774,10 +776,11 @@ private fun RiderHomeDashboard(
     ) {
         Spacer(Modifier.height(12.dp))
         HomeHeader(
-            locationText = state.myLocation?.address?.takeIf { it.isNotBlank() }
-                ?: stringResource(R.string.rider_your_location),
+            locationText = state.myLocation?.address?.takeIf { it.isNotBlank() } ?: stringResource(R.string.rider_your_location),
             userImageUrl = state.userImageUrl,
-            onLocation = { onEvent(RiderBookingEvent.OpenDestinationSearch) },
+            onLocation = {
+//                onEvent(RiderBookingEvent.OpenDestinationSearch)
+                         },
             onProfile = onProfile,
         )
         Spacer(Modifier.height(24.dp))
@@ -959,8 +962,8 @@ private fun CategoryTile(
                 modifier = Modifier.fillMaxSize().padding(horizontal = 20.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                CategoryImage(category.imageUrl, Modifier.size(84.dp))
-                Spacer(Modifier.width(18.dp))
+                CategoryImage(category.imageUrl, Modifier.size(100.dp))
+                Spacer(Modifier.width(10.dp))
                 CategoryTitleBlock(title, subtitle, Modifier.weight(1f))
             }
         } else {
@@ -991,11 +994,11 @@ private fun CategoryTile(
 private fun categorySubtitle(category: com.mytm.darrbi.domain.model.RideCategory): String? {
     category.subtitle?.takeIf { it.isNotBlank() }?.let { return it }
     val res = when {
-        category.key.contains("taxi") -> R.string.cat_sub_taxi
+        category.key.contains("ride") -> R.string.cat_sub_taxi
         category.key.contains("rental") -> R.string.cat_sub_rental
         category.key.contains("cargo") -> R.string.cat_sub_cargo
         category.key.contains("delivery") -> R.string.cat_sub_delivery
-        category.key.contains("schedul") -> R.string.cat_sub_scheduled
+        category.key.contains("city") -> R.string.cat_sub_scheduled
         else -> return null
     }
     return stringResource(res)
@@ -2213,6 +2216,16 @@ private fun androidx.compose.foundation.layout.BoxScope.BiddingOverlay(
                 color = DarrbiTheme.colors.onSurface,
                 modifier = Modifier.fillMaxWidth(),
                 textAlign = androidx.compose.ui.text.style.TextAlign.Center,
+            )
+            Spacer(Modifier.height(14.dp))
+            // Indeterminate bar loops continuously (repeat mode) → active "searching for a captain" feel.
+            LinearProgressIndicator(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(4.dp)),
+                color = DarrbiTheme.colors.primary,
+                trackColor = DarrbiTheme.colors.primary.copy(alpha = 0.15f),
             )
             Spacer(Modifier.height(18.dp))
             Text(stringResource(R.string.rider_your_offer_label), style = DarrbiTheme.typography.label, color = DarrbiTheme.colors.onSurfaceVariant)

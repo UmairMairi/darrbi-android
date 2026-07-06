@@ -10,6 +10,7 @@ import com.mytm.darrbi.core.network.unwrapMain
 import com.mytm.darrbi.core.network.unwrapMainUnit
 import com.mytm.darrbi.data.mapper.toDomain
 import com.mytm.darrbi.data.mapper.toRide
+import com.mytm.darrbi.data.mapper.toUserProfile
 import com.mytm.darrbi.data.remote.dto.BecomeCaptainRequest
 import com.mytm.darrbi.data.remote.dto.CarBySequenceRequest
 import com.mytm.darrbi.data.remote.dto.DrivingMode
@@ -28,6 +29,7 @@ import com.mytm.darrbi.domain.model.IbanInfo
 import com.mytm.darrbi.domain.model.Notification
 import com.mytm.darrbi.domain.model.Ride
 import com.mytm.darrbi.domain.model.TopupTransaction
+import com.mytm.darrbi.domain.model.UserProfile
 import com.mytm.darrbi.domain.model.UserReport
 import com.mytm.darrbi.domain.repository.CaptainApplication
 import com.mytm.darrbi.domain.repository.OnboardingRepository
@@ -116,6 +118,13 @@ class OnboardingRepositoryImpl @Inject constructor(
 
     override suspend fun getCaptainDetails(): ApiResult<CaptainDetails> =
         safeApiCall { api.getCaptainDetails() }.unwrapMain().map { it.toDomain() }
+
+    override suspend fun getUserDetails(): ApiResult<UserProfile> {
+        val result = safeApiCall { api.getUserDetails() }.unwrapMain().map { it.toUserProfile() }
+        // Refresh the persisted session profile so it survives an app restart (matches ride-android).
+        if (result is ApiResult.Success) sessionRepository.saveUser(result.data)
+        return result
+    }
 
     override suspend fun changeDriverMode(): ApiResult<Unit> =
         safeApiCall { api.changeDriverMode() }.unwrapMainUnit()

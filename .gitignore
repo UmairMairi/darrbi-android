@@ -16,3 +16,12 @@ local.properties
 
 # Checked-in secrets removed from VCS
 secrets.defaults.properties
+
+# Release signing keystore — NEVER commit (leaking it lets anyone sign the app)
+*.jks
+*.keystore
+/app/src/main/java/com/mytm/darrbi/keys/
+
+# Exported signed build artifacts (APK/AAB output copied out of build/)
+/app/production/
+/app/uat/

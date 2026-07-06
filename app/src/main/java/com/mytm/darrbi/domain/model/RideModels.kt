@@ -21,6 +21,13 @@ data class CabOption(
     val maxDimSumCm: Int? = null,
 ) {
     /**
+     * Whether a captain is currently available for this cab — the same signal the UI shows as
+     * "No Captain Available" ([etaMinutes] is null when no captain is online). A ride must NOT be created
+     * for a cab with no available captain.
+     */
+    val hasCaptain: Boolean get() = etaMinutes != null
+
+    /**
      * Whether this cab can carry a parcel of the given weight/dimensions (guide §3.2 UX gate). A NULL cab
      * limit is treated as "no limit". The server re-runs the same gate authoritatively at create-trip.
      */

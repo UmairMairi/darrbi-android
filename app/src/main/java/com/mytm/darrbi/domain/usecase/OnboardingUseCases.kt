@@ -8,6 +8,7 @@ import com.mytm.darrbi.domain.model.IbanInfo
 import com.mytm.darrbi.domain.model.Notification
 import com.mytm.darrbi.domain.model.Ride
 import com.mytm.darrbi.domain.model.TopupTransaction
+import com.mytm.darrbi.domain.model.UserProfile
 import com.mytm.darrbi.domain.model.UserReport
 import com.mytm.darrbi.domain.repository.CaptainApplication
 import com.mytm.darrbi.domain.repository.OnboardingRepository
@@ -127,6 +128,13 @@ class GetCaptainDetailsUseCase @Inject constructor(
         if (result is ApiResult.Success) sessionRepository.saveCaptain(result.data)
         return result
     }
+}
+
+/** The signed-in user's profile: `GET /getuserdetails`. */
+class GetUserDetailsUseCase @Inject constructor(
+    private val repository: OnboardingRepository,
+) {
+    suspend operator fun invoke(): ApiResult<UserProfile> = repository.getUserDetails()
 }
 
 /** Flips the active mode (rider ⇄ captain): `POST /captains/change-driver-mode`. */

@@ -72,6 +72,8 @@ fun DarrbiRoot() {
     val modeSwitchViewModel: ModeSwitchViewModel = hiltViewModel()
     val modeSwitching by modeSwitchViewModel.switching.collectAsStateWithLifecycle()
     val modeSwitchError by modeSwitchViewModel.error.collectAsStateWithLifecycle()
+    // Set when any API reports an expired token (HTTP 401/440 or the statusCode:440 envelope).
+    val sessionExpired by sessionViewModel.sessionExpired.collectAsStateWithLifecycle()
     // Surface a failed RIDER/CAPTAIN switch (it was silent before — looked like the toggle did nothing).
     LaunchedEffect(modeSwitchError) {
         modeSwitchError?.let {
@@ -312,6 +314,18 @@ fun DarrbiRoot() {
             ) {
                 CircularProgressIndicator(color = DarrbiTheme.colors.primary)
             }
+        }
+        // Token expired → force a logout. Non-dismissable and overlays every screen; the only exit is the
+        // button, which clears the session and drops all feature ViewModels (same path as manual logout).
+        if (sessionExpired) {
+            SessionExpiredSheet(
+                onLogout = {
+                    sessionViewModel.logout {
+                        route = Route.Onboarding
+                        viewModelStoreOwner?.viewModelStore?.clear()
+                    }
+                },
+            )
         }
     }
 }

@@ -7,6 +7,7 @@ import com.mytm.darrbi.domain.model.UserProfile
 import com.mytm.darrbi.domain.repository.SessionRepository
 import com.mytm.darrbi.domain.usecase.GetBalanceUseCase
 import com.mytm.darrbi.domain.usecase.GetIbanUseCase
+import com.mytm.darrbi.domain.usecase.GetUserDetailsUseCase
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,12 +26,14 @@ data class ProfileUiState(
 )
 
 /**
- * Profile state: the user model captured at verify-OTP, plus the saved IBAN/bank fetched from
- * `GET /user/get-iban` (as ride-android's ProfileActivity does).
+ * Profile state: the user model (seeded from the cached verify-OTP session for instant display, then
+ * refreshed from `GET /getuserdetails` as ride-android's ProfileActivity does), plus the saved IBAN/bank
+ * from `GET /user/get-iban`.
  */
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     sessionRepository: SessionRepository,
+    private val getUserDetails: GetUserDetailsUseCase,
     private val getIban: GetIbanUseCase,
     private val getBalance: GetBalanceUseCase,
 ) : ViewModel() {
@@ -39,8 +42,19 @@ class ProfileViewModel @Inject constructor(
     val state: StateFlow<ProfileUiState> = _state.asStateFlow()
 
     init {
+        loadUser()
         loadIban()
         loadBalance()
+    }
+
+    /** Refresh the name + profile details from `GET /getuserdetails`, keeping the cached copy on failure. */
+    private fun loadUser() {
+        viewModelScope.launch {
+            when (val result = getUserDetails()) {
+                is ApiResult.Success -> _state.update { it.copy(user = result.data) }
+                is ApiResult.Error, is ApiResult.Failure -> Unit
+            }
+        }
     }
 
     private fun loadBalance() {

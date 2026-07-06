@@ -77,6 +77,26 @@ data class DrivingMode(val drivingMode: Int)
 @Serializable
 data class BalanceData(val balance: Double? = null)
 
+/**
+ * `data` payload of `GET /getuserdetails` — the signed-in user's profile (ride-android's
+ * `UserDetailsModel.User`). Only the fields the profile screen surfaces are declared; the rest of the
+ * (large) response is ignored (`Json.ignoreUnknownKeys = true`).
+ */
+@Serializable
+data class UserDetailsData(
+    val userId: String? = null,
+    val firstName: String? = null,
+    val lastName: String? = null,
+    val fullName: String? = null,
+    val dateOfBirth: String? = null,
+    val referralCode: String? = null,
+    val mobileNo: String? = null,
+    val profileImage: String? = null,
+    val rating: Double? = null,
+    val userType: Int? = null,
+    val isNameUpdated: Boolean? = null,
+)
+
 /** `GET /master/pages/{terms-and-conditions|privacy-policy}/{language}` — legal content sections. */
 @Serializable
 data class LegalData(val data: List<LegalItem> = emptyList())

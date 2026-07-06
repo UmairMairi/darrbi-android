@@ -21,8 +21,8 @@ android {
         applicationId = "com.mytm.darrbi"
         minSdk = 26
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -63,10 +63,10 @@ android {
         }
         create("production") {
             dimension = "env"
-            buildConfigField("String", "MAIN_URL", "\"https://prodapi.ride.sa\"")
-            buildConfigField("String", "CMS_URL", "\"https://cmsride.xintdev.com\"")
-            buildConfigField("String", "DASHBOARD_URL", "\"https://proddashboard.ride.sa\"")
-            buildConfigField("String", "SOCKET_URL", "\"https://prodsocket.ride.sa\"")
+            buildConfigField("String", "MAIN_URL", "\"https://api-darbi.xintdev.com\"")
+            buildConfigField("String", "CMS_URL", "\"https://cms-darbi.xintdev.com\"")
+            buildConfigField("String", "DASHBOARD_URL", "\"https://admin-darbi.xintdev.com\"")
+            buildConfigField("String", "SOCKET_URL", "\"https://socket-darbi.xintdev.com\"")
         }
     }
 
