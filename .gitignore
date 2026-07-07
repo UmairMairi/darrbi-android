@@ -1,27 +1,30 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
-local.properties
+#*.iml
+#.gradle
+#/local.properties
+#/.idea/caches
+#/.idea/libraries
+#/.idea/modules.xml
+#/.idea/workspace.xml
+#/.idea/navEditor.xml
+#/.idea/assetWizardSettings.xml
+#.DS_Store
+#/build
+#/captures
+#.externalNativeBuild
+#.cxx
+#local.properties
+#
+## Checked-in secrets removed from VCS
+#secrets.defaults.properties
+#
+## Release signing keystore — NEVER commit (leaking it lets anyone sign the app)
+#*.jks
+#*.keystore
+#/app/src/main/java/com/mytm/darrbi/keys/
+#
+## Exported signed build artifacts (APK/AAB output copied out of build/)
+#/app/production/
+#/app/uat/
 
-# Checked-in secrets removed from VCS
-secrets.defaults.properties
-
-# Release signing keystore — NEVER commit (leaking it lets anyone sign the app)
-*.jks
-*.keystore
-/app/src/main/java/com/mytm/darrbi/keys/
-
-# Exported signed build artifacts (APK/AAB output copied out of build/)
-/app/production/
-/app/uat/
+#Exclude everything
+*

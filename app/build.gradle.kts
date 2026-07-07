@@ -18,10 +18,12 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.mytm.darrbi"
+        // Play Store identity. Source package / R class / BuildConfig stay under `namespace`
+        // (com.mytm.darrbi); only the installed app's id is com.darrbi.app.
+        applicationId = "com.darrbi.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 2
+        versionCode = 1
         versionName = "1.0.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
